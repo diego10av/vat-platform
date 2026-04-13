@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
       // Download file from Supabase Storage
       const { data: fileData, error: dlError } = await supabase.storage
         .from('documents')
-        .download(doc.file_path);
+        .download(doc.file_path as string);
 
       if (dlError || !fileData) {
         throw new Error(`Failed to download: ${dlError?.message || 'no data'}`);

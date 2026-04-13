@@ -1,28 +1,24 @@
-import { Pool, type QueryResultRow } from 'pg';
+import { neon } from '@neondatabase/serverless';
 import { v4 as uuidv4 } from 'uuid';
 
-let pool: Pool | null = null;
-
-function getPool(): Pool {
-  if (!pool) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-      max: 10,
-    });
-  }
-  return pool;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSql(): (text: string, params?: any[]) => Promise<any[]> {
+  const sql = neon(process.env.DATABASE_URL!);
+  // neon() returns a tagged template function, but it also works as (string, params[])
+  // We cast to the simpler signature for parameterized queries
+  return sql as unknown as (text: string, params?: unknown[]) => Promise<unknown[]>;
 }
 
-export async function query<T extends QueryResultRow = QueryResultRow>(
+export async function query<T = Record<string, unknown>>(
   text: string,
   params?: unknown[]
 ): Promise<T[]> {
-  const { rows } = await getPool().query<T>(text, params);
-  return rows;
+  const sql = getSql();
+  const rows = await sql(text, params);
+  return rows as T[];
 }
 
-export async function queryOne<T extends QueryResultRow = QueryResultRow>(
+export async function queryOne<T = Record<string, unknown>>(
   text: string,
   params?: unknown[]
 ): Promise<T | null> {
@@ -31,7 +27,8 @@ export async function queryOne<T extends QueryResultRow = QueryResultRow>(
 }
 
 export async function execute(text: string, params?: unknown[]): Promise<void> {
-  await getPool().query(text, params);
+  const sql = getSql();
+  await sql(text, params);
 }
 
 export async function initializeSchema(): Promise<void> {
