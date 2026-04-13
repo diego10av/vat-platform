@@ -10,10 +10,8 @@ export async function query<T = Record<string, unknown>>(
   params?: unknown[]
 ): Promise<T[]> {
   const sql = getSql();
-  // neon() supports being called as sql(string, params[]) at runtime
-  // even though TypeScript types it as a tagged template only
-  const fn = sql as unknown as (text: string, params?: unknown[]) => Promise<Record<string, unknown>[]>;
-  const rows = await fn(text, params);
+  // Use sql.query() for parameterized queries (not tagged template)
+  const rows = await sql.query(text, params);
   return rows as T[];
 }
 
@@ -26,7 +24,8 @@ export async function queryOne<T = Record<string, unknown>>(
 }
 
 export async function execute(text: string, params?: unknown[]): Promise<void> {
-  await query(text, params);
+  const sql = getSql();
+  await sql.query(text, params);
 }
 
 export async function initializeSchema(): Promise<void> {
