@@ -49,23 +49,35 @@ function computeDueDate(p: { regime: Regime; frequency: Frequency; year: number;
   }
 
   if (frequency === 'quarterly') {
-    // period must be Q1..Q4
     const q = parseInt(period.replace(/[^0-9]/g, ''), 10);
     if (!q || q < 1 || q > 4) return new Date(Date.UTC(year + 1, 4, 1));
-    // End of quarter month: Mar(2), Jun(5), Sep(8), Dec(11)
-    const endMonth = q * 3 - 1;
-    const endOfQuarter = new Date(Date.UTC(year, endMonth + 1, 0));
-    return addCalendarDaysAndMonths(endOfQuarter, 1, 15);
+    // PRD §7.3: end of quarter + 1 month + 15 days.
+    // Cleanly: end-of-(quarter-end-month + 1) + 15 days.
+    // Q1 ends in March → end-of-April + 15d = May 15.
+    const endMonth = q * 3 - 1;                       // 0-indexed month of quarter end
+    const endOfNextMonth = lastDayOfMonth(year, endMonth + 1);
+    return addDays(endOfNextMonth, 15);
   }
 
   if (frequency === 'monthly') {
     const m = parseInt(period.replace(/[^0-9]/g, ''), 10);
     if (!m || m < 1 || m > 12) return new Date(Date.UTC(year + 1, 0, 15));
-    const endOfMonth = new Date(Date.UTC(year, m, 0));
-    return addCalendarDaysAndMonths(endOfMonth, 0, 15);
+    // End of month + 15 days.
+    const endOfMonth = lastDayOfMonth(year, m - 1);
+    return addDays(endOfMonth, 15);
   }
 
   return new Date(Date.UTC(year + 1, 4, 1));
+}
+
+function lastDayOfMonth(year: number, monthIndex: number): Date {
+  // Day 0 of (monthIndex + 1) = last day of monthIndex
+  return new Date(Date.UTC(year, monthIndex + 1, 0));
+}
+function addDays(d: Date, days: number): Date {
+  const r = new Date(d.getTime());
+  r.setUTCDate(r.getUTCDate() + days);
+  return r;
 }
 
 function describe(p: { regime: Regime; frequency: Frequency }): string {
@@ -82,13 +94,6 @@ function bucketFor(days: number): DeadlineInfo['bucket'] {
   if (days <= 30) return 'soon';
   if (days <= 60) return 'comfortable';
   return 'far';
-}
-
-function addCalendarDaysAndMonths(d: Date, months: number, days: number): Date {
-  const r = new Date(d.getTime());
-  r.setUTCMonth(r.getUTCMonth() + months);
-  r.setUTCDate(r.getUTCDate() + days);
-  return r;
 }
 
 function startOfDay(d: Date): Date {

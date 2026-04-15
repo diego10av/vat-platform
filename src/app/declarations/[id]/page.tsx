@@ -71,6 +71,7 @@ interface DeclarationData {
   payment_confirmed_at: string | null;
   proof_of_filing_filename: string | null;
   proof_of_filing_uploaded_at: string | null;
+  notes: string | null;
   documentStats: { total: number; uploaded: number; invoices: number; non_invoices: number; extracted: number; errors: number };
   documents: DocumentRec[];
   lines: InvoiceLine[];
@@ -413,6 +414,8 @@ export default function DeclarationDetailPage() {
               )}
             </div>
           </header>
+
+          <DeclarationNotes declarationId={id} initial={data.notes} />
 
           {/* Approval toast (precedent learning report etc.) */}
           {precedentToast && (
@@ -1630,6 +1633,68 @@ function OutputsPanel({ declarationId }: { declarationId: string }) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Notes (collapsible, auto-saving). Shown above the reconciliation card.
+// Uses the existing notes column on declarations.
+// ═══════════════════════════════════════════════════════════════
+function DeclarationNotes({ declarationId, initial }: { declarationId: string; initial: string | null }) {
+  const [open, setOpen] = useState(!!initial);
+  const [notes, setNotes] = useState(initial || '');
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const t = setTimeout(async () => {
+      setSaving(true);
+      try {
+        await fetch(`/api/declarations/${declarationId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes }),
+        });
+        setSavedAt(new Date());
+        setDirty(false);
+      } finally { setSaving(false); }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [notes, dirty, declarationId]);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mb-4 text-[11px] text-gray-400 hover:text-gray-700 cursor-pointer transition-colors flex items-center gap-1"
+      >
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add internal note
+      </button>
+    );
+  }
+
+  return (
+    <div className="bg-amber-50/60 border border-amber-200 rounded-lg p-3 mb-4">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="text-[11px] uppercase tracking-wide font-semibold text-amber-700 flex items-center gap-1.5">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          Internal note
+        </div>
+        <span className="text-[10px] text-gray-400">
+          {saving ? 'Saving…' : savedAt ? `Saved ${savedAt.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}` : ''}
+        </span>
+      </div>
+      <textarea
+        value={notes}
+        onChange={e => { setNotes(e.target.value); setDirty(true); }}
+        rows={2}
+        placeholder="Internal context for this declaration. Not sent to the client."
+        className="w-full bg-transparent text-[12px] text-gray-800 focus:outline-none resize-none"
+      />
     </div>
   );
 }

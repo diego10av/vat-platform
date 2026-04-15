@@ -282,7 +282,9 @@ export default function EntitiesPage() {
             {entities.map(entity => (
               <tr key={entity.id} className="border-t hover:bg-gray-50">
                 <td className="px-4 py-3 text-gray-600">{entity.client_name || '—'}</td>
-                <td className="px-4 py-3 font-medium">{entity.name}</td>
+                <td className="px-4 py-3 font-medium">
+                  <Link href={`/entities/${entity.id}`} className="hover:text-blue-600 hover:underline">{entity.name}</Link>
+                </td>
                 <td className="px-4 py-3">
                   <span className={`text-xs px-2 py-0.5 rounded font-medium ${
                     entity.regime === 'simplified' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
@@ -292,6 +294,8 @@ export default function EntitiesPage() {
                 <td className="px-4 py-3 text-gray-600">{entity.vat_number || '—'}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-3">
+                    <Link href={`/entities/${entity.id}`}
+                      className="text-blue-600 hover:underline text-xs">Open</Link>
                     <button onClick={() => handleEdit(entity)}
                       className="text-blue-600 hover:underline text-xs">Edit</button>
                     <Link href={`/declarations?entity_id=${entity.id}`}
