@@ -1506,6 +1506,13 @@ function OutputsPanel({ declarationId }: { declarationId: string }) {
             <DownloadIcon /> eCDF XML
           </button>
           <button
+            onClick={download('ecsl?format=xlsx')}
+            className="h-8 px-3 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 cursor-pointer flex items-center gap-1.5"
+            title="EC Sales List (état récapitulatif) — only meaningful if the entity supplies B2B services to EU customers"
+          >
+            <DownloadIcon /> ECSL
+          </button>
+          <button
             onClick={() => setEmailOpen(true)}
             className="h-8 px-3 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 cursor-pointer flex items-center gap-1.5"
           >
