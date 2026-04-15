@@ -20,6 +20,7 @@ export default function RootLayout({
             <a href="/entities" className="hover:text-gray-300 transition-colors">Entities</a>
             <a href="/declarations" className="hover:text-gray-300 transition-colors">Declarations</a>
             <a href="/deadlines" className="hover:text-gray-300 transition-colors">Deadlines</a>
+            <a href="/aed-letters" className="hover:text-gray-300 transition-colors">AED letters</a>
           </div>
         </nav>
         <main className="max-w-7xl mx-auto px-4 py-6">
