@@ -80,6 +80,7 @@ async function handleDraft(request: NextRequest): Promise<NextResponse> {
     [declaration_id]
   );
 
+  // invoice_date is TEXT (YYYY-MM-DD). Cast safely; rows that fail to parse are excluded.
   const lateLines = await query<{ provider: string; description: string; invoice_date: string; amount_eur: number }>(
     `SELECT i.provider, il.description, i.invoice_date,
             il.amount_eur::float AS amount_eur
@@ -87,7 +88,9 @@ async function handleDraft(request: NextRequest): Promise<NextResponse> {
        JOIN invoices i ON il.invoice_id = i.id
       WHERE il.declaration_id = $1
         AND il.state != 'deleted'
-        AND i.invoice_date < ($2::int || '-01-01')::date
+        AND i.invoice_date IS NOT NULL
+        AND i.invoice_date ~ '^\\d{4}-\\d{2}-\\d{2}'
+        AND TO_DATE(i.invoice_date, 'YYYY-MM-DD') < MAKE_DATE($2::int, 1, 1)
       ORDER BY i.invoice_date ASC`,
     [declaration_id, decl.year]
   );
