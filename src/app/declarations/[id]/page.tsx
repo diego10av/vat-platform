@@ -1421,6 +1421,12 @@ function OutputsPanel({ declarationId }: { declarationId: string }) {
             <DownloadIcon /> Excel
           </button>
           <button
+            onClick={download('pdf')}
+            className="h-8 px-3 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 cursor-pointer flex items-center gap-1.5"
+          >
+            <DownloadIcon /> Front page PDF
+          </button>
+          <button
             onClick={download('xml')}
             className="h-8 px-3 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 cursor-pointer flex items-center gap-1.5"
           >
