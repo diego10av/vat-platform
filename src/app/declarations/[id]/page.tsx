@@ -1344,6 +1344,7 @@ function OutputsPanel({ declarationId }: { declarationId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [copiedRef, setCopiedRef] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -1398,8 +1399,8 @@ function OutputsPanel({ declarationId }: { declarationId: string }) {
   const sectionOrder = ['A', 'B', 'D', 'F', 'I', 'III', 'IV'];
   const sections = sectionOrder.filter(s => boxesBySection[s]);
 
-  const downloadExcel = () => {
-    window.location.href = `/api/declarations/${declarationId}/excel`;
+  const download = (path: string) => () => {
+    window.location.href = `/api/declarations/${declarationId}/${path}`;
   };
 
   return (
@@ -1414,22 +1415,33 @@ function OutputsPanel({ declarationId }: { declarationId: string }) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={downloadExcel}
+            onClick={download('excel')}
             className="h-8 px-3 rounded bg-[#1a1a2e] text-white text-[11px] font-semibold hover:bg-[#2a2a4e] transition-all duration-150 cursor-pointer flex items-center gap-1.5"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            Download Excel
+            <DownloadIcon /> Excel
+          </button>
+          <button
+            onClick={download('xml')}
+            className="h-8 px-3 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 cursor-pointer flex items-center gap-1.5"
+          >
+            <DownloadIcon /> eCDF XML
+          </button>
+          <button
+            onClick={() => setEmailOpen(true)}
+            className="h-8 px-3 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 cursor-pointer flex items-center gap-1.5"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Draft email
           </button>
           <button
             onClick={() => setExpanded(!expanded)}
             className="h-8 px-3 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 cursor-pointer"
           >
-            {expanded ? 'Hide all boxes' : 'All boxes'}
+            {expanded ? 'Hide boxes' : 'All boxes'}
           </button>
         </div>
       </div>
+      {emailOpen && <EmailDrafterModal declarationId={declarationId} onClose={() => setEmailOpen(false)} />}
 
       <div className="p-4">
         {/* Totals row */}
@@ -1529,6 +1541,160 @@ function OutputsPanel({ declarationId }: { declarationId: string }) {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  );
+}
+
+// ─── Email Drafter Modal ───
+function EmailDrafterModal({ declarationId, onClose }: { declarationId: string; onClose: () => void }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ subject: string; body: string; model: string } | null>(null);
+  const [subject, setSubject] = useState('');
+  const [body, setBody] = useState('');
+  const [expertNotes, setExpertNotes] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  async function generate() {
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch('/api/agents/draft-email', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ declaration_id: declarationId, expert_notes: expertNotes || null }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+      const d = await res.json();
+      setDraft(d);
+      setSubject(d.subject);
+      setBody(d.body);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function copyAll() {
+    const full = `Subject: ${subject}\n\n${body}`;
+    navigator.clipboard.writeText(full).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  function openInMail() {
+    const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = url;
+  }
+
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 animate-fadeIn">
+      <div className="bg-white rounded-lg w-full max-w-3xl shadow-2xl flex flex-col" style={{ maxHeight: '90vh' }}>
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h3 className="text-[14px] font-semibold text-gray-900">Draft client email</h3>
+            <div className="text-[11px] text-gray-500 mt-0.5">Generated by Claude — review carefully before sending.</div>
+          </div>
+          <IconBtn title="Close (Esc)" onClick={onClose}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </IconBtn>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5">
+          {!draft && !loading && (
+            <div>
+              <label className="block text-[11px] uppercase tracking-wide font-semibold text-gray-500 mb-1.5">
+                Expert notes (optional)
+              </label>
+              <textarea
+                value={expertNotes}
+                onChange={e => setExpertNotes(e.target.value)}
+                rows={4}
+                placeholder="Specific legal observations, position changes, AED considerations… these will be quoted verbatim in the email."
+                className="w-full border border-gray-300 rounded px-3 py-2 text-[12px] focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+              />
+              <button
+                onClick={generate}
+                className="mt-3 h-9 px-4 rounded bg-[#1a1a2e] text-white text-[12px] font-semibold hover:bg-[#2a2a4e] transition-all duration-150 cursor-pointer"
+              >
+                Generate draft
+              </button>
+            </div>
+          )}
+
+          {loading && (
+            <div className="flex items-center justify-center py-10 text-[12px] text-gray-500 gap-2">
+              <Spinner /> Drafting with Claude (Opus)…
+            </div>
+          )}
+
+          {error && (
+            <div className="text-[12px] text-red-700 bg-red-50 border border-red-200 rounded px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          {draft && (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] uppercase tracking-wide font-semibold text-gray-500 mb-1.5">Subject</label>
+                <input
+                  value={subject}
+                  onChange={e => setSubject(e.target.value)}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-[12px] font-medium focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] uppercase tracking-wide font-semibold text-gray-500 mb-1.5">Body</label>
+                <textarea
+                  value={body}
+                  onChange={e => setBody(e.target.value)}
+                  rows={18}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-[12px] font-mono leading-relaxed focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+                />
+              </div>
+              <div className="text-[10px] text-gray-400">Generated by {draft.model}</div>
+            </div>
+          )}
+        </div>
+
+        {draft && (
+          <div className="px-5 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-end gap-2">
+            <button
+              onClick={generate}
+              className="h-8 px-3 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-white hover:border-gray-400 transition-all duration-150 cursor-pointer"
+            >
+              Re-generate
+            </button>
+            <button
+              onClick={copyAll}
+              className="h-8 px-3 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-white hover:border-gray-400 transition-all duration-150 cursor-pointer"
+            >
+              {copied ? '✓ Copied' : 'Copy'}
+            </button>
+            <button
+              onClick={openInMail}
+              className="h-8 px-3 rounded bg-[#1a1a2e] text-white text-[11px] font-semibold hover:bg-[#2a2a4e] transition-all duration-150 cursor-pointer"
+            >
+              Open in mail client
+            </button>
           </div>
         )}
       </div>
