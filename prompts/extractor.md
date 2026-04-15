@@ -15,7 +15,7 @@ Extract the following from the invoice:
 - **country**: ISO 2-letter country code of the provider (derive from VAT number prefix, address, or letterhead)
 - **invoice_date**: Date of the invoice in YYYY-MM-DD format
 - **invoice_number**: Invoice reference number
-- **direction**: "incoming" (received from a supplier) or "outgoing" (issued to a client). Most invoices you'll see are incoming.
+- **direction**: "incoming" (received from a supplier) or "outgoing" (issued by the declaration entity). See "Determining direction" below.
 - **total_ex_vat**: Total amount excluding VAT, in EUR
 - **total_vat**: Total VAT amount, in EUR (0 if no VAT charged)
 - **total_incl_vat**: Total amount including VAT, in EUR
@@ -33,6 +33,27 @@ Most invoices have one line. Some (e.g., notary invoices) have multiple lines wi
 - **rc_amount**: Reverse charge VAT amount. This is the VAT that the Luxembourg entity must self-assess. For foreign suppliers with no VAT charged, this is typically amount_eur * 0.17. Null if Luxembourg VAT is charged.
 - **amount_incl**: Line amount including VAT in EUR
 
+## Determining direction
+
+The declaration entity name is given to you in the user message. You must decide whether the **declaration entity** is the **issuer** or the **recipient** of the invoice:
+
+1. **Declaration entity appears as issuer** (letterhead, sender block, "From:", bank account for payment, "Payable to: [entity]") → `direction = "outgoing"`. The invoice was issued by the entity itself — these are management fees, consulting fees, recharges, etc. invoiced to a client.
+
+2. **Declaration entity appears as recipient** (addressed in "To:", "Bill to:", "Invoice to:", "Account name:", "Client:", or in the address block as the buyer) → `direction = "incoming"`. The provider is the other party.
+
+3. **Fuzzy name matching** for identifying the entity: ignore accents, legal forms (`S.à r.l.`, `SARL`, `SA`, `SCA`, `SCSp`, `GmbH`, `sp. z o.o.`, `Ltd`, `LLP`, `S.C.A.`, etc.), and common filler words (`Luxembourg`, `Holdings`, `Partners`, `Capital`, `Fund`, `III`, `IV`). `Acme Fund III S.à r.l.` = `Acme Fund III SARL` = `ACME FUND III` = same entity.
+
+4. **When in doubt**, prefer `incoming` — most invoices in a VAT file are received invoices. The user will correct misclassified outgoing invoices via the "Move to Services Rendered" action.
+
+### Fictional worked examples
+
+| Scenario | Declaration entity | direction |
+|---|---|---|
+| Letterhead says "Acme Fund GP S.à r.l." + "To: Acme Investment Fund SCA" | **Acme Fund GP SARL** (letterhead = issuer) | `outgoing` |
+| "To: Acme Fund GP SARL" + letterhead "Nordic Advisory GmbH" | **Acme Fund GP SARL** (named in To block = recipient) | `incoming` |
+| Letterhead "Alpine Capital SCA" + "Bill to: Mueller Consulting sp. z o.o." | **Alpine Capital SCA** (letterhead = issuer) | `outgoing` |
+| Letterhead "Greenfield Investments Ltd" + "Invoice to: Alpine Capital SCA" | **Alpine Capital SCA** (Invoice to = recipient) | `incoming` |
+
 ## Special Cases
 
 1. **Reverse charge**: If a foreign supplier charges no VAT (or states "reverse charge applies", "TVA non applicable"), set vat_applied to null and compute rc_amount = amount_eur * 0.17.
@@ -47,7 +68,7 @@ Return ONLY a JSON object with no additional text:
 
 ```json
 {
-  "provider": "JTC (Luxembourg) S.A.",
+  "provider": "Meridian Admin Services S.A.",
   "provider_vat": "LU12345678",
   "country": "LU",
   "invoice_date": "2025-03-15",

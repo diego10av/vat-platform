@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { classifyInvoiceLine } from '@/config/classification-rules';
+import { classifyDeclaration } from '@/lib/classify';
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -217,22 +217,52 @@ export async function POST(request: NextRequest) {
           invoiceData = match ? JSON.parse(match[0]) : {};
         }
 
-        const invoiceId = generateId();
-        await execute(
-          `INSERT INTO invoices (id, document_id, declaration_id, provider, provider_vat, country,
-            invoice_date, invoice_number, direction, total_ex_vat, total_vat, total_incl_vat,
-            currency, currency_amount, extraction_source)
-          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'ai')`,
-          [
-            invoiceId, doc.id, declaration_id,
-            invoiceData.provider || 'Unknown', invoiceData.provider_vat || null,
-            invoiceData.country || 'LU', invoiceData.invoice_date || null,
-            invoiceData.invoice_number || null, invoiceData.direction || 'incoming',
-            invoiceData.total_ex_vat || 0, invoiceData.total_vat || 0,
-            invoiceData.total_incl_vat || 0, invoiceData.currency || null,
-            invoiceData.currency_amount || null,
-          ]
+        // Idempotent: if an invoice already exists for this document (e.g. a retry
+        // race or a duplicate atomic-claim), skip creation and reuse it.
+        const existing = await queryOne<{ id: string }>(
+          'SELECT id FROM invoices WHERE document_id = $1 LIMIT 1',
+          [doc.id]
         );
+        let invoiceId: string;
+        if (existing) {
+          invoiceId = existing.id;
+          // Clear existing lines so we re-extract cleanly (retry scenario)
+          await execute('DELETE FROM invoice_lines WHERE invoice_id = $1', [invoiceId]);
+          await execute(
+            `UPDATE invoices
+               SET provider = $1, provider_vat = $2, country = $3, invoice_date = $4,
+                   invoice_number = $5, direction = $6, total_ex_vat = $7, total_vat = $8,
+                   total_incl_vat = $9, currency = $10, currency_amount = $11
+             WHERE id = $12`,
+            [
+              invoiceData.provider || 'Unknown', invoiceData.provider_vat || null,
+              invoiceData.country || 'LU', invoiceData.invoice_date || null,
+              invoiceData.invoice_number || null, invoiceData.direction || 'incoming',
+              invoiceData.total_ex_vat || 0, invoiceData.total_vat || 0,
+              invoiceData.total_incl_vat || 0, invoiceData.currency || null,
+              invoiceData.currency_amount || null,
+              invoiceId,
+            ]
+          );
+        } else {
+          invoiceId = generateId();
+          await execute(
+            `INSERT INTO invoices (id, document_id, declaration_id, provider, provider_vat, country,
+              invoice_date, invoice_number, direction, total_ex_vat, total_vat, total_incl_vat,
+              currency, currency_amount, extraction_source)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'ai')
+            ON CONFLICT (document_id) WHERE document_id IS NOT NULL DO NOTHING`,
+            [
+              invoiceId, doc.id, declaration_id,
+              invoiceData.provider || 'Unknown', invoiceData.provider_vat || null,
+              invoiceData.country || 'LU', invoiceData.invoice_date || null,
+              invoiceData.invoice_number || null, invoiceData.direction || 'incoming',
+              invoiceData.total_ex_vat || 0, invoiceData.total_vat || 0,
+              invoiceData.total_incl_vat || 0, invoiceData.currency || null,
+              invoiceData.currency_amount || null,
+            ]
+          );
+        }
 
         const lines = (invoiceData.lines as Array<Record<string, unknown>>) || [{
           description: invoiceData.provider || 'Services',
@@ -294,54 +324,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ===== Auto-classify with deterministic rules =====
-  // Runs the rules engine over all unclassified, non-manual lines in this declaration.
+  // ===== Auto-classify with the full pipeline (rules + precedents + inference) =====
   let classificationSummary: Record<string, unknown> | null = null;
   try {
-    const classifyLines = await query<{
-      id: string;
-      direction: string;
-      country: string | null;
-      vat_rate: number | null;
-      vat_applied: number | null;
-      description: string | null;
-      treatment_source: string | null;
-      treatment: string | null;
-    }>(
-      `SELECT il.id, i.direction, i.country, il.vat_rate, il.vat_applied, il.description,
-              il.treatment_source, il.treatment
-         FROM invoice_lines il
-         JOIN invoices i ON il.invoice_id = i.id
-        WHERE il.declaration_id = $1
-          AND il.state != 'deleted'
-          AND (il.treatment_source IS NULL OR il.treatment_source != 'manual')`,
-      [declaration_id]
-    );
-
-    const byRule: Record<string, number> = {};
-    for (const line of classifyLines) {
-      const result = classifyInvoiceLine({
-        direction: line.direction as 'incoming' | 'outgoing',
-        country: line.country,
-        vat_rate: line.vat_rate == null ? null : Number(line.vat_rate),
-        vat_applied: line.vat_applied == null ? null : Number(line.vat_applied),
-        description: line.description,
-      });
-      await execute(
-        `UPDATE invoice_lines
-            SET treatment = $1,
-                treatment_source = 'rule',
-                classification_rule = $2,
-                flag = $3,
-                flag_reason = $4,
-                state = CASE WHEN state = 'extracted' THEN 'classified' ELSE state END,
-                updated_at = NOW()
-          WHERE id = $5`,
-        [result.treatment, result.rule, result.flag, result.flag_reason ?? null, line.id]
-      );
-      byRule[result.rule] = (byRule[result.rule] || 0) + 1;
-    }
-    classificationSummary = { processed: classifyLines.length, by_rule: byRule };
+    classificationSummary = await classifyDeclaration(declaration_id) as unknown as Record<string, unknown>;
   } catch (e) {
     console.error('[extract] classification failed:', e);
   }

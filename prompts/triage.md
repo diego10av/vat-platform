@@ -15,7 +15,7 @@ In Luxembourg private equity and fund structures, service providers often addres
    - Legal forms: `SARL`, `S.à r.l.`, `Sàrl`, `SA`, `SCA`, `SCS`, `SCSp`, `SICAV`, `SICAF` — strip before comparing.
    - Common words: `Luxembourg`, `Holdings`, `Partners`, `Capital`, `Fund`, `III`, `IV`, etc.
    - Whitespace and punctuation.
-   - Example: `Avallon Partners III S.á r.l.` = `Avallon Partners III SARL` = `Avallon Partners III S.à r.l.` = same entity.
+   - Example: `Acme Fund III S.á r.l.` = `Acme Fund III SARL` = `Acme Fund III S.à r.l.` = same entity.
 
 3. **Chamber of Commerce documents** (`Bulletin de Cotisation`, `Chambre de Commerce`, `Centre Commun de la Sécurité Sociale` membership notices) are **invoice**, NOT receipt. They are annual subscription/membership fees that the entity must include in its VAT return (treatment = OUT_SCOPE). They look like notices or statements, but they bill a fee and must appear in the appendix.
 
@@ -41,7 +41,7 @@ Return ONLY a JSON object, no commentary, no markdown fences:
 {
   "type": "invoice",
   "confidence": 0.95,
-  "reason": "Invoice from JTC (Luxembourg) S.A. with VAT number LU... billing the declaration entity (match found in address block)."
+  "reason": "Invoice from Meridian Admin Services S.A. with VAT number LU... billing the declaration entity (match found in address block)."
 }
 ```
 

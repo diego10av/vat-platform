@@ -4,7 +4,9 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import { TREATMENT_CODES, INCOMING_TREATMENTS, OUTGOING_TREATMENTS, type TreatmentCode } from '@/config/treatment-codes';
 
-// ────────────────────────── Types ──────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// Types
+// ═══════════════════════════════════════════════════════════════
 interface InvoiceLine {
   id: string;
   invoice_id: string;
@@ -38,9 +40,9 @@ interface InvoiceLine {
   document_id: string | null;
   extraction_source: string | null;
   source_filename: string | null;
+  deleted_reason?: string | null;
 }
-
-interface Document {
+interface DocumentRec {
   id: string;
   filename: string;
   file_type: string;
@@ -50,7 +52,6 @@ interface Document {
   triage_confidence: number | null;
   error_message: string | null;
 }
-
 interface DeclarationData {
   id: string;
   entity_id: string;
@@ -65,16 +66,17 @@ interface DeclarationData {
   vat_number: string;
   matricule: string;
   documentStats: { total: number; uploaded: number; invoices: number; non_invoices: number; extracted: number; errors: number };
-  documents: Document[];
+  documents: DocumentRec[];
   lines: InvoiceLine[];
 }
-
 type PreviewTarget =
   | { kind: 'document'; documentId: string; rowKey: string; filename?: string }
   | { kind: 'manual'; rowKey: string; provider: string }
   | null;
 
-// ────────────────────────── Page ──────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// Page
+// ═══════════════════════════════════════════════════════════════
 export default function DeclarationDetailPage() {
   const params = useParams();
   const id = params.id as string;
@@ -82,13 +84,18 @@ export default function DeclarationDetailPage() {
   const [data, setData] = useState<DeclarationData | null>(null);
   const [uploading, setUploading] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [classifying, setClassifying] = useState(false);
+  const [uploadingPrecedents, setUploadingPrecedents] = useState(false);
+  const [precedentToast, setPrecedentToast] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null); // row-level loading
   const [editingLine, setEditingLine] = useState<string | null>(null);
-  const [showDeleted, setShowDeleted] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget>(null);
-  const [previewWidth, setPreviewWidth] = useState(50); // percent
+  const [previewWidth, setPreviewWidth] = useState(50);
   const [isDraggingDivider, setIsDraggingDivider] = useState(false);
+  const [showDeleted, setShowDeleted] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const precedentInput = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
@@ -98,50 +105,85 @@ export default function DeclarationDetailPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ───── Upload / Extract / Classify ─────
+  // ── Upload / Extract / Classify ──
   async function handleUpload(files: FileList | File[]) {
     if (!files.length) return;
     setUploading(true);
-    const formData = new FormData();
-    formData.set('declaration_id', id);
-    for (const file of Array.from(files)) formData.append('files', file);
-    await fetch('/api/documents/upload', { method: 'POST', body: formData });
+    const form = new FormData();
+    form.set('declaration_id', id);
+    for (const f of Array.from(files)) form.append('files', f);
+    await fetch('/api/documents/upload', { method: 'POST', body: form });
     setUploading(false);
     loadData();
   }
+
+  async function handlePrecedentUpload(files: FileList | File[]) {
+    if (!files.length || !data) return;
+    setUploadingPrecedents(true);
+    setPrecedentToast(null);
+    const form = new FormData();
+    form.set('entity_id', data.entity_id);
+    form.set('file', files[0]);
+    const res = await fetch('/api/precedents/upload', { method: 'POST', body: form });
+    const result = await res.json();
+    if (res.ok) {
+      setPrecedentToast(`Imported ${result.imported} precedent${result.imported === 1 ? '' : 's'} (${result.skipped} skipped).`);
+      await handleClassify(); // re-run classification to apply precedents
+    } else {
+      setPrecedentToast(`Error: ${result.error || 'upload failed'}`);
+    }
+    setUploadingPrecedents(false);
+    setTimeout(() => setPrecedentToast(null), 5000);
+  }
+
+  async function withPending(key: string, fn: () => Promise<void>) {
+    if (pendingAction) return;
+    setPendingAction(key);
+    try { await fn(); } finally { setPendingAction(null); }
+  }
+
   async function handleRetryDocument(docId: string) {
-    await fetch(`/api/documents/${docId}/retry`, { method: 'POST' });
-    loadData();
+    await withPending(`retry-${docId}`, async () => {
+      await fetch(`/api/documents/${docId}/retry`, { method: 'POST' });
+      await loadData();
+    });
   }
   async function handleIncludeAsInvoice(docId: string) {
-    await fetch(`/api/documents/${docId}/retry`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ force_triage_as: 'invoice' }),
+    await withPending(`include-${docId}`, async () => {
+      await fetch(`/api/documents/${docId}/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force_triage_as: 'invoice' }),
+      });
+      await handleExtract();
     });
-    await handleExtract();
   }
   async function handleExtract() {
     setExtracting(true);
     await fetch(`/api/declarations/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'extracting' }),
     });
     await fetch(`/api/agents/extract`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ declaration_id: id }),
     });
     setExtracting(false);
-    loadData();
+    await loadData();
   }
   async function handleClassify() {
+    setClassifying(true);
     await fetch(`/api/agents/classify`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ declaration_id: id }),
     });
-    loadData();
+    setClassifying(false);
+    await loadData();
   }
 
-  // ───── Line updates ─────
   async function handleLineUpdate(lineId: string, updates: Record<string, unknown>) {
     await fetch(`/api/invoice-lines/${lineId}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -149,13 +191,17 @@ export default function DeclarationDetailPage() {
     });
     loadData();
   }
+
   async function handleMoveLine(lineId: string, target: 'incoming' | 'outgoing' | 'excluded') {
-    await fetch(`/api/invoice-lines/${lineId}/move`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target }),
+    await withPending(`move-${lineId}`, async () => {
+      await fetch(`/api/invoice-lines/${lineId}/move`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target }),
+      });
+      await loadData();
     });
-    loadData();
   }
+
   async function handleStatusChange(newStatus: string) {
     await fetch(`/api/declarations/${id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
@@ -164,14 +210,16 @@ export default function DeclarationDetailPage() {
     loadData();
   }
   async function handleAddOutgoing() {
-    await fetch('/api/invoices', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ declaration_id: id, direction: 'outgoing' }),
+    await withPending('add-outgoing', async () => {
+      await fetch('/api/invoices', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ declaration_id: id, direction: 'outgoing' }),
+      });
+      await loadData();
     });
-    loadData();
   }
 
-  // ───── Preview selection ─────
+  // ── Preview ──
   function openPreviewForLine(line: InvoiceLine) {
     if (line.document_id) {
       setPreview({ kind: 'document', documentId: line.document_id, rowKey: line.id, filename: line.source_filename || undefined });
@@ -179,30 +227,19 @@ export default function DeclarationDetailPage() {
       setPreview({ kind: 'manual', rowKey: line.id, provider: line.provider || 'Manual entry' });
     }
   }
-  function openPreviewForDoc(doc: Document) {
+  function openPreviewForDoc(doc: DocumentRec) {
     setPreview({ kind: 'document', documentId: doc.id, rowKey: `doc-${doc.id}`, filename: doc.filename });
   }
 
-  // ───── Keyboard navigation (arrow up/down when preview is open) ─────
+  // ── Keyboard nav ──
   const flatPreviewableRows = useMemo(() => {
-    if (!data) return [] as { rowKey: string; line: InvoiceLine | null; doc: Document | null }[];
-    const rows: { rowKey: string; line: InvoiceLine | null; doc: Document | null }[] = [];
-    // Pending documents first
-    for (const doc of data.documents.filter(d => d.status !== 'rejected')) {
-      rows.push({ rowKey: `doc-${doc.id}`, line: null, doc });
-    }
-    // Active invoice lines (incoming, then outgoing)
+    if (!data) return [] as { rowKey: string; line: InvoiceLine | null; doc: DocumentRec | null }[];
+    const rows: { rowKey: string; line: InvoiceLine | null; doc: DocumentRec | null }[] = [];
+    for (const doc of data.documents.filter(d => d.status !== 'rejected')) rows.push({ rowKey: `doc-${doc.id}`, line: null, doc });
     const active = data.lines.filter(l => l.state !== 'deleted');
-    for (const line of active.filter(l => l.direction === 'incoming')) {
-      rows.push({ rowKey: line.id, line, doc: null });
-    }
-    for (const line of active.filter(l => l.direction === 'outgoing')) {
-      rows.push({ rowKey: line.id, line, doc: null });
-    }
-    // Excluded docs
-    for (const doc of data.documents.filter(d => d.status === 'rejected')) {
-      rows.push({ rowKey: `doc-${doc.id}`, line: null, doc });
-    }
+    for (const line of active.filter(l => l.direction === 'incoming')) rows.push({ rowKey: line.id, line, doc: null });
+    for (const line of active.filter(l => l.direction === 'outgoing')) rows.push({ rowKey: line.id, line, doc: null });
+    for (const doc of data.documents.filter(d => d.status === 'rejected')) rows.push({ rowKey: `doc-${doc.id}`, line: null, doc });
     return rows;
   }, [data]);
 
@@ -211,7 +248,6 @@ export default function DeclarationDetailPage() {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); setPreview(null); return; }
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-      // Ignore when typing in an input
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       e.preventDefault();
@@ -221,7 +257,6 @@ export default function DeclarationDetailPage() {
       const n = flatPreviewableRows[next];
       if (n.line) openPreviewForLine(n.line);
       else if (n.doc) openPreviewForDoc(n.doc);
-      // Scroll selected row into view
       requestAnimationFrame(() => {
         document.getElementById(`row-${n.rowKey}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       });
@@ -230,14 +265,14 @@ export default function DeclarationDetailPage() {
     return () => window.removeEventListener('keydown', handler);
   }, [preview, flatPreviewableRows]);
 
-  // ───── Resizable divider ─────
+  // ── Resizable divider ──
   useEffect(() => {
     if (!isDraggingDivider) return;
     const onMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const fromRight = rect.right - e.clientX;
-      const pct = Math.min(70, Math.max(20, (fromRight / rect.width) * 100));
+      const pct = Math.min(70, Math.max(25, (fromRight / rect.width) * 100));
       setPreviewWidth(pct);
     };
     const onUp = () => setIsDraggingDivider(false);
@@ -262,133 +297,143 @@ export default function DeclarationDetailPage() {
   const excludedDocs = data.documents.filter(d => d.status === 'rejected');
   const pendingDocs = data.documents.filter(d => d.status !== 'rejected');
 
-  // Summary calculations
   const totalExVat = incomingLines.reduce((s, l) => s + Number(l.amount_eur || 0), 0);
-  const totalLuxVat = incomingLines
-    .filter(l => l.treatment?.startsWith('LUX_'))
-    .reduce((s, l) => s + Number(l.vat_applied || 0), 0);
-  const totalRC = incomingLines
-    .filter(l => l.treatment?.startsWith('RC_'))
-    .reduce((s, l) => s + Number(l.rc_amount || 0), 0);
-  const icAcqBase = incomingLines
-    .filter(l => l.treatment === 'IC_ACQ')
-    .reduce((s, l) => s + Number(l.amount_eur || 0), 0);
+  const totalLuxVat = incomingLines.filter(l => l.treatment?.startsWith('LUX_')).reduce((s, l) => s + Number(l.vat_applied || 0), 0);
+  const totalRC = incomingLines.filter(l => l.treatment?.startsWith('RC_')).reduce((s, l) => s + Number(l.rc_amount || 0), 0);
+  const icAcqBase = incomingLines.filter(l => l.treatment === 'IC_ACQ').reduce((s, l) => s + Number(l.amount_eur || 0), 0);
   const icAcqVat = icAcqBase * 0.17;
-  const totalDue = totalRC + icAcqVat; // simplified entities have no deduction right
+  const totalDue = totalRC + icAcqVat;
   const unclassified = activeLines.filter(l => !l.treatment).length;
   const flagged = activeLines.filter(l => Boolean(l.flag) && !Boolean(l.flag_acknowledged)).length;
 
-  const locked = data.status === 'approved' || data.status === 'filed' || data.status === 'paid';
+  const locked = ['approved', 'filed', 'paid'].includes(data.status);
   const hasFx = Boolean(data.has_fx);
   const previewOpen = !!preview;
 
   return (
-    <div
-      ref={containerRef}
-      className="flex w-full"
-      style={{ minHeight: 'calc(100vh - 80px)' }}
-    >
-      {/* ─── Left: main content ─── */}
-      <div
-        className="flex flex-col min-w-0"
-        style={{ width: previewOpen ? `${100 - previewWidth}%` : '100%' }}
-      >
-        <div className="pr-2">
+    <div ref={containerRef} className="flex w-full" style={{ minHeight: 'calc(100vh - 80px)' }}>
+      {/* ─────────── LEFT COLUMN ─────────── */}
+      <div className="flex flex-col min-w-0" style={{ width: previewOpen ? `${100 - previewWidth}%` : '100%' }}>
+        <div className="pr-3">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4">
+          <header className="flex items-start justify-between mb-5">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">
-                {data.entity_name} <span className="text-gray-400 font-normal">— {data.year} {data.period}</span>
+              <h1 className="text-[20px] font-semibold text-gray-900 tracking-tight">
+                {data.entity_name}
+                <span className="text-gray-400 font-normal ml-2">— {data.year} {data.period}</span>
               </h1>
-              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                <span>{data.regime}</span>
-                <span>•</span>
+              <div className="flex items-center gap-2 mt-1.5 text-[12px] text-gray-500">
+                <span className="capitalize">{data.regime}</span>
+                <span className="text-gray-300">•</span>
                 <span>{data.vat_number}</span>
                 <StatusBadge status={data.status} />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
               {activeLines.length > 0 && !locked && (
-                <button onClick={handleClassify}
-                  className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-50">
-                  Re-run rules
+                <button
+                  onClick={handleClassify}
+                  disabled={classifying}
+                  className="h-8 px-3 rounded border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {classifying ? 'Classifying…' : 'Re-run rules'}
                 </button>
               )}
               {data.status === 'review' && (
                 <button
                   onClick={() => handleStatusChange('approved')}
                   disabled={unclassified > 0 || flagged > 0}
-                  className="bg-green-600 text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="h-8 px-4 rounded bg-green-600 text-white text-xs font-semibold hover:bg-green-700 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   title={unclassified > 0 || flagged > 0 ? `Cannot approve: ${unclassified} unclassified, ${flagged} unacknowledged flags` : 'Approve'}
                 >
                   Approve
                 </button>
               )}
               {data.status === 'approved' && (
-                <button onClick={() => handleStatusChange('review')}
-                  className="border border-orange-300 text-orange-600 px-3 py-1.5 rounded text-xs font-medium hover:bg-orange-50">
+                <button
+                  onClick={() => handleStatusChange('review')}
+                  className="h-8 px-3 rounded border border-orange-300 text-xs font-medium text-orange-600 hover:bg-orange-50 transition-all duration-150 cursor-pointer"
+                >
                   Reopen
                 </button>
               )}
             </div>
-          </div>
+          </header>
 
-          {/* Reconciliation */}
+          {/* Reconciliation card */}
           <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-            <div className="grid grid-cols-6 gap-4 text-center">
+            <div className="grid grid-cols-6 gap-4">
               <Stat label="Uploaded" value={data.documentStats.total} />
               <Stat label="Invoices" value={data.documentStats.invoices} color="text-blue-600" />
-              <Stat label="Excluded" value={excludedDocs.length} color="text-gray-400" />
+              <Stat label="Excluded" value={excludedDocs.length + deletedLines.length} color="text-gray-400" />
               <Stat label="Errors" value={data.documentStats.errors} color={data.documentStats.errors > 0 ? 'text-red-600' : 'text-gray-400'} />
               <Stat label="Lines" value={activeLines.length} />
               <Stat label="Total EUR" value={totalExVat.toLocaleString('en-LU', { minimumFractionDigits: 2 })} small />
             </div>
           </div>
 
-          {/* Upload */}
+          {/* Upload zones */}
           {['created', 'uploading', 'review'].includes(data.status) && (
-            <div
-              className={`border-2 border-dashed rounded-lg p-5 mb-4 text-center cursor-pointer transition ${
-                dragOver ? 'border-[#1a1a2e] bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400'
-              }`}
-              onClick={() => fileInput.current?.click()}
-              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={e => { e.preventDefault(); setDragOver(false); handleUpload(e.dataTransfer.files); }}
-            >
-              <input ref={fileInput} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.doc"
-                className="hidden" onChange={e => e.target.files && handleUpload(e.target.files)} />
-              {uploading ? (
-                <span className="text-sm text-gray-500">Uploading...</span>
-              ) : (
-                <span className="text-sm text-gray-500">
-                  Drop PDF/image/Word files here, or click to browse
-                </span>
-              )}
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {/* Invoice upload */}
+              <div
+                className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-150 ${
+                  dragOver ? 'border-[#1a1a2e] bg-blue-50' : 'border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50'
+                }`}
+                onClick={() => fileInput.current?.click()}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => { e.preventDefault(); setDragOver(false); handleUpload(e.dataTransfer.files); }}
+              >
+                <input ref={fileInput} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.doc"
+                  className="hidden" onChange={e => e.target.files && handleUpload(e.target.files)} />
+                <div className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Invoices</div>
+                <div className="text-[12px] text-gray-600">
+                  {uploading ? 'Uploading…' : 'Drop PDFs here or click to browse'}
+                </div>
+              </div>
+
+              {/* Precedents upload */}
+              <div
+                className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-150 border-gray-300 bg-white hover:border-gray-400 hover:bg-gray-50"
+                onClick={() => precedentInput.current?.click()}
+              >
+                <input ref={precedentInput} type="file" accept=".xlsx,.xls"
+                  className="hidden" onChange={e => e.target.files && handlePrecedentUpload(e.target.files)} />
+                <div className="text-[11px] text-gray-400 uppercase tracking-wide font-semibold mb-1">Prior-year appendix</div>
+                <div className="text-[12px] text-gray-600">
+                  {uploadingPrecedents ? 'Parsing Excel…' : 'Upload .xlsx to seed precedents'}
+                </div>
+                {precedentToast && (
+                  <div className="mt-2 text-[11px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1">{precedentToast}</div>
+                )}
+              </div>
             </div>
           )}
 
           {/* Pending documents */}
           {pendingDocs.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-lg mb-4">
-              <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Documents ({pendingDocs.length})</h3>
+            <div className="bg-white border border-gray-200 rounded-lg mb-4 overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+                <h3 className="text-[13px] font-semibold text-gray-900">Documents ({pendingDocs.length})</h3>
                 {pendingDocs.some(d => d.status === 'uploaded' || d.status === 'error') && (
                   <button
                     onClick={handleExtract}
                     disabled={extracting}
-                    className="bg-[#1a1a2e] text-white px-3 py-1.5 rounded text-xs font-semibold hover:bg-[#2a2a4e] disabled:opacity-40"
+                    className="h-7 px-3 rounded bg-[#1a1a2e] text-white text-[11px] font-semibold hover:bg-[#2a2a4e] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
                   >
-                    {extracting ? 'Extracting...' : pendingDocs.some(d => d.status === 'error') ? 'Retry all errors' : 'Extract all'}
+                    {extracting && <Spinner small />}
+                    {extracting ? 'Extracting…' : pendingDocs.some(d => d.status === 'error') ? 'Retry all errors' : 'Extract all'}
                   </button>
                 )}
               </div>
-              <div className="max-h-72 overflow-y-auto">
+              <div className="max-h-64 overflow-y-auto">
                 {pendingDocs.map(doc => (
                   <DocRow
                     key={doc.id}
                     doc={doc}
                     selected={preview?.rowKey === `doc-${doc.id}`}
+                    loading={pendingAction === `retry-${doc.id}`}
                     onSelect={() => openPreviewForDoc(doc)}
                     onRetry={() => handleRetryDocument(doc.id)}
                   />
@@ -400,19 +445,16 @@ export default function DeclarationDetailPage() {
           {/* Services Received */}
           <SectionHeader title="Services Received" count={incomingLines.length} />
           {incomingLines.length === 0 ? (
-            <EmptyBlock>No incoming invoices yet. Upload PDFs above and click Extract.</EmptyBlock>
+            <EmptyBlock>No incoming invoices yet.</EmptyBlock>
           ) : (
             <ReviewTable
-              lines={incomingLines}
-              direction="incoming"
-              hasFx={hasFx}
+              lines={incomingLines} direction="incoming" hasFx={hasFx}
               compact={previewOpen}
-              editingLine={editingLine}
-              setEditingLine={setEditingLine}
-              onUpdate={handleLineUpdate}
-              onMove={handleMoveLine}
+              editingLine={editingLine} setEditingLine={setEditingLine}
+              onUpdate={handleLineUpdate} onMove={handleMoveLine}
               onOpenPreview={openPreviewForLine}
               selectedRowKey={preview?.rowKey}
+              pendingAction={pendingAction}
               isLocked={locked}
             />
           )}
@@ -421,100 +463,104 @@ export default function DeclarationDetailPage() {
           <div className="flex items-center justify-between mt-6 mb-2">
             <SectionHeader title="Services Rendered — Overall Turnover" count={outgoingLines.length} inline />
             {!locked && (
-              <button onClick={handleAddOutgoing}
-                className="text-xs font-medium text-[#1a1a2e] hover:underline">
+              <button
+                onClick={handleAddOutgoing}
+                disabled={pendingAction === 'add-outgoing'}
+                className="h-7 px-2.5 rounded border border-gray-300 text-[11px] font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
                 + Add outgoing invoice
               </button>
             )}
           </div>
           {outgoingLines.length === 0 ? (
             <EmptyBlock>
-              No outgoing invoices. Click &quot;Add outgoing invoice&quot; to manually enter one (e.g. management fees, consulting invoices issued by this entity).
+              No outgoing invoices. Click &quot;Add outgoing invoice&quot; to manually enter a management fee or consulting invoice issued by this entity.
             </EmptyBlock>
           ) : (
             <ReviewTable
-              lines={outgoingLines}
-              direction="outgoing"
-              hasFx={hasFx}
+              lines={outgoingLines} direction="outgoing" hasFx={hasFx}
               compact={previewOpen}
-              editingLine={editingLine}
-              setEditingLine={setEditingLine}
-              onUpdate={handleLineUpdate}
-              onMove={handleMoveLine}
+              editingLine={editingLine} setEditingLine={setEditingLine}
+              onUpdate={handleLineUpdate} onMove={handleMoveLine}
               onOpenPreview={openPreviewForLine}
               selectedRowKey={preview?.rowKey}
+              pendingAction={pendingAction}
               isLocked={locked}
             />
           )}
 
-          {/* Excluded Documents */}
+          {/* Excluded */}
           <div className="mt-6 mb-2">
-            <SectionHeader title="Excluded Documents — Review Required" count={excludedDocs.length + deletedLines.length} />
+            <SectionHeader title="Excluded — Review Required" count={excludedDocs.length + (showDeleted ? deletedLines.length : deletedLines.length)} />
           </div>
           {excludedDocs.length === 0 && deletedLines.length === 0 ? (
             <EmptyBlock>No excluded items.</EmptyBlock>
           ) : (
             <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-              <table className="w-full text-xs">
-                <thead className="bg-gray-50 text-gray-600">
+              <table className="w-full text-[12px]">
+                <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium">Source</th>
                     <th className="px-3 py-2 text-left font-medium">Reason</th>
                     <th className="px-3 py-2 text-right font-medium">Amount</th>
-                    <th className="px-3 py-2 text-left font-medium w-32">Action</th>
+                    <th className="px-3 py-2 text-left font-medium w-44">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {excludedDocs.map(doc => (
-                    <tr
-                      key={doc.id}
-                      id={`row-doc-${doc.id}`}
-                      onClick={() => openPreviewForDoc(doc)}
-                      className={`border-t border-gray-100 cursor-pointer hover:bg-gray-50 ${preview?.rowKey === `doc-${doc.id}` ? 'bg-blue-50' : ''}`}
-                    >
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <FileIcon type={doc.file_type} />
-                          <span className="truncate max-w-xs">{doc.filename}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
-                        <TriageTag triage={doc.triage_result} />
-                      </td>
-                      <td className="px-3 py-2 text-right text-gray-400">—</td>
-                      <td className="px-3 py-2">
-                        {!locked && (
-                          <button
-                            onClick={e => { e.stopPropagation(); handleIncludeAsInvoice(doc.id); }}
-                            className="text-xs font-medium text-blue-600 hover:underline"
-                          >
-                            Include as invoice
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {excludedDocs.map(doc => {
+                    const loading = pendingAction === `include-${doc.id}`;
+                    return (
+                      <tr
+                        key={doc.id} id={`row-doc-${doc.id}`}
+                        onClick={() => openPreviewForDoc(doc)}
+                        className={`border-b border-gray-100 last:border-0 transition-colors duration-150 cursor-pointer ${
+                          preview?.rowKey === `doc-${doc.id}` ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        }`}
+                      >
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <FileIcon type={doc.file_type} />
+                            <span className="truncate max-w-xs">{doc.filename}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-2"><TriageTag triage={doc.triage_result} /></td>
+                        <td className="px-3 py-2 text-right text-gray-400">—</td>
+                        <td className="px-3 py-2">
+                          {!locked && (
+                            <button
+                              disabled={loading}
+                              onClick={e => { e.stopPropagation(); handleIncludeAsInvoice(doc.id); }}
+                              className="text-[11px] font-medium text-blue-600 hover:underline disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+                            >
+                              {loading && <Spinner small />}
+                              Include as invoice
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                   {deletedLines.map(line => (
                     <tr
-                      key={line.id}
-                      id={`row-${line.id}`}
+                      key={line.id} id={`row-${line.id}`}
                       onClick={() => openPreviewForLine(line)}
-                      className={`border-t border-gray-100 cursor-pointer hover:bg-gray-50 ${preview?.rowKey === line.id ? 'bg-blue-50' : ''}`}
+                      className={`border-b border-gray-100 last:border-0 transition-colors duration-150 cursor-pointer ${
+                        preview?.rowKey === line.id ? 'bg-blue-50' : 'hover:bg-gray-50'
+                      }`}
                     >
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2">
-                          {line.document_id ? <FileIcon type="pdf" /> : <span className="text-gray-300">✎</span>}
+                          {line.document_id ? <FileIcon type="pdf" /> : <ManualIcon />}
                           <span className="truncate max-w-xs">{line.provider || line.source_filename || 'Deleted line'}</span>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-xs text-gray-500">
-                        {(line as unknown as { deleted_reason?: string }).deleted_reason || 'deleted'}
-                      </td>
+                      <td className="px-3 py-2 text-gray-500">{line.deleted_reason || 'deleted'}</td>
                       <td className="px-3 py-2 text-right font-mono text-gray-500">{fmtEUR(line.amount_eur)}</td>
                       <td className="px-3 py-2">
                         {!locked && (
                           <MoveDropdown
                             currentSection="excluded"
+                            loading={pendingAction === `move-${line.id}`}
                             onMove={t => handleMoveLine(line.id, t)}
                           />
                         )}
@@ -526,64 +572,71 @@ export default function DeclarationDetailPage() {
             </div>
           )}
 
-          {/* Show deleted toggle */}
           {deletedLines.length > 0 && (
-            <button onClick={() => setShowDeleted(!showDeleted)}
-              className="text-xs text-gray-400 hover:text-gray-600 mt-2">
+            <button
+              onClick={() => setShowDeleted(!showDeleted)}
+              className="text-[11px] text-gray-400 hover:text-gray-600 mt-2 cursor-pointer transition-colors duration-150"
+            >
               {showDeleted ? 'Hide' : 'Show'} full deleted-line history
             </button>
           )}
 
           {/* Summary */}
           {activeLines.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-lg p-4 mt-6 mb-6">
-              <h3 className="text-sm font-semibold mb-3">Summary</h3>
-              <div className="grid grid-cols-5 gap-4 text-sm">
-                <SummaryStat label="Lux VAT" value={`EUR ${fmtEUR(totalLuxVat)}`} />
-                <SummaryStat label="Reverse Charge VAT" value={`EUR ${fmtEUR(totalRC)}`} />
-                <SummaryStat label="IC Acq. VAT" value={`EUR ${fmtEUR(icAcqVat)}`} />
-                <SummaryStat label="Total Due (simpl.)" value={`EUR ${fmtEUR(totalDue)}`} bold />
-                <SummaryStat label="Blockers" value={`${unclassified} uncls · ${flagged} flagged`} color={unclassified > 0 || flagged > 0 ? 'text-red-600' : 'text-green-600'} />
+            <div className="bg-white border border-gray-200 rounded-lg p-4 mt-6 mb-8">
+              <h3 className="text-[13px] font-semibold text-gray-900 mb-3">Summary</h3>
+              <div className="grid grid-cols-5 gap-6 text-[13px]">
+                <SummaryStat label="Lux VAT" value={`€${fmtEUR(totalLuxVat)}`} />
+                <SummaryStat label="Reverse Charge VAT" value={`€${fmtEUR(totalRC)}`} />
+                <SummaryStat label="IC Acq. VAT" value={`€${fmtEUR(icAcqVat)}`} />
+                <SummaryStat label="Total Due (simplified)" value={`€${fmtEUR(totalDue)}`} bold />
+                <SummaryStat
+                  label="Blockers"
+                  value={`${unclassified} uncls · ${flagged} flagged`}
+                  color={unclassified > 0 || flagged > 0 ? 'text-red-600' : 'text-green-600'}
+                />
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ─── Divider ─── */}
+      {/* ─────────── DIVIDER ─────────── */}
       {previewOpen && (
         <div
-          onMouseDown={() => setIsDraggingDivider(true)}
-          className="w-1.5 bg-gray-100 hover:bg-[#1a1a2e] cursor-col-resize transition-colors"
+          onMouseDown={e => { e.preventDefault(); setIsDraggingDivider(true); }}
+          className="w-1 bg-gray-200 hover:bg-[#1a1a2e] transition-colors duration-150 cursor-col-resize relative group shrink-0"
           title="Drag to resize"
-        />
+        >
+          {/* Grab handle (visible on hover) */}
+          <div className="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 w-1 h-10 rounded bg-gray-300 group-hover:bg-[#1a1a2e] transition-colors duration-150" />
+        </div>
       )}
 
-      {/* ─── Right: preview ─── */}
+      {/* ─────────── PREVIEW ─────────── */}
       {previewOpen && (
-        <div style={{ width: `${previewWidth}%` }} className="min-w-[320px]">
-          <PreviewPanel
-            preview={preview}
-            onClose={() => setPreview(null)}
-          />
+        <div style={{ width: `${previewWidth}%` }} className="min-w-[360px] pl-2">
+          <PreviewPanel preview={preview} onClose={() => setPreview(null)} />
         </div>
       )}
     </div>
   );
 }
 
-// ────────────────────────── Preview Panel ──────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// Preview Panel
+// ═══════════════════════════════════════════════════════════════
 function PreviewPanel({ preview, onClose }: { preview: PreviewTarget; onClose: () => void }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [filename, setFilename] = useState<string>('');
   const [fileType, setFileType] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imgZoom, setImgZoom] = useState(1);
+  const [zoom, setZoom] = useState<'fit-width' | 'fit-page' | number>('fit-width');
 
   useEffect(() => {
     if (!preview) return;
-    setImgZoom(1);
+    setZoom('fit-width');
     if (preview.kind !== 'document') { setSignedUrl(null); return; }
     setLoading(true); setError(null); setSignedUrl(null);
     fetch(`/api/documents/${preview.documentId}/url`)
@@ -595,80 +648,117 @@ function PreviewPanel({ preview, onClose }: { preview: PreviewTarget; onClose: (
 
   if (!preview) return null;
 
+  const pdfSrc = fileType === 'pdf' && signedUrl
+    ? `${signedUrl}#view=${zoom === 'fit-page' ? 'FitH' : 'FitH'}&toolbar=1`
+    : signedUrl;
+
+  const zoomPct = typeof zoom === 'number' ? zoom : (zoom === 'fit-width' ? 1 : 0.9);
+
   return (
-    <div className="sticky top-2 flex flex-col border border-gray-200 rounded-lg overflow-hidden bg-white" style={{ height: 'calc(100vh - 80px)' }}>
+    <div className="sticky top-2 flex flex-col border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm" style={{ height: 'calc(100vh - 96px)' }}>
       {/* Toolbar */}
-      <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+      <div className="px-3 h-10 border-b border-gray-200 flex items-center justify-between bg-white">
         <div className="flex items-center gap-2 min-w-0">
           <FileIcon type={fileType || 'pdf'} />
-          <span className="text-xs font-medium truncate">
-            {preview.kind === 'manual' ? 'No source document' : (filename || 'Loading...')}
+          <span className="text-[12px] font-medium truncate text-gray-800">
+            {preview.kind === 'manual' ? 'No source document' : (filename || 'Loading…')}
           </span>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {fileType === 'image' && signedUrl && (
+        <div className="flex items-center gap-0.5 shrink-0">
+          {(fileType === 'image' || fileType === 'pdf') && signedUrl && (
             <>
-              <IconButton title="Zoom out" onClick={() => setImgZoom(z => Math.max(0.2, z - 0.2))}>−</IconButton>
-              <span className="text-xs text-gray-500 w-10 text-center">{Math.round(imgZoom * 100)}%</span>
-              <IconButton title="Zoom in" onClick={() => setImgZoom(z => Math.min(4, z + 0.2))}>+</IconButton>
-              <IconButton title="Fit width" onClick={() => setImgZoom(1)}>Fit</IconButton>
+              <IconBtn title="Zoom out" onClick={() => setZoom(z => typeof z === 'number' ? Math.max(0.25, z - 0.25) : 0.75)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
+              </IconBtn>
+              <IconBtn title="Zoom in" onClick={() => setZoom(z => typeof z === 'number' ? Math.min(4, z + 0.25) : 1.25)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="11" y1="8" x2="11" y2="14" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
+              </IconBtn>
+              <IconBtn title="Fit width" onClick={() => setZoom('fit-width')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18"/><path d="M7 8l-4 4 4 4"/><path d="M17 8l4 4-4 4"/></svg>
+              </IconBtn>
+              <IconBtn title="Fit page" onClick={() => setZoom('fit-page')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              </IconBtn>
+              <div className="w-px h-5 bg-gray-200 mx-1" />
             </>
           )}
           {signedUrl && preview.kind === 'document' && (
-            <IconButton title="Open in new tab" onClick={() => window.open(signedUrl, '_blank', 'noopener')}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 7h10v10" /><path d="M7 17L17 7" /></svg>
-            </IconButton>
+            <IconBtn title="Open in new tab" onClick={() => window.open(signedUrl, '_blank', 'noopener')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </IconBtn>
           )}
-          <IconButton title="Close (Esc)" onClick={onClose}>×</IconButton>
+          <IconBtn title="Close (Esc)" onClick={onClose}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </IconBtn>
         </div>
       </div>
 
       {/* Body */}
       <div className="flex-1 overflow-auto bg-gray-100">
         {preview.kind === 'manual' ? (
-          <div className="flex items-center justify-center h-full text-sm text-gray-500 p-8 text-center bg-gray-50">
-            <div>
-              <div className="text-3xl mb-3 opacity-20">✎</div>
-              <div className="font-medium text-gray-600 mb-1">No source document</div>
-              <div className="text-xs text-gray-400 max-w-xs">This invoice was entered manually — it is an outgoing invoice issued by the entity.</div>
-            </div>
-          </div>
+          <ManualPlaceholder />
         ) : loading ? (
-          <div className="flex items-center justify-center h-full text-xs text-gray-500">Loading preview...</div>
+          <div className="flex items-center justify-center h-full"><Spinner /></div>
         ) : error ? (
-          <div className="p-4 text-xs text-red-600">Error: {error}</div>
+          <div className="p-4 text-[12px] text-red-600 bg-red-50 border-b border-red-200">Error: {error}</div>
         ) : signedUrl ? (
           fileType === 'image' ? (
             <div className="flex items-start justify-center p-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={signedUrl} alt={filename}
-                style={{ transform: `scale(${imgZoom})`, transformOrigin: 'top center' }}
-                className="max-w-full bg-white shadow-sm" />
+                style={{
+                  transform: typeof zoom === 'number' ? `scale(${zoom})` : undefined,
+                  transformOrigin: 'top center',
+                  maxWidth: zoom === 'fit-width' ? '100%' : 'none',
+                  maxHeight: zoom === 'fit-page' ? '100%' : 'none',
+                }}
+                className="bg-white shadow-sm" />
             </div>
           ) : fileType === 'pdf' ? (
-            <iframe src={signedUrl} className="w-full h-full bg-white" title={filename} />
+            <iframe src={pdfSrc!} className="w-full h-full bg-white" title={filename} />
           ) : (
-            <div className="p-4 text-xs text-gray-600">
-              Word document. <a href={signedUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Download to preview</a>.
+            <div className="p-4 text-[12px] text-gray-600">
+              <a href={signedUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Download to preview</a>.
             </div>
           )
         ) : null}
       </div>
 
       {/* Footer hint */}
-      <div className="px-3 py-1.5 border-t border-gray-200 text-[10px] text-gray-400 flex items-center justify-between bg-gray-50">
-        <span>↑/↓ to navigate · Esc to close</span>
+      <div className="px-3 h-7 border-t border-gray-200 text-[10px] text-gray-400 flex items-center justify-between bg-gray-50">
+        <span>↑/↓ to navigate · Esc to close{typeof zoom === 'number' ? ` · zoom ${Math.round(zoomPct * 100)}%` : ''}</span>
         {preview.kind === 'document' && signedUrl && (
-          <a href={signedUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Open full size ↗</a>
+          <a href={signedUrl} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+            Open full size ↗
+          </a>
         )}
       </div>
     </div>
   );
 }
 
-// ────────────────────────── Review Table ──────────────────────────
+function ManualPlaceholder() {
+  return (
+    <div className="flex items-center justify-center h-full bg-gray-50 p-8 text-center">
+      <div>
+        <div className="w-12 h-12 mx-auto rounded-full bg-gray-200 flex items-center justify-center mb-3">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        </div>
+        <div className="text-[13px] font-medium text-gray-700">No source document</div>
+        <div className="text-[11px] text-gray-500 mt-1 max-w-[260px] mx-auto">
+          This entry was added manually — it is an outgoing invoice issued by the entity.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Review Table
+// ═══════════════════════════════════════════════════════════════
 function ReviewTable({
-  lines, direction, hasFx, compact, editingLine, setEditingLine, onUpdate, onMove, onOpenPreview, selectedRowKey, isLocked,
+  lines, direction, hasFx, compact, editingLine, setEditingLine, onUpdate, onMove, onOpenPreview,
+  selectedRowKey, pendingAction, isLocked,
 }: {
   lines: InvoiceLine[];
   direction: 'incoming' | 'outgoing';
@@ -680,6 +770,7 @@ function ReviewTable({
   onMove: (id: string, target: 'incoming' | 'outgoing' | 'excluded') => void;
   onOpenPreview: (line: InvoiceLine) => void;
   selectedRowKey: string | undefined;
+  pendingAction: string | null;
   isLocked: boolean;
 }) {
   const treatments = direction === 'incoming' ? INCOMING_TREATMENTS : OUTGOING_TREATMENTS;
@@ -687,30 +778,26 @@ function ReviewTable({
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-[11.5px] border-collapse">
+        <table className="w-full text-[12px] border-collapse">
           <thead>
             <tr className="bg-gray-50 text-gray-600 border-b border-gray-200">
-              <th className="px-1 py-2 w-8"></th>
-              <th className="px-2 py-2 text-left font-medium">Provider</th>
-              {!compact && <th className="px-2 py-2 text-left font-medium">Country</th>}
-              <th className="px-2 py-2 text-left font-medium">Description</th>
-              {!compact && <th className="px-2 py-2 text-left font-medium whitespace-nowrap">Date</th>}
-              {!compact && <th className="px-2 py-2 text-left font-medium">Inv. #</th>}
-              <th className="px-2 py-2 text-right font-medium whitespace-nowrap">Amount</th>
-              <th className="px-2 py-2 text-right font-medium">Rate</th>
-              {!compact && <th className="px-2 py-2 text-right font-medium whitespace-nowrap">VAT</th>}
-              {!compact && <th className="px-2 py-2 text-right font-medium whitespace-nowrap">RC</th>}
-              {!compact && <th className="px-2 py-2 text-right font-medium whitespace-nowrap">Total</th>}
-              {hasFx && !compact && (
-                <>
-                  <th className="px-2 py-2 text-right font-medium">Ccy</th>
-                  <th className="px-2 py-2 text-right font-medium">FX Amt</th>
-                  <th className="px-2 py-2 text-right font-medium">ECB</th>
-                </>
-              )}
-              <th className="px-2 py-2 text-left font-medium">Treatment</th>
-              {!compact && <th className="px-2 py-2 text-center font-medium">Flag</th>}
-              {!isLocked && <th className="px-2 py-2 w-10"></th>}
+              <Th width={32}></Th>
+              <Th>Provider</Th>
+              {!compact && <Th>Country</Th>}
+              <Th>Description</Th>
+              {!compact && <Th>Date</Th>}
+              {!compact && <Th>Inv. #</Th>}
+              <Th right>Amount</Th>
+              <Th right>Rate</Th>
+              {!compact && <Th right>VAT</Th>}
+              {!compact && <Th right>RC</Th>}
+              {!compact && <Th right>Total</Th>}
+              {hasFx && !compact && <Th right>Ccy</Th>}
+              {hasFx && !compact && <Th right>FX Amt</Th>}
+              {hasFx && !compact && <Th right>ECB</Th>}
+              <Th>Treatment</Th>
+              {!compact && <Th center>Flag</Th>}
+              {!isLocked && <Th width={32}></Th>}
             </tr>
           </thead>
           <tbody>
@@ -727,6 +814,7 @@ function ReviewTable({
                 onMove={onMove}
                 onOpenPreview={onOpenPreview}
                 isSelected={selectedRowKey === line.id}
+                moveLoading={pendingAction === `move-${line.id}`}
                 isLocked={isLocked}
                 direction={direction}
               />
@@ -738,9 +826,23 @@ function ReviewTable({
   );
 }
 
-// ────────────────────────── Table Row ──────────────────────────
+function Th({ children, right, center, width }: { children?: React.ReactNode; right?: boolean; center?: boolean; width?: number }) {
+  return (
+    <th
+      style={width ? { width } : undefined}
+      className={`px-2 py-2 font-medium text-[11px] uppercase tracking-wide text-gray-500 ${right ? 'text-right' : center ? 'text-center' : 'text-left'} whitespace-nowrap`}
+    >
+      {children}
+    </th>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Table Row
+// ═══════════════════════════════════════════════════════════════
 function TableRow({
-  line, treatments, hasFx, compact, isEditing, onEditToggle, onUpdate, onMove, onOpenPreview, isSelected, isLocked, direction,
+  line, treatments, hasFx, compact, isEditing, onEditToggle, onUpdate, onMove, onOpenPreview,
+  isSelected, moveLoading, isLocked, direction,
 }: {
   line: InvoiceLine;
   treatments: readonly TreatmentCode[];
@@ -752,134 +854,138 @@ function TableRow({
   onMove: (id: string, target: 'incoming' | 'outgoing' | 'excluded') => void;
   onOpenPreview: (line: InvoiceLine) => void;
   isSelected: boolean;
+  moveLoading: boolean;
   isLocked: boolean;
   direction: 'incoming' | 'outgoing';
 }) {
-  const rowClassName = [
-    'border-b border-gray-100 group',
-    getRowAccent(line),
-    isSelected ? 'bg-blue-50' : '',
-    !isLocked ? 'hover:bg-gray-50' : '',
-  ].filter(Boolean).join(' ');
-
-  const editableCellProps = (editing: boolean) => ({
-    onClick: (e: React.MouseEvent) => {
-      if (!editing && !isLocked) { e.stopPropagation(); onEditToggle(); }
-    },
-    className: 'px-2 py-1.5 cursor-pointer',
-  });
-
   const flagAck = Boolean(line.flag_acknowledged);
   const isFlagged = Boolean(line.flag);
+  const isInference = line.treatment_source === 'inference';
+  const isPrecedent = line.treatment_source === 'precedent';
+
+  const rowClass = [
+    'border-b border-gray-100 transition-colors duration-150',
+    line.state === 'deleted' ? 'bg-gray-50 text-gray-400 line-through' : '',
+    isSelected ? 'bg-blue-50' : !isLocked ? 'hover:bg-gray-50/70' : '',
+    isInference ? 'bg-amber-50/50' : '',
+    isPrecedent && !isSelected ? 'bg-blue-50/40' : '',
+    !line.treatment && !isSelected ? 'bg-red-50/30' : '',
+  ].filter(Boolean).join(' ');
+
+  const editCellProps = () => ({
+    onClick: (e: React.MouseEvent) => {
+      if (!isEditing && !isLocked) { e.stopPropagation(); onEditToggle(); }
+    },
+    className: 'px-2 py-1.5 ' + (isLocked ? 'cursor-default' : 'cursor-pointer'),
+  });
 
   return (
-    <tr id={`row-${line.id}`} className={rowClassName}>
+    <tr id={`row-${line.id}`} className={rowClass}>
       {/* Preview icon */}
       <td className="px-1 py-1.5 text-center">
         <button
           onClick={e => { e.stopPropagation(); onOpenPreview(line); }}
-          className="text-gray-300 hover:text-[#1a1a2e] transition-colors"
-          title={line.document_id ? `Preview: ${line.source_filename}` : 'No source document (manual entry)'}
+          className="inline-flex w-6 h-6 items-center justify-center rounded text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition-all duration-150 cursor-pointer"
+          title={line.document_id ? `Preview: ${line.source_filename}` : 'No source document (manual)'}
         >
           {line.document_id ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           ) : (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            <ManualIcon />
           )}
         </button>
       </td>
 
       {/* Provider */}
-      <td {...editableCellProps(isEditing)}>
+      <td {...editCellProps()}>
         {isEditing && !isLocked ? (
-          <input className="w-full border border-gray-300 rounded px-1.5 py-0.5 text-xs" defaultValue={line.provider}
+          <input autoFocus className="w-full border border-gray-300 rounded px-1.5 py-0.5 text-[12px] focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+            defaultValue={line.provider}
             onClick={e => e.stopPropagation()}
             onBlur={e => onUpdate(line.id, { provider: e.target.value })} />
         ) : (
-          <span className="font-medium text-gray-900">{line.provider || '—'}</span>
+          <span className="font-medium text-gray-900 block truncate max-w-[180px]">{line.provider || '—'}</span>
         )}
       </td>
 
-      {/* Country */}
       {!compact && (
-        <td {...editableCellProps(isEditing)}>
+        <td {...editCellProps()}>
           {isEditing && !isLocked ? (
-            <input className="w-14 border border-gray-300 rounded px-1.5 py-0.5 text-xs" defaultValue={line.country}
+            <input className="w-14 border border-gray-300 rounded px-1.5 py-0.5 text-[12px] focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+              defaultValue={line.country}
               onClick={e => e.stopPropagation()}
               onBlur={e => onUpdate(line.id, { country: e.target.value })} />
           ) : <span className="text-gray-600">{line.country || '—'}</span>}
         </td>
       )}
 
-      {/* Description */}
-      <td {...editableCellProps(isEditing)} title={line.description}>
+      <td {...editCellProps()} title={line.description}>
         {isEditing && !isLocked ? (
-          <input className="w-full border border-gray-300 rounded px-1.5 py-0.5 text-xs" defaultValue={line.description}
+          <input className="w-full border border-gray-300 rounded px-1.5 py-0.5 text-[12px] focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+            defaultValue={line.description}
             onClick={e => e.stopPropagation()}
             onBlur={e => onUpdate(line.id, { description: e.target.value })} />
         ) : (
-          <span className="text-gray-700 block truncate max-w-[180px]">{line.description || '—'}</span>
+          <span className="text-gray-700 block truncate max-w-[220px]">{line.description || '—'}</span>
         )}
       </td>
 
-      {/* Date */}
       {!compact && (
-        <td {...editableCellProps(isEditing)}>
+        <td {...editCellProps()}>
           {isEditing && !isLocked ? (
-            <input type="date" className="border border-gray-300 rounded px-1 py-0.5 text-xs" defaultValue={line.invoice_date}
+            <input type="date" className="border border-gray-300 rounded px-1 py-0.5 text-[12px] focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+              defaultValue={line.invoice_date}
               onClick={e => e.stopPropagation()}
               onBlur={e => onUpdate(line.id, { invoice_date: e.target.value })} />
           ) : <span className="text-gray-600 whitespace-nowrap">{formatDate(line.invoice_date)}</span>}
         </td>
       )}
 
-      {/* Invoice # */}
       {!compact && (
-        <td {...editableCellProps(isEditing)}>
+        <td {...editCellProps()}>
           {isEditing && !isLocked ? (
-            <input className="w-20 border border-gray-300 rounded px-1.5 py-0.5 text-xs" defaultValue={line.invoice_number}
+            <input className="w-20 border border-gray-300 rounded px-1.5 py-0.5 text-[12px] focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+              defaultValue={line.invoice_number}
               onClick={e => e.stopPropagation()}
               onBlur={e => onUpdate(line.id, { invoice_number: e.target.value })} />
           ) : <span className="text-gray-600">{line.invoice_number || '—'}</span>}
         </td>
       )}
 
-      {/* Amount */}
-      <td {...editableCellProps(isEditing)} className="px-2 py-1.5 text-right font-mono cursor-pointer">
+      <td {...editCellProps()} className="px-2 py-1.5 text-right font-mono cursor-pointer tabular-nums">
         {isEditing && !isLocked ? (
-          <input className="w-24 border border-gray-300 rounded px-1.5 py-0.5 text-xs text-right" type="number" step="0.01"
-            defaultValue={line.amount_eur} onClick={e => e.stopPropagation()}
+          <input className="w-24 border border-gray-300 rounded px-1.5 py-0.5 text-[12px] text-right focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+            type="number" step="0.01" defaultValue={line.amount_eur}
+            onClick={e => e.stopPropagation()}
             onBlur={e => onUpdate(line.id, { amount_eur: parseFloat(e.target.value) })} />
         ) : <span className="text-gray-900">{fmtEUR(line.amount_eur)}</span>}
       </td>
 
-      {/* Rate */}
-      <td className="px-2 py-1.5 text-right">
-        <span className="text-gray-500">
-          {line.vat_rate != null ? `${(Number(line.vat_rate) * 100).toFixed(0)}%` : '—'}
-        </span>
+      <td className="px-2 py-1.5 text-right tabular-nums text-gray-500">
+        {line.vat_rate != null ? `${(Number(line.vat_rate) * 100).toFixed(0)}%` : '—'}
       </td>
 
-      {/* VAT, RC, Total (hidden in compact) */}
-      {!compact && <td className="px-2 py-1.5 text-right font-mono text-gray-700">{fmtEUR(line.vat_applied)}</td>}
-      {!compact && <td className="px-2 py-1.5 text-right font-mono text-gray-700">{fmtEUR(line.rc_amount)}</td>}
-      {!compact && <td className="px-2 py-1.5 text-right font-mono text-gray-500">{fmtEUR(line.amount_incl)}</td>}
+      {!compact && <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-700">{fmtEUR(line.vat_applied)}</td>}
+      {!compact && <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-700">{fmtEUR(line.rc_amount)}</td>}
+      {!compact && <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-500">{fmtEUR(line.amount_incl)}</td>}
 
-      {/* FX */}
       {hasFx && !compact && (
         <>
           <td className="px-2 py-1.5 text-right text-gray-500">{line.currency || '—'}</td>
-          <td className="px-2 py-1.5 text-right font-mono text-gray-500">{line.currency_amount ? fmtEUR(line.currency_amount) : '—'}</td>
+          <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-500">{line.currency_amount ? fmtEUR(line.currency_amount) : '—'}</td>
           <td className="px-2 py-1.5 text-right text-gray-500">{line.ecb_rate || '—'}</td>
         </>
       )}
 
       {/* Treatment */}
-      <td {...editableCellProps(isEditing)} className="px-2 py-1.5">
+      <td {...editCellProps()}>
         {isEditing && !isLocked ? (
-          <select className="border border-gray-300 rounded px-1.5 py-0.5 text-xs" value={line.treatment || ''}
+          <select
+            className="border border-gray-300 rounded px-1.5 py-0.5 text-[11px] focus:border-[#1a1a2e] focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+            value={line.treatment || ''}
             onClick={e => e.stopPropagation()}
-            onChange={e => onUpdate(line.id, { treatment: e.target.value || null, treatment_source: 'manual' })}>
+            onChange={e => onUpdate(line.id, { treatment: e.target.value || null, treatment_source: 'manual' })}
+          >
             <option value="">Unclassified</option>
             {treatments.map(t => (
               <option key={t} value={t}>{t} — {TREATMENT_CODES[t].label}</option>
@@ -890,16 +996,18 @@ function TableRow({
             treatment={line.treatment}
             source={line.treatment_source}
             rule={line.classification_rule}
+            flagReason={line.flag_reason}
           />
         )}
       </td>
 
-      {/* Flag */}
       {!compact && (
         <td className="px-2 py-1.5 text-center">
           {isFlagged ? (
             <button
-              className={flagAck ? 'text-gray-300' : 'text-amber-600 hover:text-amber-700'}
+              className={`inline-flex w-6 h-6 items-center justify-center rounded transition-colors duration-150 cursor-pointer ${
+                flagAck ? 'text-gray-300 hover:text-gray-400' : 'text-amber-600 hover:text-amber-700 hover:bg-amber-100'
+              }`}
               title={line.flag_reason || 'Flagged'}
               onClick={e => {
                 e.stopPropagation();
@@ -912,11 +1020,11 @@ function TableRow({
         </td>
       )}
 
-      {/* Actions dropdown */}
       {!isLocked && (
         <td className="px-2 py-1.5 text-center">
           <MoveDropdown
             currentSection={direction === 'incoming' ? 'incoming' : 'outgoing'}
+            loading={moveLoading}
             onMove={t => onMove(line.id, t)}
           />
         </td>
@@ -925,12 +1033,14 @@ function TableRow({
   );
 }
 
-// ────────────────────────── Move Dropdown ──────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// Move Dropdown
+// ═══════════════════════════════════════════════════════════════
 function MoveDropdown({
-  currentSection,
-  onMove,
+  currentSection, loading, onMove,
 }: {
   currentSection: 'incoming' | 'outgoing' | 'excluded';
+  loading?: boolean;
   onMove: (target: 'incoming' | 'outgoing' | 'excluded') => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -955,22 +1065,27 @@ function MoveDropdown({
     <div ref={ref} className="relative inline-block">
       <button
         onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
-        className="text-gray-300 hover:text-[#1a1a2e] transition-colors px-1"
+        disabled={loading}
+        className="inline-flex w-6 h-6 items-center justify-center rounded text-gray-400 hover:text-[#1a1a2e] hover:bg-gray-100 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         title="Move to another section"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="5" r="1.5" />
-          <circle cx="12" cy="12" r="1.5" />
-          <circle cx="12" cy="19" r="1.5" />
-        </svg>
+        {loading ? (
+          <Spinner small />
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" />
+          </svg>
+        )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-md shadow-lg min-w-[200px] py-1">
+        <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-md shadow-lg min-w-[210px] py-1 animate-fadeIn">
           {targets.map(t => (
             <button
               key={t.key}
               onClick={e => { e.stopPropagation(); setOpen(false); onMove(t.key); }}
-              className={`block w-full text-left px-3 py-1.5 text-xs ${t.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'}`}
+              className={`block w-full text-left px-3 py-1.5 text-[12px] transition-colors duration-150 cursor-pointer ${
+                t.danger ? 'text-red-600 hover:bg-red-50' : 'text-gray-700 hover:bg-gray-50'
+              }`}
             >
               {t.label}
             </button>
@@ -981,41 +1096,50 @@ function MoveDropdown({
   );
 }
 
-// ────────────────────────── Treatment Badge ──────────────────────────
-function TreatmentBadge({ treatment, source, rule }: { treatment: string | null; source: string | null; rule: string | null }) {
+// ═══════════════════════════════════════════════════════════════
+// Treatment Badge
+// ═══════════════════════════════════════════════════════════════
+function TreatmentBadge({
+  treatment, source, rule, flagReason,
+}: {
+  treatment: string | null; source: string | null; rule: string | null; flagReason: string | null;
+}) {
   if (!treatment) {
-    return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200">UNCLASSIFIED</span>;
+    return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-700 border border-red-200 tracking-wide">UNCLASSIFIED</span>;
   }
   const code = treatment as TreatmentCode;
   const spec = TREATMENT_CODES[code];
-  const colors = treatmentColorClass(code);
-  const tooltip = rule && rule !== 'NO_MATCH'
-    ? `Classified by ${rule} • ${spec?.label || treatment}${source ? ` • source: ${source}` : ''}`
-    : (spec?.label || treatment) + (source ? ` • source: ${source}` : '');
+  const colors = treatmentColorClass(code, source);
+  const labelParts = [];
+  if (rule === 'PRECEDENT') labelParts.push('Precedent match (prior year)');
+  else if (rule?.startsWith('INFERENCE')) labelParts.push(`${rule} — proposed`);
+  else if (rule && rule !== 'NO_MATCH') labelParts.push(`Classified by ${rule}`);
+  if (spec?.label) labelParts.push(spec.label);
+  if (source) labelParts.push(`source: ${source}`);
+  if (flagReason) labelParts.push(`⚠ ${flagReason}`);
+  const tooltip = labelParts.join(' • ');
+
   return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold ${colors}`}
-      title={tooltip}
-    >
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold tracking-wide ${colors}`} title={tooltip}>
       {treatment}
     </span>
   );
 }
 
-// ────────────────────────── Doc row ──────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// Doc row
+// ═══════════════════════════════════════════════════════════════
 function DocRow({
-  doc, selected, onSelect, onRetry,
+  doc, selected, loading, onSelect, onRetry,
 }: {
-  doc: Document;
-  selected: boolean;
-  onSelect: () => void;
-  onRetry: () => void;
+  doc: DocumentRec; selected: boolean; loading: boolean;
+  onSelect: () => void; onRetry: () => void;
 }) {
   return (
     <div
       id={`row-doc-${doc.id}`}
       onClick={onSelect}
-      className={`px-4 py-2 border-b border-gray-100 last:border-0 text-xs cursor-pointer transition-colors ${selected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+      className={`px-4 py-2 border-b border-gray-100 last:border-0 text-[12px] cursor-pointer transition-colors duration-150 ${selected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
@@ -1029,21 +1153,25 @@ function DocRow({
         </div>
       </div>
       {doc.status === 'error' && doc.error_message && (
-        <div
-          onClick={e => e.stopPropagation()}
-          className="mt-1 ml-6 text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1 break-words flex items-start justify-between gap-2"
-        >
-          <div className="flex-1">
-            <span className="font-semibold">Error:</span> {doc.error_message}
-          </div>
-          <button onClick={onRetry} className="text-blue-600 hover:underline shrink-0 font-semibold">Retry</button>
+        <div onClick={e => e.stopPropagation()}
+          className="mt-1 ml-6 text-[11px] text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1 break-words flex items-start justify-between gap-2">
+          <div className="flex-1"><span className="font-semibold">Error:</span> {doc.error_message}</div>
+          <button
+            disabled={loading}
+            onClick={onRetry}
+            className="text-blue-600 hover:underline shrink-0 font-semibold disabled:opacity-40 cursor-pointer flex items-center gap-1"
+          >
+            {loading && <Spinner small />}Retry
+          </button>
         </div>
       )}
     </div>
   );
 }
 
-// ────────────────────────── Small components ──────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// Small components
+// ═══════════════════════════════════════════════════════════════
 function StatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
     created: 'bg-gray-100 text-gray-700',
@@ -1055,11 +1183,7 @@ function StatusBadge({ status }: { status: string }) {
     filed: 'bg-emerald-100 text-emerald-800',
     paid: 'bg-teal-100 text-teal-800',
   };
-  return (
-    <span className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wide ${colors[status] || 'bg-gray-100'}`}>
-      {status}
-    </span>
-  );
+  return <span className={`text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wide ${colors[status] || 'bg-gray-100'}`}>{status}</span>;
 }
 function DocStatusTag({ status }: { status: string }) {
   const colors: Record<string, string> = {
@@ -1089,15 +1213,30 @@ function TriageTag({ triage }: { triage: string | null }) {
 }
 function FileIcon({ type }: { type: string }) {
   return (
-    <span className="text-gray-400 shrink-0 text-base leading-none">
-      {type === 'pdf' ? '📄' : type === 'image' ? '🖼' : '📝'}
-    </span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400 shrink-0">
+      {type === 'image' ? (
+        <>
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+        </>
+      ) : (
+        <>
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+        </>
+      )}
+    </svg>
   );
 }
-function IconButton({ children, onClick, title }: { children: React.ReactNode; onClick: () => void; title: string }) {
+function ManualIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-300">
+      <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+    </svg>
+  );
+}
+function IconBtn({ children, onClick, title }: { children: React.ReactNode; onClick: () => void; title: string }) {
   return (
     <button onClick={onClick} title={title}
-      className="w-7 h-7 flex items-center justify-center rounded text-gray-600 hover:bg-gray-200 text-sm transition-colors">
+      className="inline-flex w-7 h-7 items-center justify-center rounded text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors duration-150 cursor-pointer">
       {children}
     </button>
   );
@@ -1106,7 +1245,7 @@ function Stat({ label, value, color, small }: { label: string; value: string | n
   return (
     <div>
       <div className="text-[10px] text-gray-500 uppercase tracking-wide font-semibold">{label}</div>
-      <div className={`font-semibold mt-0.5 ${color || 'text-gray-900'} ${small ? 'text-sm' : 'text-lg'}`}>{value}</div>
+      <div className={`font-semibold mt-1 tabular-nums ${color || 'text-gray-900'} ${small ? 'text-sm' : 'text-lg'}`}>{value}</div>
     </div>
   );
 }
@@ -1114,32 +1253,37 @@ function SummaryStat({ label, value, color, bold }: { label: string; value: stri
   return (
     <div>
       <div className="text-[11px] text-gray-500">{label}</div>
-      <div className={`${bold ? 'font-bold text-base' : 'font-semibold text-sm'} ${color || 'text-gray-900'}`}>{value}</div>
+      <div className={`tabular-nums mt-0.5 ${bold ? 'font-bold text-[15px]' : 'font-semibold text-[13px]'} ${color || 'text-gray-900'}`}>{value}</div>
     </div>
   );
 }
 function SectionHeader({ title, count, inline }: { title: string; count: number; inline?: boolean }) {
   return (
-    <h3 className={`text-sm font-semibold text-gray-900 ${inline ? '' : 'mb-2'}`}>
+    <h3 className={`text-[13px] font-semibold text-gray-900 ${inline ? '' : 'mb-2'}`}>
       {title} <span className="text-gray-400 font-normal ml-1">({count})</span>
     </h3>
   );
 }
 function EmptyBlock({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6 text-center text-sm text-gray-400">
+    <div className="bg-white border border-gray-200 rounded-lg p-6 text-center text-[12px] text-gray-400">
       {children}
     </div>
   );
 }
-
-// ────────────────────────── Helpers ──────────────────────────
-function getRowAccent(line: InvoiceLine): string {
-  if (line.state === 'deleted') return 'bg-gray-50 line-through text-gray-400';
-  if (!line.treatment) return 'bg-red-50/40';
-  if (Boolean(line.flag) && !Boolean(line.flag_acknowledged)) return 'bg-amber-50/60';
-  return '';
+function Spinner({ small }: { small?: boolean }) {
+  const size = small ? 12 : 18;
+  return (
+    <svg className="animate-spin text-current" width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25"/>
+      <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+    </svg>
+  );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Helpers
+// ═══════════════════════════════════════════════════════════════
 function formatDate(d: string | null): string {
   if (!d) return '—';
   const parts = d.split('-');
@@ -1152,9 +1296,12 @@ function fmtEUR(v: number | null | string): string {
   if (isNaN(n)) return '—';
   return n.toLocaleString('en-LU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
-function treatmentColorClass(code: TreatmentCode | null): string {
+function treatmentColorClass(code: TreatmentCode | null, source: string | null): string {
+  // Inference-sourced classifications get an amber tint to signal "needs confirmation"
+  if (source === 'inference') return 'bg-amber-100 text-amber-800 border border-amber-200';
+  if (source === 'precedent') return 'bg-blue-100 text-blue-800 border border-blue-300';
   if (!code) return 'bg-gray-100 text-gray-600 border border-gray-200';
-  if (code.startsWith('LUX_')) return 'bg-blue-100 text-blue-800 border border-blue-200';
+  if (code.startsWith('LUX_')) return 'bg-sky-100 text-sky-800 border border-sky-200';
   if (code.startsWith('RC_EU')) return 'bg-purple-100 text-purple-800 border border-purple-200';
   if (code.startsWith('RC_NONEU')) return 'bg-fuchsia-100 text-fuchsia-800 border border-fuchsia-200';
   if (code === 'IC_ACQ') return 'bg-indigo-100 text-indigo-800 border border-indigo-200';
