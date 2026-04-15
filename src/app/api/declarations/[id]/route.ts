@@ -46,7 +46,7 @@ export async function GET(
      JOIN invoices i ON il.invoice_id = i.id
      LEFT JOIN documents d ON i.document_id = d.id
      WHERE il.declaration_id = $1
-     ORDER BY il.sort_order ASC, i.provider ASC`,
+     ORDER BY i.direction DESC, il.sort_order ASC, i.provider ASC`,
     [id]
   );
 

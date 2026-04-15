@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import Anthropic from '@anthropic-ai/sdk';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { classifyInvoiceLine } from '@/config/classification-rules';
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 
@@ -293,11 +294,63 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // ===== Auto-classify with deterministic rules =====
+  // Runs the rules engine over all unclassified, non-manual lines in this declaration.
+  let classificationSummary: Record<string, unknown> | null = null;
+  try {
+    const classifyLines = await query<{
+      id: string;
+      direction: string;
+      country: string | null;
+      vat_rate: number | null;
+      vat_applied: number | null;
+      description: string | null;
+      treatment_source: string | null;
+      treatment: string | null;
+    }>(
+      `SELECT il.id, i.direction, i.country, il.vat_rate, il.vat_applied, il.description,
+              il.treatment_source, il.treatment
+         FROM invoice_lines il
+         JOIN invoices i ON il.invoice_id = i.id
+        WHERE il.declaration_id = $1
+          AND il.state != 'deleted'
+          AND (il.treatment_source IS NULL OR il.treatment_source != 'manual')`,
+      [declaration_id]
+    );
+
+    const byRule: Record<string, number> = {};
+    for (const line of classifyLines) {
+      const result = classifyInvoiceLine({
+        direction: line.direction as 'incoming' | 'outgoing',
+        country: line.country,
+        vat_rate: line.vat_rate == null ? null : Number(line.vat_rate),
+        vat_applied: line.vat_applied == null ? null : Number(line.vat_applied),
+        description: line.description,
+      });
+      await execute(
+        `UPDATE invoice_lines
+            SET treatment = $1,
+                treatment_source = 'rule',
+                classification_rule = $2,
+                flag = $3,
+                flag_reason = $4,
+                state = CASE WHEN state = 'extracted' THEN 'classified' ELSE state END,
+                updated_at = NOW()
+          WHERE id = $5`,
+        [result.treatment, result.rule, result.flag, result.flag_reason ?? null, line.id]
+      );
+      byRule[result.rule] = (byRule[result.rule] || 0) + 1;
+    }
+    classificationSummary = { processed: classifyLines.length, by_rule: byRule };
+  } catch (e) {
+    console.error('[extract] classification failed:', e);
+  }
+
   // Update declaration status to review
   const allDocs = await query("SELECT status FROM documents WHERE declaration_id = $1", [declaration_id]);
   if (allDocs.some(d => d.status === 'extracted')) {
     await execute("UPDATE declarations SET status = 'review', updated_at = NOW() WHERE id = $1", [declaration_id]);
   }
 
-  return NextResponse.json({ results, processed: results.length });
+  return NextResponse.json({ results, processed: results.length, classification: classificationSummary });
 }

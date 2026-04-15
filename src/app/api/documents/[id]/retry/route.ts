@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, execute, logAudit } from '@/lib/db';
 
 // POST /api/documents/:id/retry
-// Body: { force_triage_as?: 'invoice' | 'credit_note' }  (optional)
+// Body: {
+//   force_triage_as?: 'invoice' | 'credit_note',
+//   force_direction?: 'incoming' | 'outgoing'   // optional hint for extractor / post-process
+// }
 // - Without force: reset to 'uploaded' so the next Extract All reprocesses normally.
-// - With force: override the triage decision (used by "Include as Invoice" on
+// - With force_triage_as: override the triage decision (used by "Include as ..." on
 //   documents the triage agent excluded as wrong_entity / receipt / etc).
+// - With force_direction: after extraction, flip the invoice direction to this value.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
