@@ -22,6 +22,8 @@ export default function RootLayout({
             <a href="/declarations" className="hover:text-gray-300 transition-colors">Declarations</a>
             <a href="/deadlines" className="hover:text-gray-300 transition-colors">Deadlines</a>
             <a href="/aed-letters" className="hover:text-gray-300 transition-colors">AED letters</a>
+            <a href="/registrations" className="hover:text-gray-300 transition-colors">Registrations</a>
+            <a href="/legal-overrides" className="hover:text-gray-300 transition-colors">Overrides</a>
             <a href="/audit" className="hover:text-gray-300 transition-colors">Audit</a>
             <a href="/metrics" className="hover:text-gray-300 transition-colors">Metrics</a>
             <a href="/settings" className="hover:text-gray-300 transition-colors">Settings</a>

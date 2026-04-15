@@ -57,7 +57,20 @@ The declaration entity name is given to you in the user message. You must decide
 ## Special Cases
 
 1. **Reverse charge**: If a foreign supplier charges no VAT (or states "reverse charge applies", "TVA non applicable"), set vat_applied to null and compute rc_amount = amount_eur * 0.17.
-2. **Split invoices**: If an invoice has items with different VAT rates (e.g., notary: honoraires at 17% + registration duties at 0%), create separate lines for each rate.
+2. **Split invoices** — IMPORTANT: many invoices contain multiple distinct items that need separate lines because they have different VAT treatments. Always look carefully and split by:
+   - **Different VAT rates** on the same invoice (17% + 14% + 8% + 0% can all coexist).
+   - **Different tax treatments** even at 0% (rent at 0% Art 44 ≠ disbursement at 0% out of scope ≠ Chamber of Commerce cotisation at 0% out of scope).
+   - **Disbursements (frais, débours, out-of-pocket expenses, KNF/CSSF fees passed through)** — always a separate line with vat_rate=0.
+   - **Mixed services and goods** — services and intra-Community goods must be separated.
+
+   Common split patterns to recognise:
+   - **Notary invoices**: honoraires (17%) + registration duties / droits d'enregistrement (0%) + disbursements (0%, out of scope).
+   - **Property/office sharing**: rent (0%, Art 44) + services (17%) + maintenance (8%) + utilities (sometimes 17%).
+   - **Fund administration**: management fee (0%, Art 44) + depositary services (14%) + transfer agency (17%).
+   - **Legal**: professional fees (17%) + court fees / disbursements (0%).
+   - **Quarterly bundles**: a single invoice listing 5+ services for the same period — extract each as a separate line.
+
+   When in doubt, split. The user can always merge two lines back manually, but cannot easily un-merge a line that should have been split.
 3. **FX invoices**: If the invoice is in a non-EUR currency, extract the currency and currency_amount. Convert to EUR if a rate is shown on the invoice. If no rate is shown, leave amount_eur as the currency amount (the user will add the ECB rate manually).
 4. **Credit notes**: Amounts should be negative.
 5. **Disbursements**: Some invoices include disbursements (frais) that are passed through at cost with no VAT. These should be a separate line with vat_rate = 0.

@@ -49,9 +49,9 @@ export interface PrecedentMatch {
 
 export interface ClassificationResult {
   treatment: TreatmentCode | null;
-  rule: string;                // e.g. "RULE 11", "INFERENCE A", "PRECEDENT", "NO_MATCH"
+  rule: string;                // e.g. "RULE 11", "INFERENCE A", "PRECEDENT", "OVERRIDE · X", "NO_MATCH"
   reason: string;              // human/legal explanation
-  source: 'rule' | 'precedent' | 'inference';
+  source: 'rule' | 'precedent' | 'inference' | 'override';
   flag: boolean;
   flag_reason?: string;
 }
