@@ -33,9 +33,26 @@ function num(v: unknown): number | null {
   const n = typeof v === 'number' ? v : Number(String(v).replace(/,/g, '.'));
   return Number.isFinite(n) ? n : null;
 }
-// direction: accept only 'incoming' | 'outgoing'; fall back to 'incoming'.
-function direction(v: unknown): 'incoming' | 'outgoing' {
-  return v === 'outgoing' ? 'outgoing' : 'incoming';
+// direction: accept only 'incoming' | 'outgoing' | null. The previous
+// silent-to-incoming default misclassified outgoing group recharges and
+// zeroed output VAT. We now propagate null and let the downstream UI
+// flag the line for reviewer decision.
+function direction(v: unknown): 'incoming' | 'outgoing' | null {
+  if (v === 'outgoing') return 'outgoing';
+  if (v === 'incoming') return 'incoming';
+  return null;
+}
+// Direction confidence: 'high' | 'medium' | 'low'. Populated by the
+// extractor; any unrecognised value collapses to null (the downstream
+// UI treats null as "low" for display).
+function directionConfidence(v: unknown): 'high' | 'medium' | 'low' | null {
+  return v === 'high' || v === 'medium' || v === 'low' ? v : null;
+}
+// String array (for invoice_validity_missing_fields). Rejects non-array
+// and non-string entries.
+function stringArray(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x): x is string => typeof x === 'string' && !!x.trim());
 }
 // iso-date or null. Rejects junk like "unknown", "N/A".
 function isoDate(v: unknown): string | null {
@@ -276,23 +293,35 @@ async function runExtraction(params: {
           customer_name_as_written: str(invoiceData.customer_name_as_written),
           customer_vat: str(invoiceData.customer_vat),
           customer_country: str(invoiceData.customer_country),
+          customer_address: str(invoiceData.customer_address),
           invoice_number: str(invoiceData.invoice_number),
           invoice_date: isoDate(invoiceData.invoice_date),
           due_date: isoDate(invoiceData.due_date),
           service_period_start: isoDate(invoiceData.service_period_start),
           service_period_end: isoDate(invoiceData.service_period_end),
           direction: direction(invoiceData.direction),
+          direction_confidence: directionConfidence(invoiceData.direction_confidence),
           is_credit_note: bool(invoiceData.is_credit_note),
+          corrected_invoice_reference: str(invoiceData.corrected_invoice_reference),
           currency: str(invoiceData.currency),
           currency_amount: num(invoiceData.currency_amount),
           fx_rate_on_invoice: num(invoiceData.fx_rate_on_invoice),
           needs_fx: bool(invoiceData.needs_fx),
+          fx_source_hint: str(invoiceData.fx_source_hint),
           total_ex_vat: num(invoiceData.total_ex_vat),
           total_vat: num(invoiceData.total_vat),
           total_incl_vat: num(invoiceData.total_incl_vat),
           exemption_reference: str(invoiceData.exemption_reference),
           reverse_charge_mentioned: bool(invoiceData.reverse_charge_mentioned),
+          self_billing_mentioned: bool(invoiceData.self_billing_mentioned),
+          triangulation_mentioned: bool(invoiceData.triangulation_mentioned),
+          margin_scheme_mentioned: bool(invoiceData.margin_scheme_mentioned),
+          self_supply_mentioned: bool(invoiceData.self_supply_mentioned),
+          customs_reference: str(invoiceData.customs_reference),
           bank_account_iban: str(invoiceData.bank_account_iban),
+          suspicious_content_flag: bool(invoiceData.suspicious_content_flag),
+          suspicious_content_note: str(invoiceData.suspicious_content_note),
+          invoice_validity_missing_fields: stringArray(invoiceData.invoice_validity_missing_fields),
         };
 
         // Build line records with null propagation. Prior versions defaulted
@@ -334,56 +363,86 @@ async function runExtraction(params: {
             txSql, 'SELECT id FROM invoices WHERE document_id = $1 LIMIT 1', [doc.id]
           );
           let invoiceId: string;
+          // Column ordering below MUST match the array order of upsertParams.
+          // Keep them locked-step; inserting a column in the wrong slot is a
+          // silent data-corruption bug. The list is long because Luxembourg
+          // VAT returns need this much evidence per invoice.
           const upsertParams = [
             inv.provider, inv.provider_vat, inv.country, inv.provider_address,
-            inv.customer_name_as_written, inv.customer_vat, inv.customer_country,
+            inv.customer_name_as_written, inv.customer_vat, inv.customer_country, inv.customer_address,
             inv.invoice_number, inv.invoice_date, inv.due_date,
             inv.service_period_start, inv.service_period_end,
-            inv.direction, inv.is_credit_note,
-            inv.currency, inv.currency_amount, inv.fx_rate_on_invoice, inv.needs_fx,
+            inv.direction, inv.direction_confidence,
+            inv.is_credit_note, inv.corrected_invoice_reference,
+            inv.currency, inv.currency_amount, inv.fx_rate_on_invoice, inv.needs_fx, inv.fx_source_hint,
             inv.total_ex_vat, inv.total_vat, inv.total_incl_vat,
-            inv.exemption_reference, inv.reverse_charge_mentioned, inv.bank_account_iban,
+            inv.exemption_reference, inv.reverse_charge_mentioned,
+            inv.self_billing_mentioned, inv.triangulation_mentioned,
+            inv.margin_scheme_mentioned, inv.self_supply_mentioned,
+            inv.customs_reference, inv.bank_account_iban,
+            inv.suspicious_content_flag, inv.suspicious_content_note,
+            inv.invoice_validity_missing_fields,
           ];
+          const COL_COUNT = upsertParams.length; // 36
           if (existing) {
             invoiceId = existing.id;
             await execTx(txSql, 'DELETE FROM invoice_lines WHERE invoice_id = $1', [invoiceId]);
             await execTx(txSql,
               `UPDATE invoices SET
                  provider = $1, provider_vat = $2, country = $3, provider_address = $4,
-                 customer_name_as_written = $5, customer_vat = $6, customer_country = $7,
-                 invoice_number = $8, invoice_date = $9, due_date = $10,
-                 service_period_start = $11, service_period_end = $12,
-                 direction = $13, is_credit_note = $14,
-                 currency = $15, currency_amount = $16, fx_rate_on_invoice = $17, needs_fx = $18,
-                 total_ex_vat = $19, total_vat = $20, total_incl_vat = $21,
-                 exemption_reference = $22, reverse_charge_mentioned = $23, bank_account_iban = $24
-               WHERE id = $25`,
+                 customer_name_as_written = $5, customer_vat = $6, customer_country = $7, customer_address = $8,
+                 invoice_number = $9, invoice_date = $10, due_date = $11,
+                 service_period_start = $12, service_period_end = $13,
+                 direction = $14, direction_confidence = $15,
+                 is_credit_note = $16, corrected_invoice_reference = $17,
+                 currency = $18, currency_amount = $19, fx_rate_on_invoice = $20, needs_fx = $21, fx_source_hint = $22,
+                 total_ex_vat = $23, total_vat = $24, total_incl_vat = $25,
+                 exemption_reference = $26, reverse_charge_mentioned = $27,
+                 self_billing_mentioned = $28, triangulation_mentioned = $29,
+                 margin_scheme_mentioned = $30, self_supply_mentioned = $31,
+                 customs_reference = $32, bank_account_iban = $33,
+                 suspicious_content_flag = $34, suspicious_content_note = $35,
+                 invoice_validity_missing_fields = $36
+               WHERE id = $${COL_COUNT + 1}`,
               [...upsertParams, invoiceId]
             );
           } else {
             invoiceId = generateId();
+            // $1..$3 are (id, document_id, declaration_id); $4..$39 are the 36 upsertParams.
             await execTx(txSql,
               `INSERT INTO invoices (
                  id, document_id, declaration_id,
                  provider, provider_vat, country, provider_address,
-                 customer_name_as_written, customer_vat, customer_country,
+                 customer_name_as_written, customer_vat, customer_country, customer_address,
                  invoice_number, invoice_date, due_date,
                  service_period_start, service_period_end,
-                 direction, is_credit_note,
-                 currency, currency_amount, fx_rate_on_invoice, needs_fx,
+                 direction, direction_confidence,
+                 is_credit_note, corrected_invoice_reference,
+                 currency, currency_amount, fx_rate_on_invoice, needs_fx, fx_source_hint,
                  total_ex_vat, total_vat, total_incl_vat,
-                 exemption_reference, reverse_charge_mentioned, bank_account_iban,
+                 exemption_reference, reverse_charge_mentioned,
+                 self_billing_mentioned, triangulation_mentioned,
+                 margin_scheme_mentioned, self_supply_mentioned,
+                 customs_reference, bank_account_iban,
+                 suspicious_content_flag, suspicious_content_note,
+                 invoice_validity_missing_fields,
                  extraction_source)
                VALUES (
                  $1, $2, $3,
                  $4, $5, $6, $7,
-                 $8, $9, $10,
-                 $11, $12, $13,
-                 $14, $15,
-                 $16, $17,
-                 $18, $19, $20, $21,
-                 $22, $23, $24,
-                 $25, $26, $27,
+                 $8, $9, $10, $11,
+                 $12, $13, $14,
+                 $15, $16,
+                 $17, $18,
+                 $19, $20,
+                 $21, $22, $23, $24, $25,
+                 $26, $27, $28,
+                 $29, $30,
+                 $31, $32,
+                 $33, $34,
+                 $35, $36,
+                 $37, $38,
+                 $39,
                  'ai')
                ON CONFLICT (document_id) WHERE document_id IS NOT NULL DO NOTHING`,
               [invoiceId, doc.id, declaration_id, ...upsertParams]

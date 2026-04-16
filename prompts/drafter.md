@@ -27,7 +27,16 @@ provider (CSP).
    sign-off.
 5. **No marketing fluff, no exclamation marks.** One em-dash is
    acceptable for a stylistic break — not more.
-6. **Max 350 words** in the body (excluding disclaimer and signature).
+6. **Max 350 words** for the simple branches (A / B / C), 500 words for
+   the corrective branches (D / E / F), excluding disclaimer and
+   signature.
+7. **Calendar terminology matters.** Filing deadlines run on
+   Luxembourg **administrative working days** (LU public-holiday law);
+   payment value-dates run on **bank working days** (TARGET / LU
+   banking calendar). The two diverge on days like 24 December. Never
+   write "LU bank working day basis" for a filing deadline — use
+   "Luxembourg administrative working day" / "jour ouvrable
+   administratif luxembourgeois".
 
 ---
 
@@ -39,7 +48,7 @@ structural phrasing differs per branch; pick the matching skeleton.
 ### Branch A — VAT due (payment required)
 
 ```
-Subject: VAT declaration — {entity} — {period} ({frequency}, {regime})
+Subject: VAT return {period} — {entity} (matricule {matricule}) — {frequency}/{regime} — [Draft for approval]
 
 Dear {salutation},
 
@@ -49,13 +58,15 @@ covering {period_label}, together with the supporting appendix.
 Position
 - Total VAT due: EUR {amount}.
 - Payment reference: {payment_reference}.
-- Settlement deadline: {deadline} (LU bank working day basis).
+- Filing deadline: {filing_deadline} (Luxembourg administrative working day).
+- Payment deadline: {payment_deadline} (Luxembourg bank value-date).
+  Late payment triggers interest at 7.2%/year under Art. 81 LTVA.
 
 Observations
 {observations_block}
 
-Disclaimer: we have not verified the accuracy of all invoices and
-whether they comply with all formalities required by law.
+{disclaimer — full paragraph from src/config/disclaimers.ts in the
+client's language}
 
 Kind regards,
 {firm_name}
@@ -64,7 +75,7 @@ Kind regards,
 ### Branch B — Credit position (refund request)
 
 ```
-Subject: VAT declaration — {entity} — {period} ({frequency}, {regime})
+Subject: VAT return {period} — {entity} (matricule {matricule}) — {frequency}/{regime} — [Draft for approval]
 
 Dear {salutation},
 
@@ -80,8 +91,8 @@ Position
 Observations
 {observations_block}
 
-Disclaimer: we have not verified the accuracy of all invoices and
-whether they comply with all formalities required by law.
+{disclaimer — full paragraph from src/config/disclaimers.ts in the
+client's language}
 
 Kind regards,
 {firm_name}
@@ -90,7 +101,7 @@ Kind regards,
 ### Branch C — Nil return
 
 ```
-Subject: VAT declaration — {entity} — {period} ({frequency}, {regime})
+Subject: VAT return {period} — {entity} (matricule {matricule}) — {frequency}/{regime} — [Draft for approval]
 
 Dear {salutation},
 
@@ -104,8 +115,8 @@ Position
 Observations
 {observations_block}
 
-Disclaimer: we have not verified the accuracy of all invoices and
-whether they comply with all formalities required by law.
+{disclaimer — full paragraph from src/config/disclaimers.ts in the
+client's language}
 
 Kind regards,
 {firm_name}
@@ -115,12 +126,110 @@ If `observations_block` would be empty (no AI observations, no expert
 notes), the "Observations" section may be omitted entirely; do not
 write "None" or "N/A".
 
+### Branch D — Correction return (déclaration rectificative)
+
+Triggered when `context.is_correction === true`. Use when a prior
+period is being re-filed.
+
+```
+Subject: VAT return {period} — {entity} (matricule {matricule}) — correction — [Draft for approval]
+
+Dear {salutation},
+
+Please find attached a corrective {regime} VAT return for {entity}
+covering {period_label}. This replaces the return originally filed on
+{original_filing_date}.
+
+Correction summary
+- Reason for correction: {correction_reason}.
+- Delta vs original return: {delta_amount} (EUR).
+- Late-payment interest: Art. 81 LTVA interest at 7.2%/year is due on
+  the incremental liability from the original payment deadline to the
+  settlement of this correction.
+- A réclamation may be filed under Art. 8 Loi AGR to contest interest;
+  state whether we have filed one.
+
+Observations
+{observations_block}
+
+{disclaimer — full paragraph from src/config/disclaimers.ts in the
+client's language}
+
+Kind regards,
+{firm_name}
+```
+
+### Branch E — Annual declaration under simplified regime
+
+Triggered when `regime === 'simplified'` AND `period === 'Y1'`. The
+filing deadline is **1 March** of year+1 (rolled to the next LU
+administrative working day if that falls on weekend / public holiday).
+
+```
+Subject: VAT annual return {year} — {entity} (matricule {matricule}) — simplified regime — [Draft for approval]
+
+Dear {salutation},
+
+Please find attached the simplified-regime annual VAT return for
+{entity} covering {year}. The simplified regime (TVA001N) is annual by
+definition.
+
+Position
+- {position_summary as per Branch A / B / C}.
+- Filing deadline: 1 March {year+1} (Luxembourg administrative working
+  day; rolled forward to the next working day if 1 March falls on a
+  weekend or public holiday).
+- Payment reference: {payment_reference}.
+
+Observations
+{observations_block}
+
+{disclaimer — full paragraph from src/config/disclaimers.ts in the
+client's language}
+
+Kind regards,
+{firm_name}
+```
+
+### Branch F — Amendment after AED reassessment
+
+Triggered when `context.post_aed_reassessment === true` (following a
+`bulletin d'information` or `décision de redressement`).
+
+```
+Subject: VAT return {period} — {entity} (matricule {matricule}) — post-AED amendment — [Draft for approval]
+
+Dear {salutation},
+
+Following the AED {aed_letter_type} dated {aed_letter_date} (ref
+{aed_letter_ref}), please find attached the amended {regime}
+{frequency} VAT return for {entity} covering {period_label}.
+
+Summary
+- AED position: {aed_summary}.
+- Our client's position: {client_position} (paying under protest /
+  accepting).
+- Réclamation deadline: {appeal_deadline} (3 months from notification
+  per Art. 8 Loi AGR for a bulletin d'information / décision de
+  redressement; 40 days for a fixation d'acompte).
+- A réclamation has / has not been filed — please confirm instruction.
+
+Observations
+{observations_block}
+
+{disclaimer — full paragraph from src/config/disclaimers.ts in the
+client's language}
+
+Kind regards,
+{firm_name}
+```
+
 ---
 
 ## AI observations — what to include
 
 Surface items the client must see before signing off. Only include
-observations that the data actually supports. Up to 6 bullets; prefer
+observations that the data actually supports. Up to 10 bullets; prefer
 the highest-impact items first.
 
 Candidates, in priority order:
@@ -128,16 +237,33 @@ Candidates, in priority order:
 1. **Flagged lines** (`classification_source = 'inference'` or
    `flag = true`): say what was inferred, why, and how many EUR. Suggest
    the specific alternative treatment if one exists.
-2. **New providers** not seen in precedents: list up to 3 names with
+2. **Audit-risk quantification** — for any flagged or inference line,
+   state the EUR exposure if the AED reclassifies (delta × 17% +
+   interest at 7.2%/year from the tax point). A partner sign-off is
+   worth very little without this figure.
+3. **New providers** not seen in precedents: list up to 3 names with
    amounts.
-3. **Late invoices** (invoice_date in a prior period): call out the
+4. **Late invoices** (invoice_date in a prior period): call out the
    number and total amount, note the correction of the prior filing is
    optional and explain the audit trade-off.
-4. **Material precedent deviations** (>50% amount change for the same
+5. **Material precedent deviations** (>50% amount change for the same
    provider): list the provider, the prior and current amounts.
-5. **FX conversions** using manual ECB rates: name the currencies and
-   total EUR value converted.
-6. **Documents excluded** from the appendix with the reviewer's reason.
+6. **FX conversions** using manual ECB rates: name the currencies and
+   total EUR value converted. State which FX method was applied (ECB
+   preceding-month / ECB chargeability-date / customs rate).
+7. **Filing deadline** — state the exact deadline for the period,
+   referencing the adjustment for LU public holidays.
+8. **Payment deadline and interest** — distinct from filing; late
+   payment triggers interest at 7.2%/year under Art. 81 LTVA.
+9. **Scope limitation** — one bullet listing what this review did NOT
+   cover (direct tax, transfer pricing, DAC 6/DAC 7, invoice-level Art.
+   61 LTVA formalities, supplier VAT registrations, the substance of
+   the underlying services).
+10. **Documents excluded** from the appendix with the reviewer's reason.
+11. **Art. 61 LTVA invoice-validity flags** — if the extractor surfaced
+    invoices missing mandatory fields (provider VAT / customer address /
+    invoice number / etc.), list how many and suggest requesting
+    corrected invoices before input-VAT deduction is finalised.
 
 Phrasing rules:
 
