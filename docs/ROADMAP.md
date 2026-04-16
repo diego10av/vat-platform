@@ -28,6 +28,8 @@ Effort: S (< 1 day) · M (1-3 days) · L (3-10 days) · XL (> 10 days)
 | 6 | **Rate limiting + Anthropic budget alerts** | S | Middleware rate limit on `/api/agents/*`. Monthly budget cap per firm. Kill-switch if overrun. *Budget-cap half shipped in commit [incoming] — monthly SUM over api_calls + 429 refusal at cap. Rate limiting per minute still pending.* |
 | 7 | **Refactor declaration page into subfiles** | M | 2,480-line monolith → DocumentsTab / ReviewTab / FilingTab / OutputsTab / PreviewPanel. Pure mechanical refactor; business logic unchanged. |
 | 8 | **Pricing validated with 5 customer calls** | M | Not code. 5 discovery calls with LU fiduciary firms. Validate the seats-+-per-declaration hypothesis. |
+| 9 | **In-product chat with Opus (Ask cifra)** | M | Right-side drawer triggered from every page. Single-turn Q&A v1 → threaded v2. Context-aware (knows current declaration / selected line / entity). Opus 4.5 with legal-sources.ts in system prompt, budget-guarded, answers in user's language with clickable legal_ref pills. Converts legal-watch from reference docs into a live assistant. Used EVERY day by every reviewer → higher retention than almost any other feature. |
+| 10 | **ViDA Peppol e-invoicing module — Pillar 1 pre-empt** | L | Structured e-invoice generator (Peppol-BIS / EN-16931 XML). LU clients with FR / BE / IT / PL subsidiaries already need this today (those jurisdictions have mandatory B2B e-invoicing live). Pre-empts ViDA 2030 for LU. Also: incoming Peppol ingestion — parse structured XML directly, skip OCR entirely, zero error rate. See `docs/VIDA.md` for full scoping. **Strategic priority**: Diego's fiduciary clients ask about e-invoicing today; cifra can cross-sell this to every VAT customer. |
 
 ---
 
@@ -66,6 +68,39 @@ Effort: S (< 1 day) · M (1-3 days) · L (3-10 days) · XL (> 10 days)
 | 30 | **Knowledge base / inline help** | M | "What's the difference between LUX_17 and LUX_17_NONDED?" surfaces `legal-sources.ts` entries inline. |
 | 31 | **AED XSD real verification** | L | Resolve the 5 🟥 items in `docs/legal-watch-triage.md` (namespace, FormVersion, element name, period encoding, Agent block). Required before any real filing can be uploaded. |
 | 32 | **Expansion to Belgium VAT** | XL | New legal-sources corpus, new classifier rules, new forms. Year-2 roadmap. |
+| 33 | **Accounting integrations — Sage BOB 50 / Exact / Odoo** | L | Bidirectional connector: pull chart of accounts + suppliers from accounting, push journal-entry drafts from approved declarations. ENDS the double transcription (factura → IVA → contabilidad) that every fiduciary currently does manually. Upsell €100-200/mo per connection. Build NOT an accounting product — plug into what the client already uses. |
+
+---
+
+## 🧭 Fund-compliance expansion — the "cifra becomes compliance hub" arc
+
+Beyond VAT, Luxembourg fund entities face a long tail of periodic
+compliance obligations that are today filed via Excel, Word templates,
+or fragmented tools. cifra's classifier-first + legal-watch architecture
+transposes cleanly. Each line below is a separate product module; each
+becomes a new revenue line once the VAT customer base is established.
+
+| # | Module | Effort | Why it fits cifra |
+|---|--------|--------|-------------------|
+| 40 | **FATCA / CRS reporting (US-IRS + OECD CRS)** | XL | Fund entities file FATCA (US) + CRS (OECD) reports annually. Account-level data on reportable persons. Deadlines, schema (XML), transmission to AED (for LU). High-complexity compliance; same user (fiduciary firm). Legal-watch already handles multi-source tracking. |
+| 41 | **Subscription tax (taxe d'abonnement) filings** | L | Fund-type entities (UCITS, SIF, RAIF, SICAR) pay subscription tax quarterly based on NAV. Filing to AED on a specific form (TVA-TAB?). Numbers-heavy, rule-based, perfect fit. |
+| 42 | **Direct tax returns — corporate income tax + net wealth tax** | XL | LU corporate income tax (IRC + ICC + NWT). SOPARFIs and active holdings file annually on Form 500. Less automatable than VAT but same customer base. Consider partnership with Sage or building only for fund-entity-specific structures. |
+| 43 | **KYC / AML onboarding automation** | L | When a fiduciary onboards a new fund entity, it collects UBO forms, source-of-funds declarations, sanctions screening, PEP screening. Highly templated. cifra's document triage + extractor ports well. Adjacent to fund compliance but stylistically different — careful not to dilute VAT focus. |
+| 44 | **AIFMD / UCITS annex IV reporting** | L | AIFMs file quarterly Annex IV reports to CSSF. Data-heavy XML. Same pipe pattern as eCDF. Fits fund-type customers exactly. |
+| 45 | **DAC6 reportable arrangements** | M | Cross-border tax arrangements notification. Relatively low volume but high-stakes. Could be a cheap add-on. |
+| 46 | **CBAM quarterly reports** | M | For clients importing steel / aluminium / cement / fertilisers. Narrow applicability but nobody is serving LU importers on this today (2026 still transitional phase). |
+| 47 | **CESOP cross-reference viewer** | S | CESOP data is available to tax authorities since 2024 — fiduciary firms don't see what AED sees. cifra could surface CESOP patterns for clients to self-check before AED does. |
+
+**Strategic note:** Diego's stated vision is "cifra becomes the
+compliance hub for LU fund entities". Each module above takes ~4-8
+weeks of focused work once the VAT core is stable. Aim: one new module
+per quarter after reaching 20 paying customers. Priority order when
+entering this phase:
+  1. Subscription tax (small, high-margin, very common)
+  2. FATCA/CRS (high-value, complex, annual cycle fits cifra's rhythm)
+  3. ViDA Peppol e-invoicing (already listed P1 #10 above — cross-sold)
+  4. AIFMD Annex IV (fund-specific, high-margin)
+  5. Everything else by customer demand
 
 ---
 

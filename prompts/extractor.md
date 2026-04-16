@@ -335,46 +335,101 @@ applies the entity's policy downstream.
 
 ---
 
-## Split invoices — split aggressively
+## Line structure — DEFAULT TO ONE LINE; split only when FORCED
 
-Many invoices have multiple lines with different VAT treatments. **Split
-whenever ANY of the following differs between parts of the invoice**:
+The printed layout of an invoice is **NOT** your line structure. A
+notary invoice with 8 printed items all at the standard LU 17% rate
+MUST produce **ONE** extractor line, not eight. Same for a legal-firm
+invoice with 5 "professional services" items all taxable at 17%.
+Same for a consulting invoice with 12 hourly-breakdown rows at 17%.
 
-- **Different rates**: a notary invoice might list honoraires (17%) +
-  registration duties (0%) + disbursements (0%) — three lines.
-- **Different tax treatments at the same rate**: 0% rent (Art 44) is NOT
-  the same as 0% disbursement (out of scope) is NOT the same as 0%
-  Chamber-of-Commerce cotisation — keep them as separate lines so the
-  classifier can treat them correctly. Use `is_disbursement` and
-  `exemption_reference` to disambiguate.
-- **Goods vs services** on the same invoice (rare but occurs with
-  hybrid deliveries) — always separate.
-- **Different service periods** on the same invoice (e.g. Q1 + Q2
-  bundled) if the amounts are separately priced.
+### The master rule
 
-Common split patterns to recognise:
+**One invoice_line per unique VAT treatment code.** That's it.
 
-| Provider type       | Typical split                                                                                            |
-|---------------------|----------------------------------------------------------------------------------------------------------|
-| Notary              | honoraires 17% + droits d'enregistrement 0% (out-of-scope) + débours 0% (Art. 28§3 c)                   |
-| Fund administrator  | management fee 0% Art. 44§1 d + depositary 14% + transfer agency 17% + sub-custody pass-through         |
-| Depositary bank     | depositary fee 14% + safekeeping 14% + transaction fees 17% + sub-custody pass-through 0%               |
-| Audit firm          | audit fee 17% + out-of-pocket disbursements 0% Art. 28§3 c + regulator filing fees 0% out-of-scope     |
-| Landlord            | rent 0% Art. 44§1 b + charges locatives 8–17% + utilities 17%                                          |
-| Legal / law firm    | professional fees 17% + court-registry filing 0% débours + stamp duties 0% out-of-scope                |
-| Insurance broker    | commission 0% Art. 44§1 a + administration fees 17%                                                    |
-| Corporate services  | domiciliation 17% (Circ. 764) + CCSS / CSSF pass-throughs 0%                                           |
-| IT / SaaS           | subscription 17% LU + professional services 17% + third-party licence pass-through (supplier country)  |
+If all the printed items on the invoice would map to the **same**
+classifier treatment (all at LU 17% standard rate, or all exempt
+under the same Art. 44 sub-paragraph, or all out of scope), emit
+**ONE** consolidated line with:
 
-Also: an invoice that bundles TAXABLE and EXEMPT services at the same
-0% rate must still be split — the classifier cannot distinguish Art.
-28§3 c débours from Art. 44 exempt from out-of-scope if they are
-merged. Droits d'enregistrement fixes vs droits proportionnels are
-both 0% but neither is a disbursement in the Art. 28§3 c sense — keep
-them on their own lines.
+- **description**: a generic phrase that captures the invoice at a
+  category level. Prefer the title / heading the invoice itself uses
+  if present (e.g. *"Honoraires pour services professionnels"*).
+  Otherwise pick the cleanest of:
+  *"Professional services"*, *"Management fees"*, *"Legal advisory"*,
+  *"Audit fees"*, *"Depositary services"*, *"Corporate services"*,
+  *"IT services"*, *"Consulting services"*, *"Administration fees"*.
+  Preserve the original language of the invoice (FR / DE / EN).
+  DO NOT list every printed item in the description — the granular
+  breakdown lives in the PDF, which the reviewer can always open.
+- **amount_eur**: the **TOTAL ex-VAT** across all printed items.
+- **vat_applied**: the **TOTAL VAT** across all printed items.
+- **amount_incl**: the **TOTAL incl-VAT** across all printed items.
+- **vat_rate**: the single applied rate (e.g. `0.17`).
 
-**When in doubt, split.** The reviewer can merge back, but cannot easily
-un-merge a silently aggregated line.
+### When you MUST split into multiple lines
+
+Split **only** when at least one of these conditions is true across
+parts of the invoice:
+
+1. **Different VAT rates** (17% + 14% + 3% on the same invoice → a line
+   per rate).
+2. **Different tax treatments at the same rate** — specifically when a
+   classifier treatment code would differ. Examples that FORCE a split:
+   - Taxable services (LUX_17) + Art. 44 exempt letting (LUX_00)
+   - Taxable services (LUX_17) + disbursements (DEBOURS, Art. 28§3 c)
+   - Taxable services (LUX_17) + out-of-scope (OUT_SCOPE: registration
+     duties / stamp duty / CSSF supervisory fee / CCSS cotisation)
+   - Art. 44 exempt (EXEMPT_44) + Art. 44§1 a financial exempt
+     (EXEMPT_44A_FIN) — different sub-paragraphs
+3. **Goods vs services** mixed on the same invoice (IC_ACQ vs RC_EU_TAX
+   paths differ).
+4. **Disbursements** mentioned anywhere — always their own line with
+   `is_disbursement: true`. Even one disbursement in a 10-item list
+   forces 2 lines (the 9 services + the 1 disbursement).
+5. **Different explicit exemption references** cited for different
+   items (e.g. Art. 44§1 a on one, Art. 44§1 d on another).
+
+### Reference: common split patterns in LU fund-entity invoices
+
+| Provider type       | Typical split                                                                                       |
+|---------------------|-----------------------------------------------------------------------------------------------------|
+| Notary              | honoraires 17% + droits d'enregistrement 0% (out-of-scope) + débours 0% (Art. 28§3 c) — **3 lines** |
+| Fund administrator  | management fee Art. 44§1 d + depositary 14% + transfer agency 17% — **up to 3 lines**              |
+| Depositary bank     | safekeeping + oversight + transaction fees (usually all at 17% — **1 line** unless clearly split)  |
+| Audit firm          | audit fee 17% + out-of-pocket débours 0% — **2 lines** (audit fee is a single line even if broken down by hours internally) |
+| Landlord            | rent Art. 44§1 b + service charges + utilities — **1-3 lines depending on rate mix**               |
+| Legal / law firm    | professional fees 17% + court-registry débours + stamp duties out-of-scope — **1-3 lines**         |
+| Insurance broker    | commission Art. 44§1 a + admin fees 17% — **2 lines**                                              |
+| Corporate services  | domiciliation 17% + CCSS/CSSF pass-throughs 0% — **2 lines**                                       |
+| IT / SaaS           | subscription 17% + professional services 17% (all LU) — **1 line** unless one item is a licence pass-through to a non-EU vendor |
+| Consulting          | 5 hourly-breakdown rows, all at 17% → **1 line** *"Consulting services"* with total amount         |
+
+### Decision flowchart
+
+```
+Start with the invoice.
+  │
+  ├─ Is there any rate variation (17/14/8/3) across items?
+  │      YES → split by rate.
+  │      NO  → continue
+  │
+  ├─ Is there any treatment variation at the same rate
+  │   (taxable vs exempt vs out-of-scope vs disbursement)?
+  │      YES → split by treatment.
+  │      NO  → continue
+  │
+  ├─ Are there any is_disbursement items mixed with taxable services?
+  │      YES → separate the disbursement(s) as their own line(s).
+  │      NO  → continue
+  │
+  └─ ONE line. Total amounts. Generic description.
+```
+
+**Do not split for stylistic reasons.** The reviewer does not want to
+look at 8 rows of the same €125 legal-fees breakdown. They want one
+row with the total. Granular detail is in the PDF; they know how to
+open it.
 
 **Reconciliation check**: the sum of `lines[].amount_eur` must equal
 `total_ex_vat` within EUR 0.02. If it doesn't, split again or re-read.

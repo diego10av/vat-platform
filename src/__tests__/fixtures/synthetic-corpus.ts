@@ -630,7 +630,6 @@ export const FIXTURES: InvoiceFixture[] = [
       direction: 'outgoing', country: 'LU',
       description: 'Self-supply for private use of business asset',
       vat_rate: 0, vat_applied: 0, amount_eur: 1500,
-      // @ts-expect-error — extractor-supplied extension field
       self_supply_mentioned: true,
     } as InvoiceLineInput,
     expected: { treatment: 'AUTOLIV_17', rule: 'RULE 31' },

@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   HomeIcon, Building2Icon, FileTextIcon, InboxIcon, CalendarIcon,
-  ScaleIcon, BookOpenIcon,
+  BookOpenIcon,
   BarChart3Icon, ShieldCheckIcon, SettingsIcon,
   type LucideIcon,
 } from 'lucide-react';
@@ -50,14 +50,12 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
     {
       label: 'Library',
       items: [
-        // Registrations is no longer a top-level nav item — it's now a
-        // lifecycle state of the Client entity (vat_status =
-        // 'pending_registration'). The full /registrations list is
-        // still reachable from within the Client detail page, and
-        // pending-registration Clients show a badge on the Clients
-        // list. The old global registrations route stays alive for
-        // back-compat but is no longer surfaced in nav.
-        { href: '/legal-overrides',  label: 'Legal overrides', icon: ScaleIcon },
+        // Two items previously lived here that no longer do:
+        //   · Registrations  →  folded into Client lifecycle (vat_status =
+        //     'pending_registration'). Route kept for back-compat.
+        //   · Legal overrides →  folded into the Legal watch page as a
+        //     top section. Route kept for back-compat + deep-links from
+        //     agent explanations.
         { href: '/legal-watch',      label: 'Legal watch',     icon: BookOpenIcon },
       ],
     },

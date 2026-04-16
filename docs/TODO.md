@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-16
+> Last updated: 2026-04-17
 
 ---
 
@@ -96,6 +96,13 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-17** — Late-night sprint
+- ✅ CRITICAL extractor prompt fix — merge-default behavior (one line per unique VAT treatment, generic descriptions) — prevents the over-splitting that was creating N lines for a single invoice
+- ✅ ROADMAP expansion — chat Opus P0, ViDA/Peppol e-invoicing P1, accounting-integrations P2, new Fund-compliance section (#40-47: FATCA/CRS, subscription tax, direct tax, KYC/AML, AIFMD Annex IV, DAC6, CBAM, CESOP)
+- ✅ `docs/VIDA.md` — strategic briefing on VAT in the Digital Age (3 pillars, LU timeline, cifra product plan 5 phases, pricing, risks, immediate actions for Diego)
+- ✅ Nav cleanup — Legal overrides folded into Legal watch page as prominent top-card; route stays alive for deep-links; sidebar Library group now a single item
+- ✅ Pre-existing `@ts-expect-error` cleanup in synthetic-corpus fixture — unblocked clean typecheck
 
 **2026-04-16** — Tonight's sprint
 - ✅ Three strategy docs created (ROADMAP, BUSINESS_PLAN, positioning) — commit `4c85c81`

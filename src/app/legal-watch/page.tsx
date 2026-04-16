@@ -1,6 +1,13 @@
 // Legal-watch page — surfaces the living legal memory of the tool.
 // Source of truth is src/config/legal-sources.ts; this page presents
 // it with the maintainer flow (review dates, triage items).
+//
+// Note (nav-cleanup 2026-04-17): this page also now acts as the
+// entry-point for /legal-overrides (the firm-specific overrides that
+// yield to direct evidence but beat precedent/inference). We surface
+// an "Your overrides" card near the top so the user doesn't need a
+// separate nav item. The /legal-overrides route stays alive for
+// deep-links from agent explanations.
 
 import Link from 'next/link';
 import { BookOpenIcon, AlertOctagonIcon, GavelIcon, ScaleIcon, BuildingIcon, ArrowUpRightIcon } from 'lucide-react';
@@ -10,9 +17,27 @@ import {
   LU_LAW, EU_LAW, CIRCULARS, CASES_EU, CASES_LU, PRACTICE,
   sourcesDueForReview, type LegalSource,
 } from '@/config/legal-sources';
+import { query } from '@/lib/db';
 
-export default function LegalWatchPage() {
+// Don't cache this — the overrides count changes whenever the user
+// adds / edits / deletes an override, and we want the top card to
+// reflect reality when they come back.
+export const dynamic = 'force-dynamic';
+
+export default async function LegalWatchPage() {
   const due = sourcesDueForReview(12);
+
+  // Count of firm-specific legal overrides. Best-effort: if the
+  // table doesn't exist yet (fresh dev DB) we just show 0.
+  let overridesCount = 0;
+  try {
+    const rows = await query<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM legal_overrides`
+    );
+    overridesCount = Number(rows[0]?.count ?? 0) || 0;
+  } catch {
+    overridesCount = 0;
+  }
   const groups: Array<{ label: string; icon: React.ReactNode; map: Record<string, LegalSource>; tone: string }> = [
     { label: 'Luxembourg law',       icon: <GavelIcon size={14} />,     map: LU_LAW,    tone: 'text-brand-600' },
     { label: 'EU law',                icon: <ScaleIcon size={14} />,     map: EU_LAW,    tone: 'text-info-700' },
@@ -60,6 +85,40 @@ export default function LegalWatchPage() {
         </div>
       )}
 
+      {/* Your overrides — firm-specific rules that deviate from the
+          default interpretation of the sources below. Surfaced
+          prominently because (a) they're the only writeable thing
+          on this screen and (b) this is the main way the user
+          tells cifra "I know better than the default for my book".
+          The count makes the link feel live; 0 is still a useful
+          signal (nothing configured). */}
+      <section className="mb-6 rounded-xl border border-border bg-surface shadow-xs overflow-hidden">
+        <div className="px-5 py-4 flex items-start gap-4">
+          <div className="w-10 h-10 rounded-lg bg-brand-50 text-brand-700 inline-flex items-center justify-center shrink-0">
+            <ScaleIcon size={16} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-[14px] font-semibold text-ink tracking-tight">Your legal overrides</h2>
+              <Badge tone={overridesCount > 0 ? 'brand' : 'neutral'} size="xs">
+                {overridesCount} {overridesCount === 1 ? 'override' : 'overrides'}
+              </Badge>
+            </div>
+            <p className="text-[12.5px] text-ink-soft mt-1 leading-relaxed">
+              Firm-specific positions (e.g. a CJEU ruling, an AED circular, or a conservative
+              stance for a given provider) that change how a matching invoice is classified.
+              <span className="text-ink-muted"> Overrides beat precedent and inference — but yield to direct evidence.</span>
+            </p>
+          </div>
+          <Link
+            href="/legal-overrides"
+            className="shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-md border border-border-strong bg-surface text-[12px] font-medium text-ink-soft hover:border-brand-300 hover:text-brand-700 transition-colors"
+          >
+            {overridesCount > 0 ? 'Manage' : 'Add override'} <ArrowUpRightIcon size={12} />
+          </Link>
+        </div>
+      </section>
+
       {/* Source groups */}
       <div className="space-y-5">
         {groups.map(group => (
@@ -67,21 +126,10 @@ export default function LegalWatchPage() {
         ))}
       </div>
 
-      {/* Footer links */}
-      <div className="mt-8 pt-5 border-t border-divider grid grid-cols-1 md:grid-cols-2 gap-3">
-        <Link
-          href="/legal-overrides"
-          className="flex items-center gap-3 p-4 rounded-xl border border-border bg-surface hover:border-border-strong hover:shadow-sm transition-all"
-        >
-          <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 inline-flex items-center justify-center shrink-0">
-            <ScaleIcon size={14} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-[13px] font-semibold text-ink">Legal overrides</div>
-            <div className="text-[11.5px] text-ink-muted mt-0.5">Rule-level overrides that apply to specific providers or descriptions.</div>
-          </div>
-          <ArrowUpRightIcon size={14} className="text-ink-muted" />
-        </Link>
+      {/* Footer — external sources to watch. The legal-overrides
+          shortcut moved up to the top of the page (see the
+          "Your overrides" card) so the user sees it first. */}
+      <div className="mt-8 pt-5 border-t border-divider">
         <Link
           href="https://legilux.public.lu"
           target="_blank"
