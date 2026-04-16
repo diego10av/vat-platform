@@ -152,13 +152,30 @@ describe('Batch 6 rules (16-19)', () => {
   });
 
   // ─── RULE 18 — outgoing to non-EU customer ───
-  it('RULE 18 — outgoing, no VAT, customer_country=US → OUT_NONEU', () => {
+  it('RULE 18 — non-EU customer WITH VAT-ID → OUT_NONEU', () => {
+    // Batch E-1 finding: Art. 17§2 LTVA shifts B2C supplies back into LU
+    // scope. OUT_NONEU is only safe when we have evidence the customer is
+    // a taxable person, typically a VAT-ID or equivalent.
     const r = classifyInvoiceLine(inv({
-      direction: 'outgoing', country: 'LU', customer_country: 'US',
+      direction: 'outgoing', country: 'LU',
+      customer_country: 'US', customer_vat: 'US EIN 12-3456789',
       vat_rate: 0, vat_applied: 0, description: 'Advisory services',
     }));
     expect(r.treatment).toBe('OUT_NONEU');
     expect(r.rule).toBe('RULE 18');
+  });
+
+  it('RULE 18X — non-EU customer WITHOUT VAT-ID → flagged, not auto-classified', () => {
+    // A non-EU customer with no business-status evidence could be a B2C
+    // consumer, in which case Art. 17§2 LTVA makes the supply LU-taxable.
+    // Auto-exempting would under-collect 17% output VAT.
+    const r = classifyInvoiceLine(inv({
+      direction: 'outgoing', country: 'LU', customer_country: 'US',
+      vat_rate: 0, vat_applied: 0, description: 'Advisory services',
+    }));
+    expect(r.treatment).toBeNull();
+    expect(r.rule).toBe('RULE 18X');
+    expect(r.flag).toBe(true);
   });
 
   it('RULE 18 does NOT fire when the invoice is billed with 17% VAT', () => {
@@ -179,14 +196,20 @@ describe('Batch 6 rules (16-19)', () => {
     expect(r.treatment).not.toBe('OUT_NONEU');
   });
 
-  // ─── RULE 19 — import VAT from non-EU goods ───
-  it('RULE 19 — non-EU country + goods + VAT paid → IMPORT_VAT', () => {
+  // ─── RULE 19 — import VAT flag-only (Batch E-1 fix) ───
+  it('RULE 19 — non-EU supplier VAT is FLAGGED, not auto-deducted', () => {
+    // Batch E-1 CRITICAL finding: VAT on a non-EU supplier invoice is
+    // foreign VAT, not LU import VAT. LU import VAT comes from the
+    // customs declaration (DAU), not the commercial invoice. The earlier
+    // auto-deduction created Art. 70 LTVA exposure (10-50% penalties).
     const r = classifyInvoiceLine(inv({
       country: 'CN', description: 'Purchase of goods (industrial equipment)',
       vat_applied: 170, amount_eur: 1000,
     }));
-    expect(r.treatment).toBe('IMPORT_VAT');
+    expect(r.treatment).toBeNull();
     expect(r.rule).toBe('RULE 19');
+    expect(r.flag).toBe(true);
+    expect(r.flag_reason).toMatch(/foreign VAT|customs declaration|DAU/i);
   });
 
   it('RULE 19 does NOT fire for non-EU services with no VAT (that is RC_NONEU_*)', () => {
@@ -197,15 +220,160 @@ describe('Batch 6 rules (16-19)', () => {
   });
 });
 
-describe('Reverse charge rules', () => {
-  it('RULE 10 — EU + fund-mgmt + Art 44 → RC_EU_EX', () => {
+// ════════════════ Batch E-1 Opus fiscal audit regressions ════════════════
+describe('Batch E-1 audit fixes', () => {
+  it('Domiciliation invoice must NOT be exempt — AED Circ. 764 taxable at 17%', () => {
+    // Previously "domiciliation" lived in REAL_ESTATE_KEYWORDS, causing
+    // every SOPARFI domiciliation invoice (Circ. 764 service) to be
+    // silently exempted as Art. 44§1 b letting.
     const r = classifyInvoiceLine(inv({
-      country: 'DE',
-      description: 'AIFM management services Q1 - exonéré Art. 44',
-      invoice_text: 'Exempt from VAT under Article 44',
+      country: 'LU',
+      description: 'Domiciliation services Q1 2025',
+      vat_rate: 0, vat_applied: 0,
     }));
+    expect(r.treatment).toBe('LUX_17');
+    expect(r.rule).toBe('RULE 5D');
+    expect(r.flag).toBe(true);
+  });
+
+  it('Real-estate carve-out (parking) must NOT be Art. 44§1 b exempt', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'LU',
+      description: 'Parking space rental — underground',
+      vat_rate: 0, vat_applied: 0,
+    }));
+    expect(r.treatment).toBe('LUX_17');
+    expect(r.rule).toBe('RULE 5C');
+  });
+
+  it('Extractor-captured Art. 44§1 a reference → EXEMPT_44A_FIN', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'LU',
+      description: 'Custodian fees',
+      exemption_reference: 'Art. 44§1 a LTVA',
+      vat_rate: 0, vat_applied: 0,
+    }));
+    expect(r.treatment).toBe('EXEMPT_44A_FIN');
+    expect(r.rule).toBe('RULE 7A');
+  });
+
+  it('Extractor-captured Art. 44§1 b reference → EXEMPT_44B_RE', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'LU',
+      description: 'Office lease Q1',
+      exemption_reference: 'Art. 44 § 1 b LTVA',
+      vat_rate: 0, vat_applied: 0,
+    }));
+    expect(r.treatment).toBe('EXEMPT_44B_RE');
+    expect(r.rule).toBe('RULE 7B');
+  });
+
+  it('Extractor-captured Art. 45 opt-in on 17% outgoing → OUT_LUX_17_OPT', () => {
+    const r = classifyInvoiceLine(inv({
+      direction: 'outgoing', country: 'LU',
+      description: 'Office rental with Art. 45 opt-in',
+      exemption_reference: 'Art. 45 LTVA — option pour la taxation',
+      vat_rate: 0.17,
+    }));
+    expect(r.treatment).toBe('OUT_LUX_17_OPT');
+    expect(r.rule).toBe('RULE 15A');
+  });
+
+  it('Bare "cssf" no longer triggers OUT_SCOPE (third-party invoice)', () => {
+    // A law firm's invoice "CSSF filing assistance" is taxable at 17%,
+    // not out of scope. The tightened keyword list requires the specific
+    // public-authority phrase, not the bare regulator name.
+    const r = classifyInvoiceLine(inv({
+      country: 'LU', description: 'Legal fees — CSSF filing assistance',
+      vat_rate: 0, vat_applied: 0,
+    }));
+    // Should fall through to RULE 8 (flagged LU no-VAT) rather than
+    // silently exempting.
+    expect(r.treatment).not.toBe('OUT_SCOPE');
+  });
+
+  it('"cssf supervisory fee" still triggers OUT_SCOPE', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'LU', description: 'CSSF supervisory fee 2025',
+      vat_rate: 0, vat_applied: 0,
+    }));
+    expect(r.treatment).toBe('OUT_SCOPE');
+    expect(r.rule).toBe('RULE 6');
+  });
+
+  it('INFERENCE E — legal advisory from EU supplier to fund entity → RC_EU_TAX (taxable backstop)', () => {
+    // Legal services are taxable regardless of recipient. Without the
+    // backstop, INFERENCE C would have exempted this because the fund
+    // entity + generic "advisory" description match FUND_MGMT_KEYWORDS.
+    const r = classifyInvoiceLine(
+      inv({
+        country: 'DE',
+        description: 'Legal advisory on fund structuring',
+      }),
+      FUND_CTX,
+    );
+    expect(r.treatment).toBe('RC_EU_TAX');
+    expect(r.rule).toBe('INFERENCE E');
+    expect(r.flag).toBe(true);
+  });
+
+  it('INFERENCE C cancelled by exclusion keyword (SaaS)', () => {
+    // BlackRock (C-231/19): generic IT / SaaS is not "specific and
+    // essential to fund management". Must not auto-exempt.
+    const r = classifyInvoiceLine(
+      inv({
+        country: 'IE',
+        description: 'Portfolio management SaaS licence',
+      }),
+      FUND_CTX,
+    );
+    expect(r.rule).not.toBe('INFERENCE C');
+  });
+
+  it('Franchise-threshold LU supplier → LUX_00 via RULE 23', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'LU',
+      description: 'Service — régime de la franchise Art. 57',
+      vat_rate: 0, vat_applied: 0,
+    }));
+    expect(r.treatment).toBe('LUX_00');
+    expect(r.rule).toBe('RULE 23');
+  });
+});
+
+describe('Reverse charge rules', () => {
+  it('RULE 10 — EU + fund-mgmt + Art 44, entity IS a fund → RC_EU_EX', () => {
+    // Batch E-1 CRITICAL fix: the Art. 44§1 d fund-management exemption
+    // applies only to qualifying special investment funds per CJEU
+    // BlackRock (C-231/19) and Fiscale Eenheid X (C-595/13).
+    const r = classifyInvoiceLine(
+      inv({
+        country: 'DE',
+        description: 'AIFM management services Q1 - exonéré Art. 44',
+        invoice_text: 'Exempt from VAT under Article 44',
+      }),
+      FUND_CTX,
+    );
     expect(r.treatment).toBe('RC_EU_EX');
     expect(r.rule).toBe('RULE 10');
+  });
+
+  it('RULE 10X — same invoice received by a NON-fund entity → RC_EU_TAX (flagged)', () => {
+    // SOPARFI / active-holding cannot claim Art. 44§1 d. Must reverse-
+    // charge at 17% per Art. 17§1 LTVA. This was the CRITICAL finding
+    // of the E-1 audit (AED Art. 70 penalty exposure).
+    const r = classifyInvoiceLine(
+      inv({
+        country: 'DE',
+        description: 'AIFM management services Q1 - exonéré Art. 44',
+        invoice_text: 'Exempt from VAT under Article 44',
+      }),
+      HOLDING_CTX,
+    );
+    expect(r.treatment).toBe('RC_EU_TAX');
+    expect(r.rule).toBe('RULE 10X');
+    expect(r.flag).toBe(true);
+    expect(r.flag_reason).toMatch(/BlackRock|qualifying|fund/i);
   });
 
   it('RULE 11 — EU services with no VAT, no exemption → RC_EU_TAX', () => {
@@ -228,11 +396,14 @@ describe('Reverse charge rules', () => {
 
 describe('Inference rules (priority 4)', () => {
   it('INFERENCE A — EU advisory matching outgoing exempt pattern → RC_EU_EX (flagged)', () => {
+    // FUND_CTX has exempt_outgoing_total = 1_500_000. Under the new
+    // tightened sameMagnitude (×3, down from ×10), the incoming amount
+    // must be within 500k..4.5M. Use 800k (ratio 1.875).
     const r = classifyInvoiceLine(
       inv({
         country: 'PL',
         description: 'Investment advisory fee III Q 2025',
-        amount_eur: 350_000,
+        amount_eur: 800_000,
       }),
       FUND_CTX
     );
@@ -240,6 +411,20 @@ describe('Inference rules (priority 4)', () => {
     expect(r.rule).toBe('INFERENCE A');
     expect(r.flag).toBe(true);
     expect(r.source).toBe('inference');
+  });
+
+  it('INFERENCE A does NOT fire when magnitude ratio exceeds ×3 (tightened)', () => {
+    // Batch E-1: old ×10 was too loose — a 100k incoming and a 1M
+    // exempt outgoing matched, producing many false-positive inferences.
+    const r = classifyInvoiceLine(
+      inv({
+        country: 'PL',
+        description: 'Investment advisory fee III Q 2025',
+        amount_eur: 300_000, // ratio 5× against 1.5M FUND_CTX outgoing
+      }),
+      FUND_CTX
+    );
+    expect(r.rule).not.toBe('INFERENCE A');
   });
 
   it('INFERENCE A skips when amount magnitude is too different (and entity is not fund-type)', () => {

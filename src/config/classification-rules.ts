@@ -17,10 +17,20 @@ import type { TreatmentCode } from './treatment-codes';
 import {
   EXEMPTION_KEYWORDS,
   FUND_MGMT_KEYWORDS,
+  FUND_MGMT_EXCLUSION_KEYWORDS,
+  TAXABLE_PROFESSIONAL_KEYWORDS,
   REAL_ESTATE_KEYWORDS,
+  REAL_ESTATE_TAXABLE_CARVEOUTS,
+  DOMICILIATION_KEYWORDS,
   OUT_OF_SCOPE_KEYWORDS,
   GOODS_KEYWORDS,
+  ART_44_PARA_A_REFS,
+  ART_44_PARA_B_REFS,
+  ART_44_PARA_D_REFS,
+  ART_45_OPT_REFS,
+  FRANCHISE_KEYWORDS,
   containsAny,
+  findFirstMatch,
 } from './exemption-keywords';
 
 export interface InvoiceLineInput {
@@ -39,6 +49,7 @@ export interface InvoiceLineInput {
   is_credit_note?: boolean | null;
   exemption_reference?: string | null;  // explicit Art. 44§1 b / 44§1 d / etc.
   customer_country?: string | null;     // ISO-2 of the invoice recipient (for outgoing)
+  customer_vat?: string | null;         // VIES VAT number of the recipient (for outgoing B2B evidence)
 }
 
 export interface EntityContext {
@@ -81,8 +92,18 @@ export function classifyInvoiceLine(
 
   // PRIORITY 2 — direct evidence rules (always take precedence over precedent
   //              and inference, because the invoice itself states the facts).
-  const direct = applyDirectEvidenceRules(line);
+  const direct = applyDirectEvidenceRules(line, context);
   if (direct) return direct;
+
+  // PRIORITY 2.5 — INFERENCE E taxable backstop. When a clearly-taxable
+  // professional-services keyword is present (legal, tax, audit, M&A),
+  // do NOT let the INFERENCE A/B/C/D rules auto-exempt. These services
+  // are taxable regardless of entity type, so they reverse-charge at the
+  // standard rate.
+  if (line.direction === 'incoming') {
+    const taxableBackstop = applyTaxableBackstop(line);
+    if (taxableBackstop) return taxableBackstop;
+  }
 
   // PRIORITY 3 — precedent match from prior year
   if (precedent) {
@@ -115,21 +136,72 @@ export function classifyInvoiceLine(
 }
 
 // ────────────────────────── Priority 2: direct evidence ──────────────────────────
-function applyDirectEvidenceRules(line: InvoiceLineInput): ClassificationResult | null {
+//
+// Ordering inside this function matters. Higher-priority signals (explicit
+// extractor flags, explicit legal citations) beat text-sweep heuristics.
+// Every rule that fires on text alone carries a flag so the reviewer can
+// override.
+function applyDirectEvidenceRules(
+  line: InvoiceLineInput,
+  ctx: EntityContext = {},
+): ClassificationResult | null {
   const country = (line.country || '').toUpperCase();
   const customerCountry = (line.customer_country || '').toUpperCase();
+  const customerVat = (line.customer_vat || '').trim();
   const desc = line.description || '';
   const text = fullText(line);
+  const exRef = line.exemption_reference || '';
   const isLu = isLuxembourg(country);
   const isEu = isEU(country) && !isLu;
+  const entityType = ctx.entity_type;
+  const isFundEntity = entityType === 'fund';
 
   // ═══════════════ RULE 16 — Extractor-flagged disbursement ═══════════════
-  // When the extractor marks a line as is_disbursement (pure pass-through
-  // débours), it beats every other signal. Disbursements are outside the
-  // VAT scope per Art. 28§3 c LTVA and must go to DEBOURS, not LUX_00.
+  // Art. 28§3 c LTVA débours have four evidentiary conditions (expense
+  // incurred in the name of the customer, booked in a suspense account,
+  // no margin, supported by the original third-party invoice). The
+  // extractor's single boolean is a starting signal; we classify as
+  // DEBOURS but always flag so the reviewer confirms Art. 70 defensibility.
   if (line.is_disbursement === true) {
-    return ruleMatch('RULE 16', 'DEBOURS',
-      'Pure pass-through disbursement (débours) at cost — Art. 28§3 c LTVA (outside the VAT scope).');
+    return {
+      treatment: 'DEBOURS',
+      rule: 'RULE 16',
+      reason: 'Pure pass-through disbursement (débours) at cost — Art. 28§3 c LTVA (outside the VAT scope).',
+      source: 'rule',
+      flag: true,
+      flag_reason:
+        'Extractor flagged this line as a disbursement. Art. 28§3 c LTVA requires four evidentiary conditions: '
+        + '(a) expense incurred in the name and for the account of the customer, (b) booked in a suspense account, '
+        + '(c) no margin (pure pass-through), (d) the original third-party invoice is transferred to the customer. '
+        + 'Confirm all four before filing.',
+    };
+  }
+
+  // ═══════════════ Consume extractor-captured Art. 44 reference ═══════════════
+  // When the extractor captured an explicit paragraph reference, it beats
+  // every text-sweep. We use the reference to pick the sub-paragraph so
+  // Annexe B is categorised correctly.
+  if (exRef) {
+    if (line.direction === 'incoming') {
+      if (containsAny(exRef, ART_44_PARA_A_REFS)) {
+        return ruleMatch('RULE 7A', 'EXEMPT_44A_FIN',
+          `Exempt under Art. 44§1 a LTVA (financial services) — extractor-captured reference "${exRef}".`);
+      }
+      if (containsAny(exRef, ART_44_PARA_B_REFS)) {
+        return ruleMatch('RULE 7B', 'EXEMPT_44B_RE',
+          `Exempt under Art. 44§1 b LTVA (real-estate letting) — extractor-captured reference "${exRef}".`);
+      }
+      if (containsAny(exRef, ART_44_PARA_D_REFS)) {
+        return ruleMatch('RULE 7D', 'EXEMPT_44',
+          `Exempt under Art. 44§1 d LTVA (fund management) — extractor-captured reference "${exRef}". Verify the recipient is a qualifying special investment fund (BlackRock C-231/19).`);
+      }
+    }
+    if (line.direction === 'outgoing' && containsAny(exRef, ART_45_OPT_REFS)) {
+      if (rateEquals(line.vat_rate, 0.17)) {
+        return ruleMatch('RULE 15A', 'OUT_LUX_17_OPT',
+          `Outgoing real-estate letting taxed by option under Art. 45 LTVA — extractor-captured reference "${exRef}".`);
+      }
+    }
   }
 
   if (line.direction === 'incoming') {
@@ -141,54 +213,168 @@ function applyDirectEvidenceRules(line: InvoiceLineInput): ClassificationResult 
 
     // LU + no VAT + direct keywords
     if (isLu && isZeroOrNull(line.vat_rate)) {
+      // Domiciliation — ALWAYS taxable at 17% under Circ. 764. This block
+      // must run BEFORE any real-estate check because the old behaviour
+      // of classifying "domiciliation" as LUX_00 was the most frequent
+      // misclassification for SOPARFIs.
+      if (containsAny(desc, DOMICILIATION_KEYWORDS)) {
+        return {
+          treatment: 'LUX_17',
+          rule: 'RULE 5D',
+          reason: 'Domiciliation / corporate services — taxable at 17% per AED Circ. 764 (Art. 28-5 LTVA). Not a real-estate letting.',
+          source: 'rule',
+          flag: true,
+          flag_reason:
+            'Domiciliation invoice with no VAT shown. AED Circ. 764 requires 17% on this service. '
+            + 'Either the supplier forgot the VAT (ask for a corrected invoice) or this is not in fact '
+            + 'a domiciliation. Do NOT treat as real-estate letting under Art. 44§1 b.',
+        };
+      }
       if (containsAny(desc, REAL_ESTATE_KEYWORDS)) {
-        return ruleMatch('RULE 5', 'LUX_00', 'Exempt letting of immovable property (Art. 44§1 b LTVA).');
+        // Carve-out check: hotels, parking, hunting, machinery rental are
+        // taxable per Art. 44§1 b points 1-4.
+        const carveOut = findFirstMatch(desc, REAL_ESTATE_TAXABLE_CARVEOUTS);
+        if (carveOut) {
+          return {
+            treatment: 'LUX_17', rule: 'RULE 5C',
+            reason: `Real-estate supply (${carveOut}) — carve-out from Art. 44§1 b exemption; taxable at 17%. Verify rate on the invoice.`,
+            source: 'rule', flag: true,
+            flag_reason: `"${carveOut}" is one of the Art. 44§1 b points 1-4 carve-outs and is always taxable.`,
+          };
+        }
+        return {
+          treatment: 'LUX_00', rule: 'RULE 5',
+          reason: 'Exempt letting of immovable property (Art. 44§1 b LTVA).',
+          source: 'rule', flag: true,
+          flag_reason:
+            'Real-estate keyword matched. Confirm: (i) the landlord has NOT opted for taxation '
+            + 'under Art. 45 (in which case VAT should be 17%); (ii) the property is not within '
+            + 'the carve-outs (hotel, parking, hunting, safe-deposit, machinery rental).',
+        };
       }
       if (containsAny(desc, OUT_OF_SCOPE_KEYWORDS)) {
-        return ruleMatch('RULE 6', 'OUT_SCOPE', 'Out of scope — not a supply of goods or services within VAT scope (Chamber of Commerce cotisation, CSSF subscription).');
+        const matched = findFirstMatch(desc, OUT_OF_SCOPE_KEYWORDS);
+        return ruleMatch('RULE 6', 'OUT_SCOPE',
+          `Out of scope — "${matched ?? 'unrecognised'}" is outside the VAT scope (LTVA Art. 4§5 public-authority levy / Art. 2 no-consideration).`);
+      }
+      if (containsAny(text, FRANCHISE_KEYWORDS)) {
+        return ruleMatch('RULE 23', 'LUX_00',
+          'LU supplier under Art. 57 LTVA franchise threshold — no VAT charged and no deduction available to the recipient.');
       }
       if (containsAny(text, EXEMPTION_KEYWORDS)) {
-        return ruleMatch('RULE 7', 'EXEMPT_44', 'Exempt under Art. 44§1 d LTVA (fund management) — transposing Art. 135(1)(g) EU VAT Directive.');
+        // Pick Art. 44 sub-paragraph from the matched keyword family.
+        if (containsAny(text, FUND_MGMT_KEYWORDS)) {
+          return ruleMatch('RULE 7', 'EXEMPT_44',
+            'Exempt under Art. 44§1 d LTVA (fund management) — transposing Art. 135(1)(g) EU VAT Directive.');
+        }
+        return {
+          treatment: 'EXEMPT_44', rule: 'RULE 7',
+          reason: 'Exempt supply with an Art. 44 reference — specific sub-paragraph not determined.',
+          source: 'rule', flag: true,
+          flag_reason: 'Exemption keyword matched but sub-paragraph (44§1 a/b/c/d/e) could not be inferred. Select the correct code manually.',
+        };
       }
       // RULE 8 is default catch-all — handled in applyFallbackRules
     }
 
     // ═══════════════ RULE 17 — IC acquisition of goods, by rate ═══════════════
-    // Refines the legacy RULE 9 → IC_ACQ with rate-specific treatments so
-    // boxes 711/713/715/717 can be filled accurately. Falls back to the
-    // generic IC_ACQ when no rate is readable.
+    // Correct IC pattern: zero VAT on the supplier invoice (exempt IC supply
+    // at origin per Art. 138 Directive). We classify at the applicable LU
+    // rate. When the supplier erroneously charged foreign VAT, flag as
+    // anomaly instead of silently reverse-charging at the foreign rate.
     if (isEu && containsAny(desc, GOODS_KEYWORDS)) {
+      if (!isZeroOrNull(line.vat_applied)) {
+        return {
+          treatment: null, rule: 'RULE 17X',
+          reason: 'EU supplier charged foreign VAT on a goods supply — anomaly.',
+          source: 'rule', flag: true,
+          flag_reason:
+            'Intra-Community supplies of goods are normally exempt at origin (Art. 138 Directive) '
+            + 'and the acquirer reverse-charges at the LU rate. This invoice shows supplier VAT — '
+            + 'request a corrected invoice and seek refund in the origin Member State.',
+        };
+      }
       if (rateEquals(line.vat_rate, 0.17)) return ruleMatch('RULE 17', 'IC_ACQ_17', 'Intra-Community acquisition of goods, applicable LU rate 17% — Art. 21 LTVA.');
       if (rateEquals(line.vat_rate, 0.14)) return ruleMatch('RULE 17', 'IC_ACQ_14', 'Intra-Community acquisition of goods, applicable LU rate 14% — Art. 21 LTVA.');
       if (rateEquals(line.vat_rate, 0.08)) return ruleMatch('RULE 17', 'IC_ACQ_08', 'Intra-Community acquisition of goods, applicable LU rate 8% — Art. 21 LTVA.');
       if (rateEquals(line.vat_rate, 0.03)) return ruleMatch('RULE 17', 'IC_ACQ_03', 'Intra-Community acquisition of goods, applicable LU rate 3% — Art. 21 LTVA.');
-      // No rate readable — fall back to the legacy generic code (RULE 9).
-      return ruleMatch('RULE 9', 'IC_ACQ', 'Intra-Community acquisition of goods (Art. 21 LTVA) — rate not determined; reviewer may re-classify.');
+      // No rate readable — fall back to the legacy generic code (RULE 9), flag.
+      return {
+        treatment: 'IC_ACQ', rule: 'RULE 9',
+        reason: 'Intra-Community acquisition of goods (Art. 21 LTVA) — applicable LU rate not determined.',
+        source: 'rule', flag: true,
+        flag_reason: 'Applicable LU rate could not be inferred. Select IC_ACQ_17 / 14 / 08 / 03 manually before filing — box 051 = Σ(711..717) must reconcile.',
+      };
     }
 
-    // EU (non-LU) + no VAT + fund management + explicit exemption
+    // ═══════════════ RULE 10 — RC EU exempt (fund management) ═══════════════
+    // Gated on entity_type === 'fund'. Per CJEU BlackRock (C-231/19) and
+    // Fiscale Eenheid X (C-595/13), the Art. 44§1 d exemption applies only
+    // when the recipient is a qualifying special investment fund. A
+    // SOPARFI / active-holding / GP receiving management fees must
+    // reverse-charge at 17% (RC_EU_TAX), not RC_EU_EX. The earlier rule
+    // auto-exempted without entity-type guard — CRITICAL AED exposure.
     if (isEu && isZeroOrNull(line.vat_applied)
         && containsAny(text, FUND_MGMT_KEYWORDS)
         && containsAny(text, EXEMPTION_KEYWORDS)) {
-      return ruleMatch('RULE 10', 'RC_EU_EX', 'Reverse charge, exempt under Art. 44§1 d LTVA (fund management) — eCDF box 435.');
+      if (isFundEntity) {
+        return ruleMatch('RULE 10', 'RC_EU_EX',
+          'Reverse charge, exempt under Art. 44§1 d LTVA (fund management to a qualifying special investment fund) — eCDF box 435.');
+      }
+      // Non-fund entity — do NOT auto-exempt.
+      return {
+        treatment: 'RC_EU_TAX', rule: 'RULE 10X',
+        reason: 'EU fund-management-style invoice received by a non-fund entity — reverse-charge at 17% (Art. 17§1 LTVA).',
+        source: 'rule', flag: true,
+        flag_reason:
+          'Invoice cites Art. 44 but the recipient is not classified as a qualifying special investment fund '
+          + '(per BlackRock C-231/19 / Fiscale Eenheid X C-595/13). Treated as taxable reverse-charge. '
+          + 'If the entity IS a qualifying fund (UCITS, SIF, RAIF, SICAR, Part II UCI), change entity_type and re-run.',
+      };
     }
 
-    // ═══════════════ RULE 19 — Import VAT from non-EU goods ═══════════════
-    // Non-EU origin + goods keywords + some VAT actually paid (to customs)
-    // on the invoice or extractor. Heuristic only — the reviewer confirms.
+    // ═══════════════ RULE 19 — Import VAT from non-EU goods (FLAG-ONLY) ═══════════════
+    // Previous behaviour auto-classified the line as IMPORT_VAT and
+    // promised deduction in box 077. That was fiscally WRONG — the VAT on
+    // a foreign supplier's commercial invoice is foreign VAT, not LU
+    // import VAT. LU import VAT arises from the customs declaration (DAU)
+    // and is only deductible against that document. Auto-deducting the
+    // commercial VAT overstates deductions and is exactly what triggers
+    // Art. 70 LTVA penalties. We now FLAG without classifying.
     if (!isLu && !isEu && country !== ''
         && containsAny(desc, GOODS_KEYWORDS)
         && !isZeroOrNull(line.vat_applied)) {
-      return ruleMatch('RULE 19', 'IMPORT_VAT',
-        'Goods imported from outside the EU with customs VAT paid (Art. 27 LTVA) — deductible in box 077 if used for taxable activity.');
+      return {
+        treatment: null, rule: 'RULE 19',
+        reason: 'Non-EU goods supplier invoice with VAT-like amount — requires manual routing.',
+        source: 'rule', flag: true,
+        flag_reason:
+          'VAT on a non-EU supplier invoice is FOREIGN VAT and is NOT deductible in Luxembourg. '
+          + 'LU import VAT arises from the customs declaration (DAU / bordereau des douanes), not '
+          + 'the commercial invoice. Route options: (a) if you hold the DAU, classify as IMPORT_VAT '
+          + 'manually and book the customs VAT (not the commercial one) in box 077; (b) otherwise, '
+          + 'the commercial-invoice VAT is unrecoverable foreign VAT — classify as LUX_00 and absorb.',
+      };
     }
 
-    // Non-EU + no VAT + fund management + explicit exemption
+    // ═══════════════ RULE 12 — RC non-EU exempt (fund management) ═══════════════
+    // Same entity-type guard as RULE 10.
     if (!isLu && !isEu && country !== ''
         && isZeroOrNull(line.vat_applied)
         && containsAny(text, FUND_MGMT_KEYWORDS)
         && containsAny(text, EXEMPTION_KEYWORDS)) {
-      return ruleMatch('RULE 12', 'RC_NONEU_EX', 'Reverse charge, exempt under Art. 44§1 d LTVA (fund management, non-EU supplier) — eCDF box 445.');
+      if (isFundEntity) {
+        return ruleMatch('RULE 12', 'RC_NONEU_EX',
+          'Reverse charge, exempt under Art. 44§1 d LTVA (fund management to a qualifying special investment fund, non-EU supplier) — eCDF box 445.');
+      }
+      return {
+        treatment: 'RC_NONEU_TAX', rule: 'RULE 12X',
+        reason: 'Non-EU fund-management-style invoice received by a non-fund entity — reverse-charge at 17% (Art. 17§1 LTVA).',
+        source: 'rule', flag: true,
+        flag_reason:
+          'Invoice cites Art. 44 but the recipient is not classified as a qualifying special investment fund. '
+          + 'Treated as taxable reverse-charge. Change entity_type to fund and re-run if this is a UCITS / SIF / RAIF / etc.',
+      };
     }
   }
 
@@ -196,30 +382,81 @@ function applyDirectEvidenceRules(line: InvoiceLineInput): ClassificationResult 
     // ═══════════════ RULE 18 — Outgoing to non-EU customer ═══════════════
     // When the extractor captured customer_country and it is non-EU, the
     // supply is outside the LU VAT scope (place-of-supply rules). Requires
-    // zero LU VAT actually charged.
+    // zero LU VAT actually charged AND evidence that the customer is a
+    // taxable person (B2B) — either a captured VAT number or explicit
+    // business-status evidence. Absent that evidence, flag: a B2C supply
+    // to a non-EU individual can still be LU-taxable under Art. 17§2
+    // LTVA / Art. 45 Directive.
     const isBilledWithoutVat =
       isZeroOrNull(line.vat_rate) && isZeroOrNull(line.vat_applied);
     if (isBilledWithoutVat && customerCountry &&
         !isLuxembourg(customerCountry) && !isEU(customerCountry)) {
-      return ruleMatch('RULE 18', 'OUT_NONEU',
-        'Supply to a non-EU customer — outside the scope of LU VAT (place-of-supply: customer\'s country).');
+      if (customerVat) {
+        return ruleMatch('RULE 18', 'OUT_NONEU',
+          `Supply to a non-EU business customer (VAT-ID ${customerVat}, ${customerCountry}) — outside the scope of LU VAT (place-of-supply: customer's country).`);
+      }
+      return {
+        treatment: null, rule: 'RULE 18X',
+        reason: 'Outgoing to non-EU customer without business-status evidence.',
+        source: 'rule', flag: true,
+        flag_reason:
+          'Customer country is non-EU but no VAT-ID was captured. If the customer is a non-business '
+          + '(B2C), the place of supply defaults to Luxembourg (Art. 17§2 LTVA / Art. 45 Directive) '
+          + 'and 17% LU VAT applies. Capture the customer\'s tax-status evidence (VAT number or '
+          + 'equivalent per Regulation 282/2011 Art. 18) before classifying.',
+      };
     }
 
-    // RULE 14 used to match any outgoing with EXEMPTION_KEYWORDS *or* the bare
-    // phrase "management fee(s)". An outgoing management fee billed WITH 17%
-    // VAT (perfectly valid — SOPARFI issuing a taxable advisory invoice) was
-    // then silently classified as exempt. We now require BOTH the exemption
-    // reference AND the invoice to actually be billed without VAT.
+    // RULE 14 requires BOTH an exemption reference AND zero VAT, AND picks
+    // the sub-paragraph based on the matched keyword family (real-estate
+    // → 44§1 b, fund management → 44§1 d, financial → 44§1 a).
     if (isBilledWithoutVat && containsAny(text, EXEMPTION_KEYWORDS)) {
-      return ruleMatch('RULE 14', 'OUT_LUX_00',
-        'Exempt outgoing supply with explicit legal reference (Art. 44§1 d LTVA) and no VAT charged — eCDF box 012.');
+      let reason = 'Exempt outgoing supply with explicit legal reference (Art. 44 LTVA) and no VAT charged — eCDF box 012.';
+      if (containsAny(text, FUND_MGMT_KEYWORDS)) {
+        reason = 'Exempt outgoing supply under Art. 44§1 d LTVA (fund management to a qualifying fund) — eCDF box 012.';
+      } else if (containsAny(text, REAL_ESTATE_KEYWORDS)) {
+        reason = 'Exempt outgoing supply under Art. 44§1 b LTVA (real-estate letting without Art. 45 opt-in) — eCDF box 012.';
+      }
+      return ruleMatch('RULE 14', 'OUT_LUX_00', reason);
     }
     if (rateEquals(line.vat_rate, 0.17)) {
       return ruleMatch('RULE 15', 'OUT_LUX_17', 'Taxable outgoing supply at 17% — eCDF boxes 701/046.');
     }
+    if (rateEquals(line.vat_rate, 0.14)) return ruleMatch('RULE 15B', 'OUT_LUX_14', 'Taxable outgoing supply at 14% (Art. 40-1 LTVA).');
+    if (rateEquals(line.vat_rate, 0.08)) return ruleMatch('RULE 15C', 'OUT_LUX_08', 'Taxable outgoing supply at 8% (Art. 40-1 LTVA).');
+    if (rateEquals(line.vat_rate, 0.03)) return ruleMatch('RULE 15D', 'OUT_LUX_03', 'Taxable outgoing supply at 3% (Art. 40-1 LTVA).');
   }
 
   return null;
+}
+
+// ────────────────────────── Priority 2.5: taxable backstop ──────────────────────────
+// When the service description matches a clearly-taxable professional
+// category (legal, tax, audit, M&A, generic consulting), do NOT let the
+// inference chain promote the line into an Art. 44 exemption. These
+// services are taxable regardless of the recipient's entity type.
+// Only applies to incoming services with no VAT applied — taxable
+// invoices with VAT are handled by the direct-evidence rate rules.
+function applyTaxableBackstop(line: InvoiceLineInput): ClassificationResult | null {
+  if (!isZeroOrNull(line.vat_applied)) return null;
+  const text = fullText(line);
+  const matched = findFirstMatch(text, TAXABLE_PROFESSIONAL_KEYWORDS);
+  if (!matched) return null;
+  const country = (line.country || '').toUpperCase();
+  const isLu = isLuxembourg(country);
+  const isEu = isEU(country) && !isLu;
+  if (isLu || !country) return null; // LU handled by direct rate rules / RULE 8
+
+  const treatment: TreatmentCode = isEu ? 'RC_EU_TAX' : 'RC_NONEU_TAX';
+  return {
+    treatment,
+    rule: 'INFERENCE E',
+    reason: `"${matched}" — taxable professional service, reverse-charge at 17% (Art. 17§1 LTVA). Art. 44 exemptions are narrow (Deutsche Bank C-44/11, BlackRock C-231/19) and do not cover legal / tax / audit / M&A services.`,
+    source: 'inference',
+    flag: true,
+    flag_reason:
+      `Detected taxable-backstop keyword "${matched}". This service is classified as taxable reverse-charge to prevent keyword collisions with Art. 44 fund-management exemption phrases. If the service is in fact within the exemption (rare for ${matched}), override manually.`,
+  };
 }
 
 // ────────────────────────── Priority 4: contextual inference ──────────────────────────
@@ -277,35 +514,47 @@ function applyInferenceRules(line: InvoiceLineInput, ctx: EntityContext): Classi
     }
   }
 
-  // ─── INFERENCE C: fund-type entity, EU, fund mgmt keywords without explicit exemption ───
-  const isFundEntity = ctx.entity_type === 'fund' || ctx.entity_type === 'gp';
+  // ─── INFERENCE C: fund entity, EU, fund mgmt keywords without explicit exemption ───
+  // Narrowed to `entity_type === 'fund'` only. The earlier rule accepted
+  // `gp` too, but a GP is not a qualifying fund under BlackRock
+  // (C-231/19) — it USES management services, it does not RECEIVE them
+  // as a special investment fund.
+  //
+  // Also cancels when an exclusion keyword (training, SaaS, IT consulting,
+  // legal/tax/audit advisory, etc.) is present — BlackRock holds that
+  // services outside "specific and essential to fund management" fall
+  // outside Art. 44§1 d.
+  const isFundEntity = ctx.entity_type === 'fund';
   const hasFundMgmtKeywords = containsAny(text, FUND_MGMT_KEYWORDS);
   const hasExemptionReference = containsAny(text, EXEMPTION_KEYWORDS);
+  const hasExclusionKeyword = containsAny(text, FUND_MGMT_EXCLUSION_KEYWORDS);
 
-  if (isEu && isFundEntity && hasFundMgmtKeywords && !hasExemptionReference) {
+  if (isEu && isFundEntity && hasFundMgmtKeywords && !hasExemptionReference && !hasExclusionKeyword) {
     return {
       treatment: 'RC_EU_EX',
       rule: 'INFERENCE C',
-      reason: 'Fund-type entity receiving a fund-management-like service — proposed exempt.',
+      reason: 'Fund-type entity receiving a fund-management-like service — proposed exempt under Art. 44§1 d LTVA (BlackRock C-231/19 "specific and essential" test).',
       source: 'inference',
       flag: true,
       flag_reason:
         'Service description suggests fund management but invoice does not explicitly claim exemption. ' +
-        'Please confirm.',
+        'Confirm the service is "specific and essential to fund management" per BlackRock (C-231/19) — ' +
+        'otherwise downgrade to RC_EU_TAX.',
     };
   }
 
   // ─── INFERENCE D: same as C but non-EU ───
-  if (!isLu && !isEu && country !== '' && isFundEntity && hasFundMgmtKeywords && !hasExemptionReference) {
+  if (!isLu && !isEu && country !== '' && isFundEntity && hasFundMgmtKeywords && !hasExemptionReference && !hasExclusionKeyword) {
     return {
       treatment: 'RC_NONEU_EX',
       rule: 'INFERENCE D',
-      reason: 'Fund-type entity receiving a fund-management-like service (non-EU) — proposed exempt.',
+      reason: 'Fund-type entity receiving a fund-management-like service (non-EU) — proposed exempt under Art. 44§1 d LTVA.',
       source: 'inference',
       flag: true,
       flag_reason:
-        'Service description suggests fund management (non-EU supplier) but invoice does not explicitly ' +
-        'claim exemption. Please confirm.',
+        'Service description suggests fund management (non-EU supplier). Non-EU advisors rarely cite ' +
+        'Art. 44 on invoices, but the BlackRock (C-231/19) "specific and essential" test is substantive, ' +
+        'not formal. Confirm before filing.',
     };
   }
 
@@ -349,14 +598,17 @@ function applyFallbackRules(line: InvoiceLineInput): ClassificationResult | null
   return null;
 }
 
-// Check whether two amounts are within the same order of magnitude (×10 range).
+// Check whether two amounts are within the same order of magnitude.
+// Tightened from the original ×10 tolerance to ×3: at ×10, an exempt
+// outgoing total of €1m matched any incoming between €100k and €10m —
+// too loose, produced many false-positive inferences.
 function sameMagnitude(a: number | null | undefined, b: number | null | undefined): boolean {
   if (!a || !b) return false;
   const ra = Math.abs(Number(a));
   const rb = Math.abs(Number(b));
   if (ra === 0 || rb === 0) return false;
   const ratio = ra > rb ? ra / rb : rb / ra;
-  return ratio <= 10;
+  return ratio <= 3;
 }
 
 function ruleMatch(ruleId: string, treatment: TreatmentCode, reason: string): ClassificationResult {

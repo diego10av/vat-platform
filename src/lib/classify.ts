@@ -130,6 +130,7 @@ export async function classifyDeclaration(declarationId: string): Promise<Classi
     direction: string;
     country: string | null;
     customer_country: string | null;
+    customer_vat: string | null;
     vat_rate: number | null;
     vat_applied: number | null;
     amount_eur: number | null;
@@ -141,7 +142,7 @@ export async function classifyDeclaration(declarationId: string): Promise<Classi
     treatment: string | null;
     provider: string | null;
   }>(
-    `SELECT il.id, i.direction, i.country, i.customer_country,
+    `SELECT il.id, i.direction, i.country, i.customer_country, i.customer_vat,
             il.vat_rate, il.vat_applied, il.amount_eur, il.description,
             il.is_disbursement, i.is_credit_note, il.exemption_reference,
             il.treatment_source, il.treatment, i.provider
@@ -177,6 +178,7 @@ export async function classifyDeclaration(declarationId: string): Promise<Classi
       direction: line.direction as 'incoming' | 'outgoing',
       country: line.country,
       customer_country: line.customer_country,
+      customer_vat: line.customer_vat,
       vat_rate: line.vat_rate == null ? null : Number(line.vat_rate),
       vat_applied: line.vat_applied == null ? null : Number(line.vat_applied),
       amount_eur: line.amount_eur == null ? null : Number(line.amount_eur),
@@ -201,6 +203,11 @@ export async function classifyDeclaration(declarationId: string): Promise<Classi
         'RULE 1', 'RULE 2', 'RULE 3', 'RULE 4', 'RULE 5', 'RULE 6', 'RULE 7',
         'RULE 9', 'RULE 10', 'RULE 12', 'RULE 14', 'RULE 15',
         'RULE 16', 'RULE 17', 'RULE 18', 'RULE 19',
+        // Batch E-1 sub-rules
+        'RULE 5C', 'RULE 5D',
+        'RULE 7A', 'RULE 7B', 'RULE 7D',
+        'RULE 15A', 'RULE 15B', 'RULE 15C', 'RULE 15D',
+        'RULE 23',
       ]);
       const isDirectEvidenceRule = DIRECT_EVIDENCE_RULES.has(direct.rule);
       if (isDirectEvidenceRule) {
