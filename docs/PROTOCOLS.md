@@ -233,7 +233,40 @@ run even when he's not at the computer). Propose as and when wanted.
 
 ---
 
-## 10. Amendment process
+## 10. Model review cadence (**critical** per Diego, 2026-04-17)
+
+cifra is a model-as-product company: the quality of every call path
+depends on the Claude tier we chose for it. Diego's explicit
+instruction: *"siempre que haya una versión nueva de Claude más
+rápida, más inteligente, más avanzada, utiliza ese modelo para las
+cosas importantes"*.
+
+Claude (the assistant) owns the model matrix in `docs/MODELS.md` and
+MUST:
+
+1. **Review the matrix at the start of every session** — is any model
+   reference stale? Any new Anthropic release since last session?
+2. **Propose upgrades proactively** whenever a trigger in
+   `docs/MODELS.md §3` fires (new tier, price cut, accuracy
+   regression, competitor release).
+3. **Treat the pricing table in `src/lib/anthropic-wrapper.ts` as
+   authoritative** — if Anthropic changes prices, the table changes
+   in the next commit, and the matrix is refreshed.
+4. **Never silently change a model.** Every swap is a one-line commit
+   with before/after accuracy on the 253-test corpus.
+5. **Keep the matrix quarterly-reviewed** — a calendar note in
+   `docs/TODO.md` says "review docs/MODELS.md + `anthropic-wrapper`
+   prices" every three months, minimum.
+
+When Diego asks *"what model is the Validator using?"* — answer from
+`docs/MODELS.md`, not from memory.
+
+When Diego asks *"should we upgrade to the new Claude X?"* — run
+the synthetic corpus on the new model first, then propose with data.
+
+---
+
+## 11. Amendment process
 
 Either of us can propose an amendment to these protocols:
 
@@ -246,4 +279,4 @@ bureaucratic, kill it. If we're forgetting things, tighten it.
 
 ---
 
-*Last amended: 2026-04-16 — initial version.*
+*Last amended: 2026-04-17 — added §10 model-review cadence.*
