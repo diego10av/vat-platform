@@ -20,7 +20,7 @@ Effort: S (< 1 day) · M (1-3 days) · L (3-10 days) · XL (> 10 days)
 
 | # | Item | Effort | Notes |
 |---|---|---|---|
-| 1 | **Validator UI integration** | M | Backend exists (Option C). Button in declaration page + drawer with findings list + accept/reject/defer actions. Unlocks dead code and is the strongest demo moment. *Doing tonight.* |
+| ~~1~~ | ~~**Validator UI integration**~~ | ~~M~~ | ✅ **Shipped 2026-04-16 in commit `4c85c81`.** Button in declaration page action strip + 440px drawer on the right with severity summary, expandable finding cards, legal-refs linking out to Legilux/CURIA, accept/reject/defer actions with rejection-reason prompt. Respects lock state. |
 | 2 | **Multi-user + roles (preparer / reviewer / partner)** | L | Supabase Auth for email/password + 3 roles with middleware enforcement. Role-based UI affordances (only partners can approve-and-file, preparers can prepare but not approve). No product for firms without this. |
 | 3 | **Onboarding wizard first-run** | M | 3-step flow: welcome → create first client entity → upload prior-year Excel (optional) → land on Home. Prevents cold-empty-state abandonment. |
 | 4 | **Client approval portal (signed link)** | M | The fund manager receives a link (JWT-signed, no login), sees the appendix + PDF preview + Approve button. Click records IP + timestamp + audit trail. Eliminates the 3-5 email back-and-forth per declaration. |
@@ -124,6 +124,7 @@ Recent milestones landed on `main`:
 
 | Date | Commit | What |
 |------|--------|------|
+| 2026-04-16 | 4c85c81 | Strategy docs (ROADMAP, BUSINESS_PLAN, positioning) + Validator UI integration |
 | 2026-04-16 | 401c5ed | UI phase 3: AED inbox rewrite + list-page polish |
 | 2026-04-16 | 54164da | UI phase 2: declaration page — breadcrumbs + lifecycle stepper + tabs |
 | 2026-04-16 | e7d4f3b | UI phase 1: AppShell + dashboard home + legal-watch |
