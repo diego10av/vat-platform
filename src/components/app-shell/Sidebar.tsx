@@ -10,11 +10,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   HomeIcon, Building2Icon, FileTextIcon, InboxIcon, CalendarIcon,
-  ClipboardCheckIcon, ScaleIcon, BookOpenIcon,
+  ScaleIcon, BookOpenIcon,
   BarChart3Icon, ShieldCheckIcon, SettingsIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { Logo, LogoMark } from '@/components/Logo';
+import { Logo } from '@/components/Logo';
 
 export interface SidebarBadges {
   /** Declarations currently in `review` status. */
@@ -50,7 +50,13 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
     {
       label: 'Library',
       items: [
-        { href: '/registrations',    label: 'Registrations',   icon: ClipboardCheckIcon },
+        // Registrations is no longer a top-level nav item — it's now a
+        // lifecycle state of the Client entity (vat_status =
+        // 'pending_registration'). The full /registrations list is
+        // still reachable from within the Client detail page, and
+        // pending-registration Clients show a badge on the Clients
+        // list. The old global registrations route stays alive for
+        // back-compat but is no longer surfaced in nav.
         { href: '/legal-overrides',  label: 'Legal overrides', icon: ScaleIcon },
         { href: '/legal-watch',      label: 'Legal watch',     icon: BookOpenIcon },
       ],
@@ -157,16 +163,19 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
 }
 
 function UserMenu() {
+  // Minimalist text-only user chip (à la Linear). No avatar circle —
+  // the previous "D" circle competed visually with the "c" logomark
+  // at the top of the sidebar. Typography carries identification; a
+  // profile photo can replace this cleanly later without re-doing
+  // the layout.
   return (
-    <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-surface-alt transition-colors cursor-pointer">
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white text-[11px] font-semibold shrink-0">
-        D
+    <div className="flex flex-col px-3 py-1.5 rounded-md hover:bg-surface-alt transition-colors cursor-pointer">
+      <div className="text-[12.5px] font-medium text-ink truncate leading-tight">
+        Diego
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-medium text-ink truncate leading-tight">Diego</div>
-        <div className="text-[10.5px] text-ink-muted truncate leading-tight">cifra · founder</div>
+      <div className="text-[10.5px] text-ink-muted truncate leading-tight mt-0.5">
+        cifra · founder
       </div>
-      <LogoMark size={12} className="opacity-0" />
     </div>
   );
 }

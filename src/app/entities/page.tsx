@@ -21,6 +21,7 @@ interface Entity {
   csp_name: string | null; csp_email: string | null;
   has_fx: number; has_outgoing: number; has_recharges: number;
   notes: string | null; created_at: string;
+  vat_status: 'registered' | 'pending_registration' | 'not_applicable';
 }
 
 const EMPTY = {
@@ -29,13 +30,22 @@ const EMPTY = {
   address: '', bank_iban: '', bank_bic: '', tax_office: '',
   client_name: '', client_email: '', csp_name: '', csp_email: '',
   has_fx: false, has_outgoing: false, has_recharges: false, notes: '',
+  // 'registered' = already has a LU VAT number and files returns.
+  // 'pending_registration' = new entity that needs to be registered
+  //   with the AED (registration workflow kicks in).
+  // 'not_applicable' = entity out of scope (rare — group treasury
+  //   SPV etc.).
+  vat_status: 'registered' as 'registered' | 'pending_registration' | 'not_applicable',
 };
+
+type VatFilter = 'all' | 'registered' | 'pending';
 
 export default function EntitiesPage() {
   const [entities, setEntities] = useState<Entity[] | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY);
+  const [vatFilter, setVatFilter] = useState<VatFilter>('all');
 
   useEffect(() => { load(); }, []);
   async function load() {
@@ -76,6 +86,7 @@ export default function EntitiesPage() {
       csp_name: e.csp_name || '', csp_email: e.csp_email || '',
       has_fx: !!e.has_fx, has_outgoing: !!e.has_outgoing, has_recharges: !!e.has_recharges,
       notes: e.notes || '',
+      vat_status: (e.vat_status as typeof form.vat_status) || 'registered',
     });
     setEditId(e.id);
     setShowForm(true);
@@ -176,6 +187,16 @@ export default function EntitiesPage() {
                     <option value="monthly">Monthly</option>
                   </Select>
                 </Field>
+                <Field label="VAT registration *" className="col-span-2">
+                  <Select
+                    value={form.vat_status}
+                    onChange={e => setForm({ ...form, vat_status: e.target.value as typeof form.vat_status })}
+                  >
+                    <option value="registered">Already registered — has LU VAT number, files returns</option>
+                    <option value="pending_registration">Needs to be registered — open registration workflow</option>
+                    <option value="not_applicable">Not applicable — out of VAT scope</option>
+                  </Select>
+                </Field>
                 <Field label="Address" className="col-span-2">
                   <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
                 </Field>
@@ -224,22 +245,69 @@ export default function EntitiesPage() {
         </Card>
       )}
 
-      {entities.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon={<BuildingIcon size={22} />}
-            title="No entities yet"
-            description="Entities are the Luxembourg legal entities you file VAT for. Start by creating one."
-            action={<Button variant="primary" icon={<PlusIcon size={14} />} onClick={() => setShowForm(true)}>Create entity</Button>}
-          />
-        </Card>
-      ) : (
+      {/* Filter bar: surfaces entities still awaiting VAT registration
+          with the AED. Pending-registration clients carry their own
+          mini-workflow inside /entities/[id] rather than living in a
+          separate top-level nav item. */}
+      {entities.length > 0 && (() => {
+        const pendingCount = entities.filter(e => e.vat_status === 'pending_registration').length;
+        const registeredCount = entities.filter(e => e.vat_status !== 'pending_registration').length;
+        return (
+          <div className="flex flex-wrap items-center gap-1 mb-4">
+            <FilterChip active={vatFilter === 'all'}        onClick={() => setVatFilter('all')}>
+              All <Count active={vatFilter === 'all'}         value={entities.length} />
+            </FilterChip>
+            <FilterChip active={vatFilter === 'registered'} onClick={() => setVatFilter('registered')}>
+              Registered <Count active={vatFilter === 'registered'} value={registeredCount} />
+            </FilterChip>
+            <FilterChip
+              active={vatFilter === 'pending'}
+              onClick={() => setVatFilter('pending')}
+              tone={pendingCount > 0 ? 'brand' : 'neutral'}
+            >
+              Pending registration <Count active={vatFilter === 'pending'} value={pendingCount} />
+            </FilterChip>
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const filtered = entities.filter(e => {
+          if (vatFilter === 'registered') return e.vat_status !== 'pending_registration';
+          if (vatFilter === 'pending')    return e.vat_status === 'pending_registration';
+          return true;
+        });
+
+        if (entities.length === 0) return (
+          <Card>
+            <EmptyState
+              icon={<BuildingIcon size={22} />}
+              title="No clients yet"
+              description="Clients are the Luxembourg legal entities you file VAT for. Start by creating one."
+              action={<Button variant="primary" icon={<PlusIcon size={14} />} onClick={() => setShowForm(true)}>Create client</Button>}
+            />
+          </Card>
+        );
+        if (filtered.length === 0) return (
+          <Card>
+            <EmptyState
+              icon={<BuildingIcon size={22} />}
+              title={vatFilter === 'pending' ? 'No pending registrations' : 'No matches'}
+              description={vatFilter === 'pending'
+                ? 'All your clients are already registered for VAT. When you onboard a new client you\u2019ll see them here.'
+                : 'Switch filter to see the full list.'}
+            />
+          </Card>
+        );
+
+        return (
         <Card className="overflow-hidden">
           <table className="w-full text-[12.5px]">
             <thead className="bg-surface-alt border-b border-divider text-ink-muted">
               <tr>
                 <Th>Client</Th>
                 <Th>Entity</Th>
+                <Th>VAT status</Th>
                 <Th>Regime</Th>
                 <Th>Frequency</Th>
                 <Th>VAT number</Th>
@@ -247,13 +315,16 @@ export default function EntitiesPage() {
               </tr>
             </thead>
             <tbody>
-              {entities.map(entity => (
+              {filtered.map(entity => (
                 <tr key={entity.id} className="border-b border-divider last:border-0 hover:bg-surface-alt/60 transition-colors duration-150">
                   <td className="px-4 py-3 text-ink-soft">{entity.client_name || <span className="text-ink-faint">—</span>}</td>
                   <td className="px-4 py-3">
                     <Link href={`/entities/${entity.id}`} className="font-medium text-ink hover:text-brand-600 transition-colors">
                       {entity.name}
                     </Link>
+                  </td>
+                  <td className="px-4 py-3">
+                    <VatStatusBadge status={entity.vat_status} />
                   </td>
                   <td className="px-4 py-3">
                     <Badge tone={entity.regime === 'simplified' ? 'info' : 'violet'}>{entity.regime}</Badge>
@@ -278,7 +349,8 @@ export default function EntitiesPage() {
             </tbody>
           </table>
         </Card>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -298,5 +370,50 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
       />
       {label}
     </label>
+  );
+}
+
+function VatStatusBadge({ status }: { status: Entity['vat_status'] }) {
+  if (status === 'pending_registration') {
+    return <Badge tone="warning">Pending registration</Badge>;
+  }
+  if (status === 'not_applicable') {
+    return <Badge tone="neutral">N/A</Badge>;
+  }
+  return <Badge tone="success">Registered</Badge>;
+}
+
+function FilterChip({
+  active, onClick, tone = 'neutral', children,
+}: {
+  active: boolean; onClick: () => void;
+  tone?: 'neutral' | 'brand';
+  children: React.ReactNode;
+}) {
+  const activeCls =
+    tone === 'brand' && !active
+      ? 'bg-brand-50 border border-brand-200 text-brand-700 hover:bg-brand-100'
+      : active
+        ? 'bg-brand-500 text-white shadow-xs'
+        : 'bg-surface border border-border text-ink-soft hover:bg-surface-alt';
+  return (
+    <button
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12.5px] font-medium transition-all ${activeCls}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function Count({ active, value }: { active: boolean; value: number }) {
+  return (
+    <span
+      className={`tabular-nums inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10.5px] font-semibold ${
+        active ? 'bg-white/20 text-white' : 'bg-brand-50 text-brand-700'
+      }`}
+    >
+      {value}
+    </span>
   );
 }

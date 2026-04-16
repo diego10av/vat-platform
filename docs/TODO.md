@@ -105,7 +105,8 @@ Things worth remembering but not actionable yet:
 - ✅ CSP + security headers (HSTS, CSP, XFO, Permissions-Policy, COOP) — commit `a3b49a0`
 - ✅ Declaration page Rules-of-Hooks crash + pink cifra wordmark — commit `878d063`
 - ✅ Anthropic monthly budget guard (hard-cap at €75, configurable via BUDGET_MONTHLY_EUR) — commit `c302cff`
-- ✅ Metrics page rebuilt into real ops dashboard (budget progress bar + daily sparkline + cost-by-agent) — commit [incoming]
+- ✅ Metrics page rebuilt into real ops dashboard (budget progress bar + daily sparkline + cost-by-agent) — commit `acf0bd0`
+- ✅ Registrations → lifecycle state of Client (vat_status) + sidebar trimmed + avatar minimalist — commit [incoming]
 - ✅ UI redesign phases 1-3 shipped — commits `e7d4f3b`, `54164da`, `401c5ed`
 - ✅ Options A/B/C/D/E all complete (see ROADMAP Shipped)
 - ✅ Domain `cifracompliance.com` purchased (2026-04-15)

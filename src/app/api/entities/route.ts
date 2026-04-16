@@ -14,12 +14,20 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const id = generateId();
 
+  // vat_status: the create form asks explicitly ("is this entity
+  // already VAT-registered in Luxembourg?"). We accept the value
+  // verbatim if it's one of the three legal states, otherwise we
+  // let the column default ('registered') take over.
+  const vatStatus = ['registered', 'pending_registration', 'not_applicable'].includes(body.vat_status)
+    ? body.vat_status
+    : 'registered';
+
   await execute(
     `INSERT INTO entities (id, name, vat_number, matricule, rcs_number, legal_form, entity_type,
       regime, frequency, address, bank_iban, bank_bic, tax_office,
       client_name, client_email, csp_name, csp_email,
-      has_fx, has_outgoing, has_recharges, notes)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+      has_fx, has_outgoing, has_recharges, notes, vat_status)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)`,
     [
       id, body.name,
       body.vat_number || null, body.matricule || null, body.rcs_number || null,
@@ -30,6 +38,7 @@ export async function POST(request: NextRequest) {
       body.csp_name || null, body.csp_email || null,
       !!body.has_fx, !!body.has_outgoing, !!body.has_recharges,
       body.notes || null,
+      vatStatus,
     ]
   );
 
