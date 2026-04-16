@@ -189,21 +189,34 @@ function computeSum(lines: LineRow[], def: BoxDefinition): number {
 // again after later passes fill in the missing values. The previous version
 // silently substituted `0` for missing refs, which produced wrong (lower)
 // numbers in one-shot evaluation and masked formula typos.
+//
+// Order of operations is critical: resolve box references FIRST, then
+// rewrite MAX(). An earlier draft did the opposite, which re-tokenised
+// already-substituted 3-digit values (e.g. a box value of 120) as if they
+// were box references — producing spurious "unresolved" failures whenever
+// a real value happened to fall in the 100..999 range.
 function evaluateFormula(expr: string, values: Record<string, number>): number | null {
-  // Resolve MAX(a, b) first by rewriting to Math.max(a,b)
+  // Step 1 — resolve every 3-digit box reference exactly once. The
+  // substitution is wrapped in parens so that `MAX(-097, 0)` with a
+  // negative value resolves to `MAX(-(-42), 0)` instead of the unparsable
+  // `MAX(--42, 0)`. This only matters for negated refs (credit formulas)
+  // but is harmless otherwise.
   let unresolved = false;
-  const resolve = (s: string): string => {
-    const out = resolveRefs(s, values, () => { unresolved = true; });
-    return out;
-  };
-  let e = expr.replace(
-    /MAX\s*\(\s*(-?[\w\d\s+\-*/.()]+)\s*,\s*(-?[\w\d\s+\-*/.()]+)\s*\)/gi,
-    (_m, a: string, b: string) => `Math.max((${resolve(a)}),(${resolve(b)}))`,
-  );
-  e = resolve(e);
+  const resolved = expr.replace(/\b(\d{3})\b/g, (_m, ref) => {
+    const v = values[ref];
+    if (typeof v === 'number') return `(${v})`;
+    unresolved = true;
+    return '(0)';
+  });
   if (unresolved) return null;
-  // Whitelist (after stripping the one allowed identifier "Math.max"):
-  //   digits, whitespace, + - * /, parentheses, dot, comma.
+
+  // Step 2 — rewrite MAX(...) to the built-in Math.max. At this point the
+  // arguments contain only numbers and operators, so a dumb textual rewrite
+  // of the function token is safe.
+  const e = resolved.replace(/MAX\s*\(/gi, 'Math.max(');
+
+  // Step 3 — whitelist (after stripping the one allowed identifier
+  // "Math.max"): digits, whitespace, + - * /, parens, dot, comma.
   const stripped = e.replace(/Math\.max/g, '');
   if (!/^[\d\s+\-*/().,]*$/.test(stripped)) return null;
   try {
@@ -215,21 +228,6 @@ function evaluateFormula(expr: string, values: Record<string, number>): number |
   } catch {
     return null;
   }
-}
-
-// Replace 3-digit box references with their numeric values. Calls onMissing
-// if a reference is not in the values map so the caller can fail-closed.
-function resolveRefs(
-  expr: string,
-  values: Record<string, number>,
-  onMissing?: () => void,
-): string {
-  return expr.replace(/\b(\d{3})\b/g, (_m, ref) => {
-    const v = values[ref];
-    if (typeof v === 'number') return String(v);
-    onMissing?.();
-    return '0';
-  });
 }
 
 function round2(n: number): number {

@@ -106,12 +106,94 @@ describe('Direct evidence rules (priority 2)', () => {
     expect(r.flag_reason).toBeTruthy();
   });
 
-  it('RULE 9 — EU + "goods" → IC_ACQ', () => {
+  it('RULE 9 — EU + "goods", no readable rate → IC_ACQ (generic fallback)', () => {
     const r = classifyInvoiceLine(inv({
       country: 'BE', description: 'Purchase of office equipment goods',
     }));
     expect(r.treatment).toBe('IC_ACQ');
     expect(r.rule).toBe('RULE 9');
+  });
+});
+
+// ════════════════ Batch 6 — new direct-evidence rules (16-19) ════════════════
+describe('Batch 6 rules (16-19)', () => {
+  // ─── RULE 16 — extractor-flagged disbursement ───
+  it('RULE 16 — is_disbursement=true → DEBOURS, regardless of country / rate', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'LU', description: 'Notary — registration duties', is_disbursement: true,
+    }));
+    expect(r.treatment).toBe('DEBOURS');
+    expect(r.rule).toBe('RULE 16');
+  });
+
+  it('RULE 16 beats a LU-17% VAT rate (extractor signal is authoritative)', () => {
+    // A disbursement flag is stronger than a rate — some invoices print a
+    // rate on every line but disbursements are out-of-scope.
+    const r = classifyInvoiceLine(inv({
+      country: 'LU', vat_rate: 0.17, description: 'Débours', is_disbursement: true,
+    }));
+    expect(r.treatment).toBe('DEBOURS');
+  });
+
+  // ─── RULE 17 — IC acquisitions by rate ───
+  it('RULE 17 — EU + goods + 17% → IC_ACQ_17', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'DE', description: 'Purchase of server hardware goods', vat_rate: 0.17,
+    }));
+    expect(r.treatment).toBe('IC_ACQ_17');
+    expect(r.rule).toBe('RULE 17');
+  });
+
+  it('RULE 17 — EU + goods + 3% → IC_ACQ_03', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'FR', description: 'Purchase of books (livres) goods', vat_rate: 0.03,
+    }));
+    expect(r.treatment).toBe('IC_ACQ_03');
+  });
+
+  // ─── RULE 18 — outgoing to non-EU customer ───
+  it('RULE 18 — outgoing, no VAT, customer_country=US → OUT_NONEU', () => {
+    const r = classifyInvoiceLine(inv({
+      direction: 'outgoing', country: 'LU', customer_country: 'US',
+      vat_rate: 0, vat_applied: 0, description: 'Advisory services',
+    }));
+    expect(r.treatment).toBe('OUT_NONEU');
+    expect(r.rule).toBe('RULE 18');
+  });
+
+  it('RULE 18 does NOT fire when the invoice is billed with 17% VAT', () => {
+    const r = classifyInvoiceLine(inv({
+      direction: 'outgoing', country: 'LU', customer_country: 'CH',
+      vat_rate: 0.17, description: 'Taxable services',
+    }));
+    // 17% VAT was actually charged — the supply is taxable LU, not OUT_NONEU.
+    expect(r.treatment).toBe('OUT_LUX_17');
+    expect(r.rule).toBe('RULE 15');
+  });
+
+  it('RULE 18 does NOT fire for EU customer (that would be OUT_EU_RC territory)', () => {
+    const r = classifyInvoiceLine(inv({
+      direction: 'outgoing', country: 'LU', customer_country: 'DE',
+      vat_rate: 0, description: 'Consulting services',
+    }));
+    expect(r.treatment).not.toBe('OUT_NONEU');
+  });
+
+  // ─── RULE 19 — import VAT from non-EU goods ───
+  it('RULE 19 — non-EU country + goods + VAT paid → IMPORT_VAT', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'CN', description: 'Purchase of goods (industrial equipment)',
+      vat_applied: 170, amount_eur: 1000,
+    }));
+    expect(r.treatment).toBe('IMPORT_VAT');
+    expect(r.rule).toBe('RULE 19');
+  });
+
+  it('RULE 19 does NOT fire for non-EU services with no VAT (that is RC_NONEU_*)', () => {
+    const r = classifyInvoiceLine(inv({
+      country: 'CH', description: 'Consulting services', vat_applied: null,
+    }));
+    expect(r.treatment).not.toBe('IMPORT_VAT');
   });
 });
 
