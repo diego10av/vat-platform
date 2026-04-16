@@ -30,21 +30,75 @@ when messaging shifts.
 
 ## 2. Morning brief — Claude's daily opener
 
-On the **first message of a new day's session** (or whenever Diego
-types `/brief`, "dame el brief", "morning", or similar), Claude must
-open the response with a structured **Morning brief** that includes:
+The brief is Diego's ally, not another boss. Diego has a full-time job
+and two small kids; he'll often read the brief on his phone between
+school drop-off and the train. Many days nothing will ship — that's
+fine and expected. The brief exists to surface what matters, not to
+make him feel behind.
 
-1. **Date + context** (how many days into the project / since last
-   session).
-2. **🔥 Urgent items from `docs/TODO.md`** — anything marked "Must do
-   in the next 48h" plus any carry-over that's been there > 3 days.
-3. **Open blockers** — work that started but didn't finish (lines on
-   ROADMAP marked "in progress" without recent commits).
-4. **Status snapshot** — last commit, test count, build health.
-5. **Today's recommendation** — one or two specific things to focus on.
+### Schedule
 
-Format: short, scannable, actionable. No essays. If nothing is urgent,
-say so explicitly and propose what's next.
+Automated scheduled task `cifra-morning-brief` fires **Mon-Sat at 8:30
+Luxembourg local time**. No Sunday (rest day). The task is stored at
+`~/.claude/scheduled-tasks/cifra-morning-brief/`. Can be disabled /
+rescheduled via `mcp__scheduled-tasks__update_scheduled_task` or
+inside Claude with a simple "cambia el brief a las X".
+
+Manual invocation: Diego can type `/brief`, "dame el brief", "morning",
+or similar any time.
+
+### Template (weekday)
+
+```
+🌅 Brief — {day_name} {date}  (day N since we started)
+
+{One-sentence momentum check. Example:
+ "Last session shipped validator UI + protocols. 253 tests green."}
+
+⚡ Pick by time available
+  🟢 5 min    — {one quick win from TODO.md}
+  🟡 30 min   — {one medium item}
+  🔴 2h deep  — {one substantive evening item, optional}
+
+🔥 Carry-over watchlist
+  {max 3 items, each with age in days.
+   If > 14 days: gentle suggestion to either act, delete, or park.
+   If 5-14 days: acknowledge without guilt, keep listed.
+   If nothing old: say "inbox is clean".}
+
+🎯 If life only gives you 15 min today: {the single most leveraged
+   15-minute action, picked from TODO or ROADMAP}
+```
+
+### Template (Saturday — lighter)
+
+```
+🌅 Saturday brief — {date}
+
+Low-pressure morning. Top 2 needle-movers if you want one:
+  • {item}
+  • {item}
+
+Or skip today entirely. See you Monday.
+```
+
+### Humane principles
+
+1. **No guilt-tripping.** "This has been open 8 days" is an observation,
+   not an accusation. Claude NEVER implies Diego is failing.
+2. **Carry-over grace.** Items age without consequence. If a TODO has
+   been open > 14 days, Claude proposes: (a) do it this week, (b)
+   delete it, or (c) move to "Parked" section. Diego decides.
+3. **Time-realistic.** Every brief must include at least one
+   sub-15-minute win, because some days that's all Diego has.
+4. **Life wins.** When Diego says "couldn't touch it this week", the
+   response is "understood, that's fine" — not "let's reschedule
+   urgently".
+5. **Brevity.** The whole brief fits on a phone screen without
+   scrolling. Shipped items go to "Done this week" quietly without
+   celebration essays.
+6. **Weekend = off by default.** Saturday light. Sunday silent.
+   If Diego wants to work, he'll open the chat himself.
 
 ---
 
