@@ -121,8 +121,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   return (
     <button
       onClick={onClick}
-      className={`h-8 px-3 rounded-md text-[12px] font-medium transition-colors duration-150 ${
-        active ? 'bg-ink text-white' : 'bg-surface border border-border text-ink-soft hover:bg-surface-alt'
+      className={`h-8 px-3 rounded-md text-[12.5px] font-medium transition-all duration-150 ${
+        active ? 'bg-brand-500 text-white shadow-xs' : 'bg-surface border border-border text-ink-soft hover:bg-surface-alt'
       }`}
     >
       {children}

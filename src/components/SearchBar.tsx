@@ -77,10 +77,10 @@ export default function SearchBar() {
   }
 
   return (
-    <div ref={ref} className="relative w-72">
+    <div ref={ref} className="relative w-full max-w-md">
       <button
         onClick={() => { setOpen(true); requestAnimationFrame(() => inputRef.current?.focus()); }}
-        className="w-full h-8 px-2.5 rounded-md border border-border bg-surface text-[12px] text-ink-muted hover:bg-surface-alt hover:border-border-strong transition-all duration-150 text-left flex items-center gap-2"
+        className="w-full h-9 px-3 rounded-md border border-border bg-surface text-[13px] text-ink-muted hover:bg-surface-alt hover:border-border-strong transition-all duration-150 text-left flex items-center gap-2"
       >
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <span className="flex-1 truncate">Search…</span>
@@ -88,8 +88,8 @@ export default function SearchBar() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-[420px] bg-surface text-ink border border-border rounded-lg shadow-lg overflow-hidden z-50 animate-fadeInScale">
-          <div className="px-3 py-2 border-b border-gray-200">
+        <div className="absolute left-0 top-full mt-2 w-[460px] bg-surface text-ink border border-border rounded-xl shadow-lg overflow-hidden z-50 animate-fadeInScale">
+          <div className="px-3 py-2.5 border-b border-divider">
             <input
               ref={inputRef}
               value={q}
@@ -114,7 +114,7 @@ export default function SearchBar() {
                     {results.entities.map((e, i) => (
                       <Item key={e.id} active={highlight === i} onClick={() => go(e)}>
                         <span className="font-medium">{e.name}</span>
-                        <span className="text-[11px] text-gray-500 ml-2">{e.client_name || ''} · {e.regime}</span>
+                        <span className="text-[11px] text-ink-muted ml-2">{e.client_name || ''} · {e.regime}</span>
                       </Item>
                     ))}
                   </Group>
@@ -126,7 +126,7 @@ export default function SearchBar() {
                       return (
                         <Item key={d.id} active={highlight === idx} onClick={() => go(d)}>
                           <span className="font-medium">{d.entity_name}</span>
-                          <span className="text-[11px] text-gray-500 ml-2">{d.year} {d.period} · {d.status}</span>
+                          <span className="text-[11px] text-ink-muted ml-2">{d.year} {d.period} · {d.status}</span>
                         </Item>
                       );
                     })}
@@ -139,7 +139,7 @@ export default function SearchBar() {
                       return (
                         <Item key={p.provider + p.declaration_id} active={highlight === idx} onClick={() => go(p)}>
                           <span className="font-medium">{p.provider}</span>
-                          <span className="text-[11px] text-gray-500 ml-2">{p.entity_name} · {p.year} {p.period}</span>
+                          <span className="text-[11px] text-ink-muted ml-2">{p.entity_name} · {p.year} {p.period}</span>
                         </Item>
                       );
                     })}

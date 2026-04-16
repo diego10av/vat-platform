@@ -10,6 +10,7 @@ import { Field, Input, Select, Label, Textarea } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { Card, CardHeader, CardBody } from '@/components/ui/Card';
+import { Stat } from '@/components/ui/Stat';
 
 interface Entity {
   id: string; name: string; vat_number: string | null; matricule: string | null;
@@ -85,8 +86,8 @@ export default function EntitiesPage() {
   return (
     <div>
       <PageHeader
-        title="Entities"
-        subtitle="Every Luxembourg entity you file for. Set the regime and frequency once — the rest flows automatically."
+        title="Clients"
+        subtitle="The Luxembourg legal entities you file VAT for. Grouped by client when a client_name is recorded. Set the regime and frequency once — the rest flows automatically."
         actions={
           <Button
             variant="primary"
@@ -97,6 +98,31 @@ export default function EntitiesPage() {
           </Button>
         }
       />
+
+      {/* KPI row */}
+      {entities.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <Stat
+            label="Entities"
+            value={entities.length}
+          />
+          <Stat
+            label="Unique clients"
+            value={new Set(entities.map(e => e.client_name || e.name)).size}
+            tone="neutral"
+          />
+          <Stat
+            label="Simplified regime"
+            value={entities.filter(e => e.regime === 'simplified').length}
+            tone="info"
+          />
+          <Stat
+            label="Ordinary regime"
+            value={entities.filter(e => e.regime === 'ordinary').length}
+            tone="brand"
+          />
+        </div>
+      )}
 
       {showForm && (
         <Card className="mb-6 animate-fadeIn">
@@ -129,9 +155,11 @@ export default function EntitiesPage() {
                 <Field label="Entity type">
                   <Select value={form.entity_type} onChange={e => setForm({ ...form, entity_type: e.target.value })}>
                     <option value="">Select…</option>
-                    <option value="fund">Fund</option>
-                    <option value="active_holding">Active holding</option>
+                    <option value="fund">Fund (UCITS / SIF / RAIF / SICAR / Part II)</option>
+                    <option value="manco">Management company (AIFM / UCITS ManCo)</option>
                     <option value="gp">General partner</option>
+                    <option value="active_holding">Active holding (Marle / Larentia+Minerva)</option>
+                    <option value="passive_holding">Passive holding (Polysar / Cibo)</option>
                     <option value="other">Other</option>
                   </Select>
                 </Field>
