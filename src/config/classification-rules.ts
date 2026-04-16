@@ -32,6 +32,13 @@ export interface InvoiceLineInput {
   description: string | null;
   // Optional full invoice text (extractor may capture). Falls back to description.
   invoice_text?: string | null;
+  // Batch 4 extractor signals — when present, these take precedence over
+  // text-based heuristics because they come from the extractor's direct
+  // reading of the invoice.
+  is_disbursement?: boolean | null;
+  is_credit_note?: boolean | null;
+  exemption_reference?: string | null;  // explicit Art. 44§1 b / 44§1 d / etc.
+  customer_country?: string | null;     // ISO-2 of the invoice recipient (for outgoing)
 }
 
 export interface EntityContext {
@@ -110,10 +117,20 @@ export function classifyInvoiceLine(
 // ────────────────────────── Priority 2: direct evidence ──────────────────────────
 function applyDirectEvidenceRules(line: InvoiceLineInput): ClassificationResult | null {
   const country = (line.country || '').toUpperCase();
+  const customerCountry = (line.customer_country || '').toUpperCase();
   const desc = line.description || '';
   const text = fullText(line);
   const isLu = isLuxembourg(country);
   const isEu = isEU(country) && !isLu;
+
+  // ═══════════════ RULE 16 — Extractor-flagged disbursement ═══════════════
+  // When the extractor marks a line as is_disbursement (pure pass-through
+  // débours), it beats every other signal. Disbursements are outside the
+  // VAT scope per Art. 28§3 c LTVA and must go to DEBOURS, not LUX_00.
+  if (line.is_disbursement === true) {
+    return ruleMatch('RULE 16', 'DEBOURS',
+      'Pure pass-through disbursement (débours) at cost — Art. 28§3 c LTVA (outside the VAT scope).');
+  }
 
   if (line.direction === 'incoming') {
     // LU + explicit rate
@@ -136,9 +153,17 @@ function applyDirectEvidenceRules(line: InvoiceLineInput): ClassificationResult 
       // RULE 8 is default catch-all — handled in applyFallbackRules
     }
 
-    // EU (non-LU) + goods keywords
+    // ═══════════════ RULE 17 — IC acquisition of goods, by rate ═══════════════
+    // Refines the legacy RULE 9 → IC_ACQ with rate-specific treatments so
+    // boxes 711/713/715/717 can be filled accurately. Falls back to the
+    // generic IC_ACQ when no rate is readable.
     if (isEu && containsAny(desc, GOODS_KEYWORDS)) {
-      return ruleMatch('RULE 9', 'IC_ACQ', 'Intra-Community acquisition of goods (Art. 21 LTVA) — eCDF boxes 051/056 + 711/712.');
+      if (rateEquals(line.vat_rate, 0.17)) return ruleMatch('RULE 17', 'IC_ACQ_17', 'Intra-Community acquisition of goods, applicable LU rate 17% — Art. 21 LTVA.');
+      if (rateEquals(line.vat_rate, 0.14)) return ruleMatch('RULE 17', 'IC_ACQ_14', 'Intra-Community acquisition of goods, applicable LU rate 14% — Art. 21 LTVA.');
+      if (rateEquals(line.vat_rate, 0.08)) return ruleMatch('RULE 17', 'IC_ACQ_08', 'Intra-Community acquisition of goods, applicable LU rate 8% — Art. 21 LTVA.');
+      if (rateEquals(line.vat_rate, 0.03)) return ruleMatch('RULE 17', 'IC_ACQ_03', 'Intra-Community acquisition of goods, applicable LU rate 3% — Art. 21 LTVA.');
+      // No rate readable — fall back to the legacy generic code (RULE 9).
+      return ruleMatch('RULE 9', 'IC_ACQ', 'Intra-Community acquisition of goods (Art. 21 LTVA) — rate not determined; reviewer may re-classify.');
     }
 
     // EU (non-LU) + no VAT + fund management + explicit exemption
@@ -146,6 +171,16 @@ function applyDirectEvidenceRules(line: InvoiceLineInput): ClassificationResult 
         && containsAny(text, FUND_MGMT_KEYWORDS)
         && containsAny(text, EXEMPTION_KEYWORDS)) {
       return ruleMatch('RULE 10', 'RC_EU_EX', 'Reverse charge, exempt under Art. 44§1 d LTVA (fund management) — eCDF box 435.');
+    }
+
+    // ═══════════════ RULE 19 — Import VAT from non-EU goods ═══════════════
+    // Non-EU origin + goods keywords + some VAT actually paid (to customs)
+    // on the invoice or extractor. Heuristic only — the reviewer confirms.
+    if (!isLu && !isEu && country !== ''
+        && containsAny(desc, GOODS_KEYWORDS)
+        && !isZeroOrNull(line.vat_applied)) {
+      return ruleMatch('RULE 19', 'IMPORT_VAT',
+        'Goods imported from outside the EU with customs VAT paid (Art. 27 LTVA) — deductible in box 077 if used for taxable activity.');
     }
 
     // Non-EU + no VAT + fund management + explicit exemption
@@ -158,13 +193,23 @@ function applyDirectEvidenceRules(line: InvoiceLineInput): ClassificationResult 
   }
 
   if (line.direction === 'outgoing') {
+    // ═══════════════ RULE 18 — Outgoing to non-EU customer ═══════════════
+    // When the extractor captured customer_country and it is non-EU, the
+    // supply is outside the LU VAT scope (place-of-supply rules). Requires
+    // zero LU VAT actually charged.
+    const isBilledWithoutVat =
+      isZeroOrNull(line.vat_rate) && isZeroOrNull(line.vat_applied);
+    if (isBilledWithoutVat && customerCountry &&
+        !isLuxembourg(customerCountry) && !isEU(customerCountry)) {
+      return ruleMatch('RULE 18', 'OUT_NONEU',
+        'Supply to a non-EU customer — outside the scope of LU VAT (place-of-supply: customer\'s country).');
+    }
+
     // RULE 14 used to match any outgoing with EXEMPTION_KEYWORDS *or* the bare
     // phrase "management fee(s)". An outgoing management fee billed WITH 17%
     // VAT (perfectly valid — SOPARFI issuing a taxable advisory invoice) was
     // then silently classified as exempt. We now require BOTH the exemption
     // reference AND the invoice to actually be billed without VAT.
-    const isBilledWithoutVat =
-      isZeroOrNull(line.vat_rate) && isZeroOrNull(line.vat_applied);
     if (isBilledWithoutVat && containsAny(text, EXEMPTION_KEYWORDS)) {
       return ruleMatch('RULE 14', 'OUT_LUX_00',
         'Exempt outgoing supply with explicit legal reference (Art. 44§1 d LTVA) and no VAT charged — eCDF box 012.');

@@ -121,20 +121,29 @@ export async function classifyDeclaration(declarationId: string): Promise<Classi
     };
   }
 
-  // Fetch lines to (re)classify — all non-manual active lines
+  // Fetch lines to (re)classify — all non-manual active lines.
+  // Batch 6 additions: is_disbursement, exemption_reference (line level),
+  // is_credit_note (invoice level), customer_country (invoice level) so the
+  // new RULES 16-19 can fire.
   const lines = await query<{
     id: string;
     direction: string;
     country: string | null;
+    customer_country: string | null;
     vat_rate: number | null;
     vat_applied: number | null;
     amount_eur: number | null;
     description: string | null;
+    is_disbursement: boolean | null;
+    is_credit_note: boolean | null;
+    exemption_reference: string | null;
     treatment_source: string | null;
     treatment: string | null;
     provider: string | null;
   }>(
-    `SELECT il.id, i.direction, i.country, il.vat_rate, il.vat_applied, il.amount_eur, il.description,
+    `SELECT il.id, i.direction, i.country, i.customer_country,
+            il.vat_rate, il.vat_applied, il.amount_eur, il.description,
+            il.is_disbursement, i.is_credit_note, il.exemption_reference,
             il.treatment_source, il.treatment, i.provider
        FROM invoice_lines il
        JOIN invoices i ON il.invoice_id = i.id
@@ -164,30 +173,34 @@ export async function classifyDeclaration(declarationId: string): Promise<Classi
     const override = findOverride(line.provider || '', line.description);
     const precedent = findPrecedent(line.provider || '', line.country);
 
+    const lineInput = {
+      direction: line.direction as 'incoming' | 'outgoing',
+      country: line.country,
+      customer_country: line.customer_country,
+      vat_rate: line.vat_rate == null ? null : Number(line.vat_rate),
+      vat_applied: line.vat_applied == null ? null : Number(line.vat_applied),
+      amount_eur: line.amount_eur == null ? null : Number(line.amount_eur),
+      description: line.description,
+      is_disbursement: line.is_disbursement,
+      is_credit_note: line.is_credit_note,
+      exemption_reference: line.exemption_reference,
+    };
+
     let result;
     if (override) {
       // Run direct-evidence rules first; if no direct match, apply override.
-      const direct = classifyInvoiceLine(
-        {
-          direction: line.direction as 'incoming' | 'outgoing',
-          country: line.country,
-          vat_rate: line.vat_rate == null ? null : Number(line.vat_rate),
-          vat_applied: line.vat_applied == null ? null : Number(line.vat_applied),
-          amount_eur: line.amount_eur == null ? null : Number(line.amount_eur),
-          description: line.description,
-        },
-        ctx,
-        null  // skip precedent so we can decide
-      );
+      const direct = classifyInvoiceLine(lineInput, ctx, null);
       // Direct-evidence rules (defined in applyDirectEvidenceRules in
-      // classification-rules.ts): 1-7, 9, 10, 12, 14, 15. RULES 8, 11, 13
-      // are the fallback catch-alls and MUST NOT block a legal override —
-      // the earlier `/^RULE [1-9]$/` regex accidentally matched RULE 8
-      // (blocking the override) and missed RULES 10/12/14/15 (letting the
-      // override silently overwrite direct invoice evidence).
+      // classification-rules.ts): 1-7, 9, 10, 12, 14, 15, and the Batch 6
+      // additions 16-19. RULES 8, 11, 13 are the fallback catch-alls and
+      // MUST NOT block a legal override — the earlier /^RULE [1-9]$/ regex
+      // accidentally matched RULE 8 (blocking the override) and missed
+      // RULES 10/12/14/15 (letting the override silently overwrite direct
+      // invoice evidence).
       const DIRECT_EVIDENCE_RULES = new Set([
         'RULE 1', 'RULE 2', 'RULE 3', 'RULE 4', 'RULE 5', 'RULE 6', 'RULE 7',
         'RULE 9', 'RULE 10', 'RULE 12', 'RULE 14', 'RULE 15',
+        'RULE 16', 'RULE 17', 'RULE 18', 'RULE 19',
       ]);
       const isDirectEvidenceRule = DIRECT_EVIDENCE_RULES.has(direct.rule);
       if (isDirectEvidenceRule) {
@@ -202,18 +215,7 @@ export async function classifyDeclaration(declarationId: string): Promise<Classi
         };
       }
     } else {
-      result = classifyInvoiceLine(
-        {
-          direction: line.direction as 'incoming' | 'outgoing',
-          country: line.country,
-          vat_rate: line.vat_rate == null ? null : Number(line.vat_rate),
-          vat_applied: line.vat_applied == null ? null : Number(line.vat_applied),
-          amount_eur: line.amount_eur == null ? null : Number(line.amount_eur),
-          description: line.description,
-        },
-        ctx,
-        precedent
-      );
+      result = classifyInvoiceLine(lineInput, ctx, precedent);
     }
 
     await execute(
