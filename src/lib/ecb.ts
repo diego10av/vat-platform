@@ -11,7 +11,13 @@
 // In-memory cache keyed by (currency, date) avoids hammering the ECB during
 // batch operations. Cache is per-server-instance and ephemeral.
 
-const cache = new Map<string, number | null>();
+// Cache only SUCCESSFUL fetches. Previously we also cached nulls from
+// failed / no-rate-available responses, which meant that a transient ECB
+// outage poisoned the cache for the life of the server instance — the
+// fill-fx endpoint would then silently skip every line for that currency
+// even after the ECB came back online. Null is now treated as "not
+// known; retry on next call".
+const cache = new Map<string, number>();
 
 const ECB_BASE = 'https://data-api.ecb.europa.eu/service/data/EXR';
 
@@ -22,7 +28,8 @@ export async function fetchECBRate(currency: string, isoDate: string): Promise<n
   if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return null;
 
   const key = `${cur}::${isoDate}`;
-  if (cache.has(key)) return cache.get(key) ?? null;
+  const cached = cache.get(key);
+  if (cached != null) return cached;
 
   // ECB publishes only for business days. If the requested date isn't published
   // we widen the window backwards by 7 days and pick the latest available.
@@ -40,7 +47,7 @@ export async function fetchECBRate(currency: string, isoDate: string): Promise<n
     console.error('[ecb] fetch failed', cur, isoDate, e);
   }
 
-  cache.set(key, rate);
+  if (rate != null && rate > 0) cache.set(key, rate);
   return rate;
 }
 

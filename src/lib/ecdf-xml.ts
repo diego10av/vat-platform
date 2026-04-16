@@ -73,10 +73,12 @@ export async function buildECDFXml(declarationId: string): Promise<XMLBuildResul
   if (decl.rcs_number) push(`          <RCS>${esc(decl.rcs_number)}</RCS>`);
   push(`        </Declarant>`);
   push(`        <Boxes>`);
+  // Emit every declared box, even when the value is zero. Previously we
+  // skipped non-total zero boxes "to keep the file readable", but the AED
+  // form expects a complete set (missing boxes can be interpreted as
+  // "not filed" and trigger a taxation d'office). Readability is the
+  // reviewer's problem — correctness is ours.
   for (const b of ecdf.boxes) {
-    // Skip zero non-key boxes to keep the file readable; keep totals always.
-    const isTotal = ['076', '097', '102', '103', '410', '409', '022', '046'].includes(b.box);
-    if (b.value === 0 && !isTotal) continue;
     push(`          <NumericField id="${esc(b.box)}" section="${esc(b.section)}">${b.value.toFixed(2)}</NumericField>`);
   }
   push(`        </Boxes>`);

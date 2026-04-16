@@ -59,24 +59,55 @@ export async function POST(
     try {
       const rate = await fetchECBRate(info.currency, info.date);
       if (!rate || rate <= 0) { skipped += 1; continue; }
-      // Update invoice header
-      await execute(
-        `UPDATE invoices SET ecb_rate = $1 WHERE id = $2`,
-        [rate, invoiceId]
-      );
-      // Recompute amount_eur for each line of that invoice (proportionally if a single line)
-      const lines = await query<{ id: string; currency_amount: number | null; amount_eur: number | null }>(
-        `SELECT id, currency_amount::float AS currency_amount, amount_eur::float AS amount_eur
-           FROM invoice_lines WHERE invoice_id = $1 AND state != 'deleted'`,
+
+      // The previous implementation selected `invoice_lines.currency_amount`,
+      // a column that doesn't exist on that table — every fill-fx run
+      // errored out silently inside the try/catch and left ecb_rate unset.
+      // When `needs_fx = true`, the extractor stores the ORIGINAL-currency
+      // numbers in amount_eur / vat_applied / amount_incl (per the rewritten
+      // extractor prompt). Converting those by dividing by the ECB rate
+      // produces the EUR values.
+      const lines = await query<{
+        id: string; amount_eur: number | null; vat_applied: number | null; amount_incl: number | null;
+      }>(
+        `SELECT id,
+                amount_eur::float AS amount_eur,
+                vat_applied::float AS vat_applied,
+                amount_incl::float AS amount_incl
+           FROM invoice_lines
+          WHERE invoice_id = $1 AND state != 'deleted'`,
         [invoiceId]
       );
       for (const l of lines) {
-        const newEur = l.currency_amount != null ? l.currency_amount / rate : l.amount_eur;
         await execute(
-          `UPDATE invoice_lines SET amount_eur = $1, updated_at = NOW() WHERE id = $2`,
-          [newEur, l.id]
+          `UPDATE invoice_lines
+              SET amount_eur = $1,
+                  vat_applied = $2,
+                  amount_incl = $3,
+                  updated_at = NOW()
+            WHERE id = $4`,
+          [
+            l.amount_eur != null ? l.amount_eur / rate : null,
+            l.vat_applied != null ? l.vat_applied / rate : null,
+            l.amount_incl != null ? l.amount_incl / rate : null,
+            l.id,
+          ]
         );
       }
+
+      // Also convert the invoice-header totals so the review UI shows EUR
+      // figures consistent with the lines. needs_fx is cleared because the
+      // conversion is now done.
+      await execute(
+        `UPDATE invoices
+            SET ecb_rate = $1,
+                total_ex_vat   = CASE WHEN total_ex_vat   IS NULL THEN NULL ELSE total_ex_vat::float / $1 END,
+                total_vat      = CASE WHEN total_vat      IS NULL THEN NULL ELSE total_vat::float / $1 END,
+                total_incl_vat = CASE WHEN total_incl_vat IS NULL THEN NULL ELSE total_incl_vat::float / $1 END,
+                needs_fx = FALSE
+          WHERE id = $2`,
+        [rate, invoiceId]
+      );
       await logAudit({
         entityId: decl.entity_id,
         declarationId: id,
@@ -85,7 +116,7 @@ export async function POST(
         targetId: invoiceId,
         field: 'ecb_rate',
         oldValue: '',
-        newValue: `${info.currency} on ${info.date} = ${rate}`,
+        newValue: `${info.currency} on ${info.date} = ${rate} (line amounts + header totals converted to EUR)`,
       });
       updated += 1;
     } catch (e) {

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, execute, logAudit } from '@/lib/db';
+import { apiError } from '@/lib/api-errors';
+
+const LOCKED_STATUSES = new Set(['approved', 'filed', 'paid']);
 
 // POST /api/invoice-lines/:id/move
 // Body: { target: 'incoming' | 'outgoing' | 'excluded' }
@@ -25,10 +28,12 @@ export async function POST(
     state: string;
     direction: string;
     entity_id: string;
+    decl_status: string;
   }>(
     `SELECT il.id, il.invoice_id, il.declaration_id, il.state,
             i.direction,
-            d2.entity_id
+            d2.entity_id,
+            d2.status AS decl_status
        FROM invoice_lines il
        JOIN invoices i ON il.invoice_id = i.id
        JOIN declarations d2 ON i.declaration_id = d2.id
@@ -37,6 +42,17 @@ export async function POST(
   );
 
   if (!line) return NextResponse.json({ error: 'Invoice line not found' }, { status: 404 });
+
+  // Lock check — an approved / filed / paid declaration must be reopened
+  // before lines can be re-assigned to a different section. Previously the
+  // move endpoint silently mutated direction and reset the treatment even
+  // on locked declarations, which would re-classify a filed return without
+  // any visible state transition.
+  if (LOCKED_STATUSES.has(line.decl_status)) {
+    return apiError('declaration_locked',
+      `This line belongs to a ${line.decl_status} declaration and cannot be moved.`,
+      { hint: 'Reopen the declaration first (approved → review).', status: 409 });
+  }
 
   const wasSection =
     line.state === 'deleted' ? 'excluded'

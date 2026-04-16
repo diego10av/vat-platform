@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query, execute, logAudit } from '@/lib/db';
 import { apiError, apiFail } from '@/lib/api-errors';
+import { TREATMENT_CODES } from '@/config/treatment-codes';
 
 // POST /api/invoice-lines/bulk
 // Body: { ids: string[], action: 'set_treatment' | 'acknowledge_flag' | 'mark_reviewed' | 'move_to_excluded', value?: string }
@@ -47,6 +48,15 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'set_treatment': {
         if (!value) return apiError('value_required', 'value (treatment code) is required.', { status: 400 });
+        // Validate the treatment against the canonical config. The previous
+        // version passed whatever string the client sent straight into SQL,
+        // so a typo like "LUX_17%" would be persisted and then silently
+        // excluded from every eCDF box filter.
+        if (!(value in TREATMENT_CODES)) {
+          return apiError('treatment_unknown',
+            `Unknown treatment code "${value}".`,
+            { hint: 'Pick a code from the treatment list.', status: 400 });
+        }
         await execute(
           `UPDATE invoice_lines
               SET treatment = $1, treatment_source = 'manual', updated_at = NOW()
