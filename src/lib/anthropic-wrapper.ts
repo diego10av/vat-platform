@@ -59,6 +59,12 @@ export interface AnthropicCallContext {
   agent: 'triage' | 'extractor' | 'classifier' | 'drafter' | 'aed_reader' | 'validator' | 'other';
   declaration_id?: string | null;
   entity_id?: string | null;
+  /**
+   * Optional attribution. If omitted, the call is attributed to 'founder'
+   * (single-user baseline until multi-tenant auth lands). The DB default
+   * matches, so sending null is equivalent to omitting it.
+   */
+  user_id?: string | null;
   label?: string; // e.g. document filename for logs
 }
 
@@ -127,6 +133,7 @@ export async function anthropicCreate(
 async function logApiCall(args: {
   declaration_id?: string | null;
   entity_id?: string | null;
+  user_id?: string | null;
   agent: string;
   model: string;
   input_tokens: number;
@@ -138,34 +145,71 @@ async function logApiCall(args: {
   status: 'ok' | 'error';
   error_message?: string;
   label?: string;
-}) {
+}): Promise<string | null> {
+  const id = generateId();
   try {
-    await execute(
-      `INSERT INTO api_calls (id, declaration_id, entity_id, agent, model,
-         input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
-         cost_eur, duration_ms, status, error_message)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [
-        generateId(),
-        args.declaration_id || null,
-        args.entity_id || null,
-        args.agent,
-        args.model,
-        args.input_tokens,
-        args.output_tokens,
-        args.cache_read_tokens || 0,
-        args.cache_creation_tokens || 0,
-        args.cost_eur,
-        args.duration_ms,
-        args.status,
-        args.error_message || null,
-      ]
-    );
+    // Try with user_id first (post-migration-001 schema). On failure
+    // (old schema, missing column), retry without it so dev/staging
+    // without the migration applied continue to work.
+    try {
+      await execute(
+        `INSERT INTO api_calls (id, declaration_id, entity_id, user_id, agent, model,
+           input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+           cost_eur, duration_ms, status, error_message)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+        [
+          id,
+          args.declaration_id || null,
+          args.entity_id || null,
+          args.user_id || 'founder',
+          args.agent,
+          args.model,
+          args.input_tokens,
+          args.output_tokens,
+          args.cache_read_tokens || 0,
+          args.cache_creation_tokens || 0,
+          args.cost_eur,
+          args.duration_ms,
+          args.status,
+          args.error_message || null,
+        ]
+      );
+    } catch (e) {
+      const err = e as { message?: string };
+      if (err.message && /column ["']?user_id["']?/i.test(err.message)) {
+        // Migration 001 not yet applied — insert without user_id.
+        await execute(
+          `INSERT INTO api_calls (id, declaration_id, entity_id, agent, model,
+             input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+             cost_eur, duration_ms, status, error_message)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+          [
+            id,
+            args.declaration_id || null,
+            args.entity_id || null,
+            args.agent,
+            args.model,
+            args.input_tokens,
+            args.output_tokens,
+            args.cache_read_tokens || 0,
+            args.cache_creation_tokens || 0,
+            args.cost_eur,
+            args.duration_ms,
+            args.status,
+            args.error_message || null,
+          ]
+        );
+      } else {
+        throw e;
+      }
+    }
+    return id;
   } catch (e) {
     // Never let logging failures break the actual request
     log.error('failed to persist api_call row', e, {
       agent: args.agent,
       model: args.model,
     });
+    return null;
   }
 }
