@@ -25,6 +25,7 @@
 import { query, queryOne } from '@/lib/db';
 import { apiOk, apiFail } from '@/lib/api-errors';
 import { getBudgetStatus } from '@/lib/budget-guard';
+import { computeDeadline, type Frequency, type Regime } from '@/lib/deadlines';
 
 type Severity = 'critical' | 'warning' | 'info';
 
@@ -92,9 +93,6 @@ export async function GET() {
     }
 
     const items: InboxItem[] = [];
-    const today = new Date();
-    const todayIso = today.toISOString().slice(0, 10);
-    const in3DaysIso = new Date(today.getTime() + 3 * 86400_000).toISOString().slice(0, 10);
 
     // ── 1. Client approved via portal → ready to file ────────────────
     //
@@ -131,57 +129,67 @@ export async function GET() {
 
     // ── 2. Filing + payment deadlines ────────────────────────────────
     //
-    // Overdue (past due_date) → critical.
-    // Within 3 days → warning.
-    // We use the existing /api/deadlines logic shape; here we query
-    // directly for simplicity. Deadline model: each declaration has a
-    // due_date either on the declaration itself or derived from the
-    // entity's regime/frequency. For now we operate on declarations
-    // that aren't yet filed/paid.
-    const upcomingDeadlines = await safeQuery<{
-      declaration_id: string;
-      entity_name: string;
-      year: number;
-      period: string;
-      status: string;
-      due_date: string | null;
+    // Declarations don't store a deadline column; the deadline is derived
+    // from the entity's (regime, frequency) + declaration (year, period)
+    // via src/lib/deadlines.ts. We query open declarations, compute
+    // deadlines in JS, and keep the ones that are overdue or within 3
+    // days.
+    //
+    // Overdue   → critical · filing_overdue / payment_overdue
+    // <= 3 days → warning · filing_soon    / payment_soon
+    const openDecls = await safeQuery<{
+      id: string; year: number; period: string; status: string;
+      regime: string; frequency: string; entity_name: string;
     }>(
-      `SELECT d.id AS declaration_id, e.name AS entity_name,
-              d.year, d.period, d.status,
-              COALESCE(d.filing_deadline, d.payment_deadline)::text AS due_date
+      `SELECT d.id, d.year, d.period, d.status,
+              e.regime, e.frequency, e.name AS entity_name
          FROM declarations d
          JOIN entities e ON d.entity_id = e.id
         WHERE d.status IN ('review', 'approved', 'filed')
-          AND COALESCE(d.filing_deadline, d.payment_deadline) IS NOT NULL
-          AND COALESCE(d.filing_deadline, d.payment_deadline) <= $1::date
-        ORDER BY COALESCE(d.filing_deadline, d.payment_deadline) ASC
-        LIMIT 30`,
-      [in3DaysIso],
+        ORDER BY d.year DESC, d.period DESC
+        LIMIT 100`,
     );
-    for (const d of upcomingDeadlines) {
-      if (!d.due_date) continue;
-      const overdue = d.due_date < todayIso;
-      const isPayment = d.status === 'filed'; // filed → next is payment
+    for (const d of openDecls) {
+      const regime = (d.regime as Regime);
+      const frequency = (d.frequency as Frequency);
+      if (!['simplified', 'ordinary'].includes(regime)) continue;
+      if (!['annual', 'quarterly', 'monthly'].includes(frequency)) continue;
+
+      const info = computeDeadline({
+        regime, frequency,
+        year: d.year,
+        period: d.period,
+      });
+      // Only surface if overdue or within 3 days.
+      if (info.days_until > 3) continue;
+
+      const isPayment = d.status === 'filed';
       const kind: InboxItemKind = isPayment
-        ? (overdue ? 'payment_overdue' : 'payment_soon')
-        : (overdue ? 'filing_overdue' : 'filing_soon');
-      const severity: Severity = overdue ? 'critical' : 'warning';
+        ? (info.is_overdue ? 'payment_overdue' : 'payment_soon')
+        : (info.is_overdue ? 'filing_overdue' : 'filing_soon');
+      const severity: Severity = info.is_overdue ? 'critical' : 'warning';
       const verb = isPayment ? 'payment' : 'filing';
-      const when = overdue
-        ? 'OVERDUE'
-        : `due by ${new Date(d.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`;
+      const when = info.is_overdue
+        ? `${Math.abs(info.days_until)}d overdue`
+        : info.days_until === 0
+          ? 'due TODAY'
+          : `due in ${info.days_until}d`;
       items.push({
-        id: `${kind}-${d.declaration_id}`,
+        id: `${kind}-${d.id}`,
         kind,
         severity,
-        title: `${d.entity_name} — ${verb} ${when.toLowerCase()}`,
-        description: `${d.year} ${d.period} · ${d.status}`,
-        href: `/declarations/${d.declaration_id}`,
-        context: { declaration_id: d.declaration_id, due_date: d.due_date, overdue },
+        title: `${d.entity_name} — ${verb} ${when}`,
+        description: `${d.year} ${d.period} · ${d.status} · ${info.description}`,
+        href: `/declarations/${d.id}`,
+        context: { declaration_id: d.id, due_date: info.due_date, overdue: info.is_overdue },
       });
     }
 
-    // ── 3. AED letters high-urgency + unactioned ─────────────────────
+    // ── 3. AED high-urgency + unactioned ─────────────────────
+    // Real table name: aed_communications (aed_letters is just a variable
+    // name used in the UI layer).
+    // Status enum on the table: received / reviewed / actioned / archived.
+    // We surface anything urgent that hasn't been actioned or archived.
     const aedHigh = await safeQuery<{
       id: string; filename: string; type: string | null;
       summary: string | null; deadline_date: string | null;
@@ -189,7 +197,7 @@ export async function GET() {
     }>(
       `SELECT a.id, a.filename, a.type, a.summary, a.deadline_date::text AS deadline_date,
               e.name AS entity_name
-         FROM aed_letters a
+         FROM aed_communications a
          LEFT JOIN entities e ON a.entity_id = e.id
         WHERE a.urgency = 'high'
           AND a.status NOT IN ('actioned', 'archived')
@@ -223,7 +231,7 @@ export async function GET() {
          JOIN entities e ON d.entity_id = e.id
         WHERE doc.status = 'error'
         GROUP BY d.id, e.name, d.year, d.period
-        ORDER BY MAX(doc.created_at) DESC NULLS LAST
+        ORDER BY MAX(doc.uploaded_at) DESC NULLS LAST
         LIMIT 10`,
     );
     for (const r of extractionErrors) {
