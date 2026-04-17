@@ -9,7 +9,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  HomeIcon, Building2Icon, FileTextIcon, InboxIcon, CalendarIcon,
+  HomeIcon, Building2Icon, FileTextIcon, CalendarIcon,
   BookOpenIcon,
   BarChart3Icon, ShieldCheckIcon, SettingsIcon,
   type LucideIcon,
@@ -46,8 +46,13 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
         { href: '/clients',      label: 'Clients',      icon: Building2Icon },
         { href: '/declarations', label: 'Declarations', icon: FileTextIcon,
           badge: badges.declarationsInReview },
-        { href: '/aed-letters',  label: 'AED inbox',    icon: InboxIcon,
-          badge: badges.aedUrgent },
+        // 2026-04-18: AED removed from top-level. It lives inside each
+        // entity now (/entities/[id] → AED tab) because a flat "AED
+        // inbox across all entities" view was a dashboard-only concept
+        // that doesn't match how VAT reviewers work (per-entity). The
+        // urgent AEDs still surface globally in the Inbox button
+        // (top-right of the topbar) — that's the actionable view.
+        // Route /aed-letters stays alive for back-compat deep-links.
         { href: '/deadlines',    label: 'Deadlines',    icon: CalendarIcon,
           badge: badges.deadlinesUrgent },
       ],
