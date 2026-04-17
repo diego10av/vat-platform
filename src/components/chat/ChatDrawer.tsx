@@ -969,7 +969,7 @@ function QuotaReachedBanner() {
       <div className="font-medium mb-0.5">Monthly AI quota reached</div>
       <div className="text-[11.5px]">
         Your chat resumes on the 1st of next month, or ask your admin to raise the cap in{' '}
-        <a href="/settings" className="underline">Settings</a>.
+        <a href="/settings/users" className="underline">Users &amp; AI caps</a>.
       </div>
     </div>
   );
