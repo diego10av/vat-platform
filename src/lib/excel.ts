@@ -80,7 +80,7 @@ export async function buildAppendix(declarationId: string): Promise<ExcelBuildRe
   const hasRC = incoming.some(l => (l.rc_amount ?? 0) !== 0);
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Luxembourg VAT Platform';
+  workbook.creator = 'cifra';
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet('VAT Appendix', {

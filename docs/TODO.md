@@ -51,9 +51,9 @@
 - [ ] 🧠 **Decide pricing after first 3 calls** — current hypothesis
       €99 / €299 / custom. Anchor question to ask: "What do you
       spend per year on VAT software today?"
-- [ ] 🟢 **5min · Rename repo `vat-platform` → `cifra-app`** — GitHub
-      UI (Settings > General > Rename). Then `git remote set-url
-      origin ...` locally.
+- [x] 🟢 **5min · Rename repo `vat-platform` → `cifra`** — GitHub +
+      Vercel renames executed 2026-04-18. Code-side rename (package.json,
+      PDF creators, docs, copy) shipped. Repo is now `github.com/diego10av/cifra`.
 - [ ] 📞 **SARL-S constitution complete** — expected 7-10 days after
       engaging a notary.
 - [ ] 🔴 **2h deep · Start P0 #2 multi-user + roles** — only after

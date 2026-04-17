@@ -6,21 +6,45 @@
 
 ## In one sentence
 
-cifra is modern Luxembourg VAT compliance software for tax professionals:
-classifier-first, AED-ready, audit-defensible.
+cifra is a Luxembourg tax & compliance workspace — AI reads, humans
+review, starting with VAT.
+
+**The headline you see today** (login, tab, top of any pitch):
+
+> *cifra — Luxembourg tax & compliance, in one workspace.
+>  AI reads, humans review. Starting with VAT.*
+
+The positioning deliberately leaves room: we identify with VAT today
+(that's where we have product + regression corpus + LTVA knowledge),
+but we don't brand ourselves as a "VAT platform". The roadmap — fund
+filings, Peppol e-invoicing under ViDA, AED operations — builds on
+top of the same workspace.
 
 ## Who it's for — ICP
 
-**Primary:** Luxembourg-based tax professionals who prepare VAT returns
-for investment-fund entities — fiduciary firms, accounting firms with
-VAT specialism, in-house VAT teams at AIFMs.
+**Wide primary audience, narrow beachhead.**
 
-The **buyer** is the managing partner or VAT practice lead. The **user**
-is the senior preparer/reviewer. Sometimes the same person in a 5-person
-boutique.
+The product is built to be sold to **anyone in Luxembourg who prepares
+and reviews compliance filings** — not just fiduciaries. The four
+distinct buyer profiles we target:
 
-**Size sweet spot:** 5-20 professionals handling 50-300 fund entities.
-Big enough to pay SaaS. Small enough to decide in a week.
+| Segment | Typical buyer | Why they buy |
+|---|---|---|
+| **Boutique tax & fiduciary firms** (5-50 staff) | Managing partner / VAT lead | Get 1 senior hour back per return; audit-defensible trail |
+| **Big 4** (PwC, KPMG, EY, Deloitte LU) | VAT practice lead / partner | Standardise the prep layer across hundreds of returns; AI guardrails that pass their QA |
+| **Specialist law firms** with VAT practice | Partner running VAT / indirect-tax | Same prep-time compression + case-law citations for opinions |
+| **In-house teams** at AIFMs, holding groups, fund admins | CFO / head of tax / VAT officer | Don't want to outsource but lack tooling — cifra is the internal workspace |
+
+**Beachhead (where we sell first):** boutique tax/fiduciary firms
+(5-20 staff, 50-300 fund entities). Big enough to pay SaaS, small
+enough to decide in a week. Once 10-20 of these are live and
+referenceable, Big 4 and law firms follow — they move slower but
+the same product wins.
+
+**Not the ICP:** generic SMEs who file their own VAT (too small),
+pure bookkeepers without VAT specialism (wrong workflow), accounting
+platforms looking to add VAT as a feature (competitor, not
+customer).
 
 ## The problem today
 

@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'cifra — Luxembourg VAT',
-  description: 'Preparation and filing of Luxembourg VAT returns. Built for tax professionals.',
+  title: 'cifra — Luxembourg tax & compliance',
+  description: 'Luxembourg tax & compliance, in one workspace. AI reads, humans review. Starting with VAT.',
   icons: {
     icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
   },

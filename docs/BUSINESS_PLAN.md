@@ -174,7 +174,7 @@ angels vs seed).
 - **Notary cost:** ~€1,500 one-off + RCS + CCSS registration
 - **Setup time:** 7-10 days with a notary
 - **Domain:** cifracompliance.com (owned)
-- **Repo:** github.com/diego10av/vat-platform (to rename `cifra-app`)
+- **Repo:** github.com/diego10av/cifra (renamed from `vat-platform` on 2026-04-18)
 - **IP:** all code in repo; MIT or proprietary (to decide — proprietary
   for the core classifier + legal-sources, probably open-source the UI
   components for marketing)

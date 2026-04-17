@@ -42,7 +42,9 @@ export default function LoginPage() {
         </div>
         <h1 className="text-[18px] font-semibold text-ink tracking-tight">Sign in</h1>
         <p className="text-[12.5px] text-ink-muted mt-1 mb-6">
-          Luxembourg VAT preparation for tax professionals.
+          Luxembourg tax &amp; compliance, in one workspace.
+          <br />
+          <span className="text-ink-faint">AI reads, humans review. Starting with VAT.</span>
         </p>
         <form onSubmit={handleSubmit} className="space-y-3">
           {error && (

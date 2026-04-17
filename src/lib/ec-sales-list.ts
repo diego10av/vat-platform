@@ -166,7 +166,7 @@ export async function buildECSLReport(declarationId: string): Promise<ECSLReport
 
 export async function buildECSLXlsx(report: ECSLReport): Promise<{ buffer: Buffer; filename: string }> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Luxembourg VAT Platform';
+  wb.creator = 'cifra';
   wb.created = new Date();
   const sheet = wb.addWorksheet('EC Sales List');
 
