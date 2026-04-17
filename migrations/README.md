@@ -46,3 +46,7 @@ Not today.
 - [ ] `003_app_logs.sql` — persists error/warn records from the
       structured logger. Without it, logs stay in stdout (Vercel drawer).
       With it, `/settings/logs` admin page shows recent issues.
+- [ ] `004_performance_indexes.sql` — 14 indexes on hot-path WHERE
+      columns (invoice_lines, declarations, invoices, audit_log,
+      aed_letters, api_calls). Pure speedup, zero code change.
+      Safe to re-run.

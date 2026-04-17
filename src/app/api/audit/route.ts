@@ -1,6 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+// In-memory cache for filter-dropdown queries. These two SELECT DISTINCT /
+// GROUP BY statements scan the whole audit_log table, so repeating them
+// on every page render is wasteful. Cached per-process with a short TTL —
+// the audit page loads are infrequent enough that a 30-second stale
+// window is imperceptible.
+interface FilterCacheEntry {
+  actions: string[];
+  counts: Array<{ action: string; n: number }>;
+  expiresAt: number;
+}
+let filterCache: FilterCacheEntry | null = null;
+const FILTER_TTL_MS = 30_000;
+
+async function getFilterOptions(): Promise<{ actions: string[]; counts: Array<{ action: string; n: number }> }> {
+  const now = Date.now();
+  if (filterCache && filterCache.expiresAt > now) {
+    return { actions: filterCache.actions, counts: filterCache.counts };
+  }
+  const actions = await query<{ action: string }>(
+    'SELECT DISTINCT action FROM audit_log ORDER BY action',
+  );
+  const counts = await query<{ action: string; n: number }>(
+    `SELECT action, COUNT(*)::int AS n FROM audit_log GROUP BY action ORDER BY n DESC`,
+  );
+  filterCache = {
+    actions: actions.map(a => a.action),
+    counts,
+    expiresAt: now + FILTER_TTL_MS,
+  };
+  return { actions: filterCache.actions, counts: filterCache.counts };
+}
+
 // GET /api/audit?entity_id=&declaration_id=&action=&since=&limit=
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
@@ -31,13 +63,10 @@ export async function GET(request: NextRequest) {
   `;
   vals.push(limit);
 
-  const rows = await query(sql, vals);
+  const [rows, filters] = await Promise.all([
+    query(sql, vals),
+    getFilterOptions(),
+  ]);
 
-  // Distinct values for filter dropdowns
-  const actions = await query<{ action: string }>('SELECT DISTINCT action FROM audit_log ORDER BY action');
-  const counts = await query<{ action: string; n: number }>(
-    `SELECT action, COUNT(*)::int AS n FROM audit_log GROUP BY action ORDER BY n DESC`
-  );
-
-  return NextResponse.json({ rows, actions: actions.map(a => a.action), counts });
+  return NextResponse.json({ rows, actions: filters.actions, counts: filters.counts });
 }
