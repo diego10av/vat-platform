@@ -18,7 +18,7 @@
 // you can't easily do from the hierarchical /clients page.
 // ════════════════════════════════════════════════════════════════════════
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { PlusIcon, Trash2Icon, ArrowRightIcon, BuildingIcon, SearchIcon } from 'lucide-react';
@@ -58,9 +58,7 @@ export default function EntitiesPage() {
   const [vatFilter, setVatFilter] = useState<VatFilter>('all');
   const [q, setQ] = useState('');
 
-  useEffect(() => { void load(); }, []);
-
-  async function load() {
+  const load = useCallback(async () => {
     try {
       const [entRes, clRes] = await Promise.all([
         fetch('/api/entities').then(r => r.ok ? r.json() : []),
@@ -73,7 +71,9 @@ export default function EntitiesPage() {
     } catch {
       setEntities([]);
     }
-  }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
 
   async function handleDelete(entity: Entity) {
     if (!confirm(`Delete "${entity.name}"? This hides it from the list but keeps the data for audit.`)) return;

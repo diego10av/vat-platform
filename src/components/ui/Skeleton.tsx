@@ -4,6 +4,12 @@ export function Skeleton({ className = '', style }: { className?: string; style?
   return <div className={`skeleton ${className}`} style={style} />;
 }
 
+// Deterministic-ish widths so server render == client render (no
+// hydration mismatch) AND so we stay pure (React 19 / react-hooks/purity
+// forbids Math.random during render). The small variation is just
+// eye candy.
+const SKELETON_WIDTHS = [88, 76, 92, 81, 85, 78, 90, 83];
+
 export function SkeletonText({ lines = 3, className = '' }: { lines?: number; className?: string }) {
   return (
     <div className={`space-y-2 ${className}`}>
@@ -11,7 +17,7 @@ export function SkeletonText({ lines = 3, className = '' }: { lines?: number; cl
         <Skeleton
           key={i}
           className="h-3"
-          style={{ width: `${75 + Math.random() * 20}%` }}
+          style={{ width: `${SKELETON_WIDTHS[i % SKELETON_WIDTHS.length]}%` }}
         />
       ))}
     </div>

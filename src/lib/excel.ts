@@ -94,7 +94,10 @@ export async function buildAppendix(declarationId: string): Promise<ExcelBuildRe
 
   if (outgoing.length > 0) {
     row += 2;
+    // Re-assignment kept for symmetry with the extending branches (row
+    // is the running cursor even if unused after this call).
     row = buildSection(sheet, row, 'B. Services Rendered — Overall Turnover', outgoing, { hasFX, hasRC: false });
+    void row;
   }
 
   const arrayBuffer = await workbook.xlsx.writeBuffer();

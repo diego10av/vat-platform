@@ -673,7 +673,7 @@ function HistoryPanel({
         <div className="text-[13px] font-medium text-ink">No saved conversations</div>
         <div className="text-[11.5px] text-ink-muted mt-1.5 max-w-[260px] leading-relaxed">
           Ask something to start a new conversation. Once you send a
-          message, it's saved here and you can come back to it anytime.
+          message, it&rsquo;s saved here and you can come back to it anytime.
         </div>
       </div>
     );
@@ -814,7 +814,7 @@ function EmptyState() {
       <div className="text-[13px] font-medium text-ink">How can I help?</div>
       <div className="text-[11.5px] text-ink-muted mt-1.5 max-w-[260px] mx-auto leading-relaxed">
         I can answer Lux VAT questions, explain classification rules, and look up the current
-        declaration or client. Cite me with a legal reference and I'll explain it.
+        declaration or client. Cite me with a legal reference and I&rsquo;ll explain it.
       </div>
       <div className="mt-4 space-y-1.5 max-w-[280px] mx-auto">
         <SuggestionChip text="What's the deadline for this declaration?" />
@@ -828,7 +828,7 @@ function EmptyState() {
 function SuggestionChip({ text }: { text: string }) {
   return (
     <div className="text-[11.5px] text-ink-soft bg-surface-alt/60 rounded px-2.5 py-1.5 italic">
-      "{text}"
+      &ldquo;{text}&rdquo;
     </div>
   );
 }

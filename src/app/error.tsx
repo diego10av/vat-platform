@@ -34,7 +34,6 @@ export default function AppError({
   useEffect(() => {
     // Structured log for Vercel's drawer. When Sentry is wired in, this
     // is the first place we call Sentry.captureException.
-    // eslint-disable-next-line no-console
     console.error('[app/error] caught render error', {
       digest: error.digest,
       message: error.message,

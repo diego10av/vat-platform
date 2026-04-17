@@ -303,7 +303,7 @@ function SchemaMissingCard() {
         <h3 className="text-[14px] font-semibold text-ink">Migration not applied</h3>
         <p className="text-[12.5px] text-ink-soft mt-1 leading-relaxed">
           The <code className="text-[11.5px] bg-surface-alt px-1 py-0.5 rounded">users</code> table
-          doesn't exist yet. This screen is read-only until you apply migration 001 in
+          doesn&rsquo;t exist yet. This screen is read-only until you apply migration 001 in
           Supabase SQL Editor.
         </p>
         <ol className="text-[12px] text-ink-soft mt-3 space-y-1 list-decimal pl-5 leading-relaxed">

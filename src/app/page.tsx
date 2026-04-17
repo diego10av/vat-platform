@@ -20,8 +20,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  PlusIcon, UsersIcon, FileTextIcon, InboxIcon, CalendarIcon,
-  ArrowRightIcon, AlertTriangleIcon, ClockIcon, CheckCircle2Icon,
+  PlusIcon, FileTextIcon, InboxIcon, CalendarIcon,
+  ArrowRightIcon, AlertTriangleIcon, ClockIcon,
   SparklesIcon, TrendingUpIcon, BuildingIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -403,29 +403,6 @@ function SectionCard({
       </div>
       <div className={compact ? 'p-4' : 'p-4'}>
         {children}
-      </div>
-    </div>
-  );
-}
-
-function KpiRow({
-  icon, label, value, tone,
-}: {
-  icon: React.ReactNode; label: string; value: number;
-  tone: 'neutral' | 'warning' | 'success' | 'muted';
-}) {
-  const toneClasses =
-    tone === 'success' ? 'text-success-700' :
-    tone === 'warning' ? 'text-brand-600' :
-    tone === 'muted'   ? 'text-ink-muted' : 'text-ink';
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2 text-[12px] text-ink-soft">
-        <span className={`${toneClasses} opacity-70`}>{icon}</span>
-        <span>{label}</span>
-      </div>
-      <div className={`text-[20px] font-bold tabular-nums ${toneClasses} tracking-tight`} style={{ letterSpacing: '-0.01em' }}>
-        {value}
       </div>
     </div>
   );

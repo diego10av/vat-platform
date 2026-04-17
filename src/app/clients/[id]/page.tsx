@@ -17,8 +17,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Building2Icon, PlusIcon, MailIcon, PhoneIcon, MapPinIcon, GlobeIcon,
-  ChevronRightIcon, PencilIcon, CheckIcon, XIcon, Trash2Icon,
-  AlertTriangleIcon,
+  ChevronRightIcon, PencilIcon, CheckIcon, Trash2Icon,
 } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 

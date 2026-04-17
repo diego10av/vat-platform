@@ -10,7 +10,7 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { NextRequest } from 'next/server';
-import { queryOne, query } from '@/lib/db';
+import { queryOne } from '@/lib/db';
 import { apiError, apiOk, apiFail } from '@/lib/api-errors';
 import { verifyApprovalToken } from '@/lib/approval-tokens';
 import { checkRateLimit } from '@/lib/rate-limit';

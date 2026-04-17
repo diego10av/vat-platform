@@ -15,15 +15,15 @@ import { ValidatorPanel } from '@/components/validator/ValidatorPanel';
 import type {
   InvoiceLine, DocumentRec, DeclarationData, PreviewTarget,
 } from './_types';
-import { formatDate, fmtEUR, treatmentColorClass } from './_helpers';
+import { formatDate, fmtEUR } from './_helpers';
 import {
-  Stat, SummaryStat, SectionHeader, EmptyBlock, Spinner, IconBtn, ManualIcon,
+  Stat, SummaryStat, SectionHeader, EmptyBlock, Spinner, ManualIcon,
 } from './_atoms';
 import { PreviewPanel } from './PreviewPanel';
 import { OutputsPanel } from './OutputsPanel';
 import { DeclarationNotes, FilingPanel } from './FilingPanel';
 import { ShareLinkModal } from './ShareLinkModal';
-import { DocRow, StatusBadge, DocStatusTag, TriageTag, FileIcon } from './DocRow';
+import { DocRow, StatusBadge, TriageTag, FileIcon } from './DocRow';
 import { TreatmentBadge } from './TreatmentBadge';
 
 // ═══════════════════════════════════════════════════════════════

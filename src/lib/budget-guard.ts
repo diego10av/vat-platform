@@ -166,7 +166,7 @@ export async function getUserBudgetStatus(userId: string): Promise<UserBudgetSta
     if (userRow && Number.isFinite(userRow.cap) && userRow.cap > 0) {
       cap = userRow.cap;
     }
-  } catch (err) {
+  } catch {
     // Migration not applied → users table missing. Act permissively.
     log.warn('users table not queryable — falling back to default cap', {
       user_id: userId,
@@ -193,7 +193,7 @@ export async function getUserBudgetStatus(userId: string): Promise<UserBudgetSta
       [userId],
     );
     spent = Number(spendRow?.total ?? 0);
-  } catch (err) {
+  } catch {
     // Migration not applied → user_id column missing. Act permissively
     // and return 0 spend so the request goes through (firm gate still
     // protects us).

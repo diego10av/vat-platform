@@ -38,7 +38,6 @@ function evaluateFormula(expr: string, values: Record<string, number>): number |
   const stripped = e.replace(/Math\.max/g, '');
   if (!/^[\d\s+\-*/().,]*$/.test(stripped)) return null;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-new-func
     const fn = new Function('Math', `return (${e});`);
     const v = fn(Math);
     if (typeof v !== 'number' || !isFinite(v)) return null;

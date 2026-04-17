@@ -9,7 +9,7 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { NextRequest } from 'next/server';
-import { query, execute, queryOne, logAudit } from '@/lib/db';
+import { execute, queryOne, logAudit } from '@/lib/db';
 import { apiError, apiOk, apiFail } from '@/lib/api-errors';
 import { logger } from '@/lib/logger';
 

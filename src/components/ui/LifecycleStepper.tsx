@@ -42,7 +42,6 @@ export function LifecycleStepper({ status }: { status: string }) {
         {STEPS.map((step, i) => {
           const isDone = i < activeIdx;
           const isCurrent = i === activeIdx;
-          const isFuture = i > activeIdx;
 
           const circleClasses = isCurrent
             ? 'bg-brand-500 text-white ring-4 ring-brand-100'

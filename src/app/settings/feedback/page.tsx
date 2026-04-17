@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
   MessageCircleIcon, AlertTriangleIcon, BugIcon, LightbulbIcon,
-  Wand2Icon, HelpCircleIcon, TrashIcon, Loader2Icon, ExternalLinkIcon,
+  Wand2Icon, HelpCircleIcon, TrashIcon, ExternalLinkIcon,
 } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 

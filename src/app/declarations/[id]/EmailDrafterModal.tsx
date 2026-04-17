@@ -166,7 +166,7 @@ export function EmailDrafterModal({
               ) : (
                 <div className="text-[11.5px] text-warning-800 bg-warning-50 border border-warning-200 rounded px-3 py-2">
                   No approvers configured for this entity. Add them on the
-                  entity page so "Open in mail" can pre-fill To / Cc.
+                  entity page so &ldquo;Open in mail&rdquo; can pre-fill To / Cc.
                 </div>
               )}
 

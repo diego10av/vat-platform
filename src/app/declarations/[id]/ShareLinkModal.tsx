@@ -250,7 +250,7 @@ export function ShareLinkModal({
               ) : (
                 <div className="mt-4 text-[11.5px] text-warning-800 bg-warning-50 border border-warning-200 rounded px-3 py-2">
                   No approvers configured for this entity.
-                  Add them on the entity page so "Draft email" can
+                  Add them on the entity page so &ldquo;Draft email&rdquo; can
                   pre-fill To / Cc automatically.
                 </div>
               )}
