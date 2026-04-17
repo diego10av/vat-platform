@@ -51,8 +51,8 @@ import { queryOne } from '@/lib/db';
 
 // AED form code mapping. These codes are the platform's best mapping from
 // (regime, frequency) to the AED form identifier; verify against the actual
-// AED form before upload.
-function getFormCode(regime: 'simplified' | 'ordinary', period: string): string {
+// AED form before upload. Exported for testing.
+export function getFormCode(regime: 'simplified' | 'ordinary', period: string): string {
   const frequency =
     period === 'Y1' ? 'annual' :
     /^Q[1-4]$/.test(period) ? 'quarterly' : 'monthly';
@@ -129,7 +129,8 @@ export async function buildECDFXml(declarationId: string): Promise<XMLBuildResul
   return { xml, filename };
 }
 
-function periodToECDF(period: string, year: number): string {
+// Exported for testing.
+export function periodToECDF(period: string, year: number): string {
   const p = (period || '').toUpperCase();
   if (p === 'Y1') return `${year}`;
   if (/^Q[1-4]$/.test(p)) return `${year}-${p}`;
@@ -137,7 +138,8 @@ function periodToECDF(period: string, year: number): string {
   return `${year}-${p}`;
 }
 
-function esc(s: string): string {
+// Exported for testing.
+export function esc(s: string): string {
   return String(s)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
