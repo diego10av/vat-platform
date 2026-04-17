@@ -97,6 +97,16 @@ Things worth remembering but not actionable yet:
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
 
+**2026-04-18 (daytime, 08:00 → 08:15)** — Second autonomous stint (Diego with kids)
+- ✅ **Client approval portal (P0 #4) shipped** — HMAC-signed self-contained tokens + public `/portal/[token]` review page + "Share for approval" button in declaration action bar + `ShareLinkModal` with selectable expiry (1–30 days) + copy-link + draft-email helpers. Eliminates the 3-5 email back-and-forth per declaration. No new DB table (token is its own truth, signed with AUTH_SECRET).
+- ✅ **Chat markdown-lite rendering** — Claude's replies now render **bold**, `inline code`, bulleted + numbered lists, paragraph breaks. Pure parser (`render-markdown.ts`) + React walker. Legal-ref pills preserved.
+- ✅ **+45 tests** (approval-tokens +12, render-markdown +18, ecb +15, ui-errors +8, rate-limit +6, api-errors +9, lifecycle +16 NEW during day; chat-context +7, budget-guard +13, logger +7, rate-limit +8 shipped overnight). **Total 372/372.**
+- ✅ Two commits: `3cb55ae` (markdown + tests), `[portal commit]` (approval portal)
+
+**Diego action needed:**
+- 🧠 Still pending: run `migrations/001_per_user_ai_budget_and_chat.sql` in Supabase (chat MVP works without, but per-user cap only activates once applied)
+- 🎯 Try the new "Share for approval" button: open any declaration in review, top-right action bar has a new "Share" button next to "Approve"
+
 **2026-04-18 (overnight, 00:30 → 07:50)** — Nocturnal autonomous sprint
 - ✅ **Rate limiting** on `/api/agents/*` (token bucket per IP × path; 5/min extract, 10/min validate, 15/min draft-email, 60/min classify) — commit [shipped]
 - ✅ **Structured logger** (`src/lib/logger.ts`) — bound loggers, structured fields, Error serialization, dev pretty-print / prod JSON-lines. Integrated in 8 critical sites (api-errors, anthropic-wrapper, ecb, extract, draft-email, aed/upload, documents/upload, declarations) — commit [shipped]
