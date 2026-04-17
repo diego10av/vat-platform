@@ -39,3 +39,7 @@ Not today.
 
 - [ ] `001_per_user_ai_budget_and_chat.sql` — users + per-user cap +
       chat tables. Required by chat MVP.
+- [ ] `002_feedback.sql` — in-product feedback table. Required by the
+      "Report issue" widget; until applied, the widget returns a soft
+      error to the user and no data is lost (client keeps message in
+      localStorage for retry).

@@ -12,6 +12,7 @@ import { usePathname } from 'next/navigation';
 import { Sidebar, type SidebarBadges } from './Sidebar';
 import { TopBar } from './TopBar';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
+import { FeedbackWidget } from '@/components/feedback/FeedbackWidget';
 
 // Routes that render without the shell (login, portal…).
 // Public-facing pages use their own minimal chrome, not the operator UI.
@@ -73,6 +74,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
+      <FeedbackWidget />
     </div>
   );
 }
