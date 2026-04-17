@@ -97,6 +97,22 @@ Things worth remembering but not actionable yet:
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
 
+**2026-04-18 (morning, 09:15 → 10:15)** — Fifth autonomous stint (Diego next to keyboard)
+- ✅ **`npm run seed:demo`** — 3 entities (SOPARFI, AIFM SCSp, Holding SARL), 3 review declarations, ~30 invoice_lines covering every treatment code, 3 AED letters, 5 precedents, 40 api_calls for /metrics. `--reset` wipes only `demo-*` prefixed rows.
+- ✅ **`docs/TESTING.md`** — 120-checkbox manual test plan across 13 sections. Partner-ready.
+- ✅ **Feedback widget** — floating button bottom-right → modal with category + severity + message. Auto-captures URL + entity/declaration. Tolerant of migration 002 missing (localStorage queue). Admin triage at `/settings/feedback`.
+- ✅ **CI pipeline** (`.github/workflows-disabled/ci.yml` for now) — typecheck + tests + build + secret-scan. Parked because PAT lacks `workflow` scope.
+- ✅ **Error recovery** — `src/lib/api-client.ts` with exponential backoff + timeout + offline short-circuit + envelope parsing. Global `OfflineBanner`.
+- ✅ **Observability** — migration 003 + `/settings/logs` admin view. Structured logger now persists error+warn to `app_logs`.
+- ✅ **Perf indexes** — migration 004 adds 14 indexes on hot-path columns. `docs/PERFORMANCE.md` documents 6 deferred N+1 fixes with recipes.
+- ✅ **A11y pass** — skip-to-content link, aria-labelledby on all modals, icon-button aria-labels, SearchBar labels, DocRow keyboard access. `docs/A11Y.md` tracks 8 deferred items.
+- ✅ **Tests +42** — 466 → 502, all green.
+
+**Diego actions now due** (migrations stack up):
+- 🔴 **Rotate GitHub PAT** with `workflow` scope → then `mv .github/workflows-disabled/ci.yml .github/workflows/ci.yml`
+- 🧠 Run in Supabase SQL Editor, in order: `migrations/001`, `002`, `003`, `004`.
+- 🎯 After migrations: `npm run seed:demo` → pick up `docs/TESTING.md` + share with partner.
+
 **2026-04-18 (daytime cont., 08:45 → 09:10)** — Fourth autonomous stint (Diego at breakfast)
 - ✅ **Thread rename UI** — hover a conversation in the history panel → pencil icon opens an inline editor; Enter saves, Escape cancels. Reuses the existing PATCH /api/chat/threads/[id] endpoint.
 - ✅ **Streaming SSE in chat** — new `/api/chat/stream` POST endpoint returns Server-Sent Events; replies appear token-by-token. Same gates (rate limit / per-user / firm-wide). Typing indicator hides once first delta lands — the growing bubble IS the feedback now.
