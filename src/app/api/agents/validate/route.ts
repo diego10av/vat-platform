@@ -28,8 +28,10 @@ export async function POST(request: NextRequest) {
       return apiError('declaration_id_required', 'declaration_id is required.', { status: 400 });
     }
 
-    const decl = await queryOne<{ id: string; status: string }>(
-      'SELECT id, status FROM declarations WHERE id = $1',
+    const decl = await queryOne<{ id: string; status: string; ai_mode: string }>(
+      `SELECT d.id, d.status, COALESCE(e.ai_mode, 'full') AS ai_mode
+         FROM declarations d JOIN entities e ON d.entity_id = e.id
+        WHERE d.id = $1`,
       [declaration_id],
     );
     if (!decl) return apiError('declaration_not_found', 'Declaration not found.', { status: 404 });
@@ -37,6 +39,21 @@ export async function POST(request: NextRequest) {
       return apiError('declaration_locked',
         `Declaration is ${decl.status}. Reopen before running the validator so any accepted findings can still be applied.`,
         { status: 409 });
+    }
+
+    // AI-mode gate — validator is an Opus call, disabled when the entity
+    // is in 'classifier_only' mode. See migration 009 + /entities/[id]
+    // settings. The reviewer can still catch errors via the deterministic
+    // classifier flags + manual review.
+    if (decl.ai_mode === 'classifier_only') {
+      return apiError(
+        'ai_mode_restricted',
+        `This entity is set to "classifier only" — the AI validator is disabled for it.`,
+        {
+          hint: 'Review findings manually, or switch the entity\u2019s AI mode to Full.',
+          status: 409,
+        },
+      );
     }
 
     // Budget guard — refuse new expensive calls once monthly cap hit.

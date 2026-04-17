@@ -43,8 +43,17 @@ export async function PUT(
     'name', 'vat_number', 'matricule', 'rcs_number', 'legal_form', 'entity_type',
     'regime', 'frequency', 'address', 'bank_iban', 'bank_bic', 'tax_office',
     'client_name', 'client_email', 'csp_name', 'csp_email',
-    'has_fx', 'has_outgoing', 'has_recharges', 'notes'
+    'has_fx', 'has_outgoing', 'has_recharges', 'notes',
+    'ai_mode', // 'full' | 'classifier_only' (CHECK constraint in migration 009)
   ];
+
+  // Defensive validation for ai_mode — the DB CHECK will catch bad values
+  // but we surface a clean error message instead of a raw constraint fail.
+  if ('ai_mode' in body && body.ai_mode != null && body.ai_mode !== 'full' && body.ai_mode !== 'classifier_only') {
+    return apiError('ai_mode_invalid',
+      `ai_mode must be "full" or "classifier_only"; got "${String(body.ai_mode)}".`,
+      { status: 400 });
+  }
 
   const updates: string[] = [];
   const values: unknown[] = [];

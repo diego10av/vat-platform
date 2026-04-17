@@ -90,12 +90,32 @@ export async function POST(request: NextRequest) {
     await initializeSchema();
     const { declaration_id } = await request.json();
 
-    const declaration = await queryOne<{ entity_id: string; entity_name: string; vat_number: string | null; regime: string }>(
-      `SELECT d.entity_id, e.name as entity_name, e.vat_number, e.regime
+    const declaration = await queryOne<{
+      entity_id: string; entity_name: string; vat_number: string | null;
+      regime: string; ai_mode: string;
+    }>(
+      `SELECT d.entity_id, e.name as entity_name, e.vat_number, e.regime,
+              COALESCE(e.ai_mode, 'full') AS ai_mode
          FROM declarations d JOIN entities e ON d.entity_id = e.id WHERE d.id = $1`,
       [declaration_id]
     );
     if (!declaration) return apiError('declaration_not_found', 'Declaration not found.', { status: 404 });
+
+    // AI-mode gate — per-entity kill-switch set in /entities/[id] settings.
+    // When an entity is in 'classifier_only' mode (typically because the
+    // client's compliance policy forbids third-party LLM calls), we refuse
+    // AI-backed extraction and tell the UI to fall back to manual entry.
+    // The deterministic classifier (rules-only) keeps working unchanged.
+    if (declaration.ai_mode === 'classifier_only') {
+      return apiError(
+        'ai_mode_restricted',
+        `This entity is set to "classifier only" — AI-assisted extraction is disabled for it.`,
+        {
+          hint: 'Enter invoices manually, or switch the entity\u2019s AI mode to Full in /entities/[id] settings.',
+          status: 409,
+        },
+      );
+    }
 
     // Budget guard — extraction is the most Anthropic-heavy endpoint
     // (one Haiku call per document). Refuse if monthly cap hit.

@@ -12,6 +12,7 @@ interface TimelineData {
     matricule: string | null; regime: string; frequency: string; address: string | null;
     has_fx: boolean; has_outgoing: boolean; has_recharges: boolean;
     notes: string | null;
+    ai_mode: 'full' | 'classifier_only' | null;
   };
   declarations: Array<{
     id: string; year: number; period: string; status: string;
@@ -66,6 +67,12 @@ export default function EntityDetailPage() {
       </div>
 
       <ApproversCard entityId={id} />
+
+      <AiModeCard
+        entityId={id}
+        current={e.ai_mode || 'full'}
+        onChanged={(next) => setData(d => d ? { ...d, entity: { ...d.entity, ai_mode: next } } : d)}
+      />
 
       <NotesCard
         kind="entity"
@@ -278,6 +285,119 @@ function KPI({ label, value, small }: { label: string; value: string | number; s
       <div className="text-[10px] text-ink-muted uppercase tracking-wide font-semibold">{label}</div>
       <div className={`font-bold mt-1 tabular-nums text-ink ${small ? 'text-base' : 'text-2xl'}`}>{value}</div>
     </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// AiModeCard — per-entity compliance kill-switch.
+//
+// Two modes:
+//   - full            (default): AI extraction, validator, and chat are
+//                                 enabled for this entity.
+//   - classifier_only: cifra runs only the deterministic LTVA/CJEU
+//                      rules. No Anthropic calls, ever. PDF extraction
+//                      and validator refuse with a 409; the reviewer
+//                      enters invoices manually.
+//
+// This is the visible product answer to "our compliance policy forbids
+// third-party LLM calls on client data". Surfaced per-entity because
+// the same firm can serve both a regular boutique (ai_mode='full') and
+// a paranoid bank client (ai_mode='classifier_only') in the same cifra
+// workspace.
+// ════════════════════════════════════════════════════════════════════════
+function AiModeCard({
+  entityId, current, onChanged,
+}: {
+  entityId: string;
+  current: 'full' | 'classifier_only';
+  onChanged: (next: 'full' | 'classifier_only') => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function set(mode: 'full' | 'classifier_only') {
+    if (mode === current) return;
+    setSaving(true); setError(null);
+    try {
+      const res = await fetch(`/api/entities/${entityId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ai_mode: mode }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data?.error?.message || 'Failed to change AI mode.');
+        return;
+      }
+      onChanged(mode);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error.');
+    } finally { setSaving(false); }
+  }
+
+  const isLocked = current === 'classifier_only';
+  return (
+    <div className={[
+      'bg-surface border rounded-lg p-4 mb-4',
+      isLocked ? 'border-warning-300' : 'border-border',
+    ].join(' ')}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h3 className="text-[13px] font-semibold text-ink">AI mode</h3>
+            {isLocked && (
+              <span className="text-[9.5px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-warning-100 text-warning-800 border border-warning-300">
+                Classifier only
+              </span>
+            )}
+          </div>
+          <p className="text-[11.5px] text-ink-muted mt-1 leading-relaxed max-w-xl">
+            {isLocked
+              ? 'This entity runs the deterministic classifier only. AI extraction, validator, and the chat assistant are disabled for it. The LTVA/CJEU rule engine still classifies ~80% of lines; the rest you classify manually.'
+              : 'cifra uses AI to extract invoices, run the validator, and power the assistant. Switch to "classifier only" if this client\u2019s compliance policy forbids third-party LLM calls on their data.'}
+          </p>
+        </div>
+        <div className="shrink-0 inline-flex rounded-md border border-border-strong overflow-hidden">
+          <ModeBtn
+            active={current === 'full'}
+            disabled={saving}
+            onClick={() => set('full')}
+            label="Full"
+          />
+          <ModeBtn
+            active={current === 'classifier_only'}
+            disabled={saving}
+            onClick={() => set('classifier_only')}
+            label="Classifier only"
+          />
+        </div>
+      </div>
+      {error && (
+        <div className="mt-3 text-[11.5px] text-danger-700 bg-danger-50 border border-danger-200 rounded px-3 py-2">
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ModeBtn({
+  active, disabled, onClick, label,
+}: { active: boolean; disabled: boolean; onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={[
+        'h-8 px-3 text-[11.5px] font-medium transition-colors',
+        active
+          ? 'bg-brand-50 text-brand-700'
+          : 'bg-surface text-ink-soft hover:bg-surface-alt',
+        disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
+      ].join(' ')}
+    >
+      {label}
+    </button>
   );
 }
 function StatusPill({ status }: { status: string }) {

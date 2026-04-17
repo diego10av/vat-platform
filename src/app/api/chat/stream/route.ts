@@ -112,6 +112,31 @@ export async function POST(request: NextRequest) {
     entity_id: body.context?.entity_id ?? null,
     declaration_id: body.context?.declaration_id ?? null,
   };
+
+  // ── Gate 1.5: per-entity AI mode ──
+  // If the user is chatting from an entity/declaration whose entity has
+  // ai_mode='classifier_only', refuse the chat stream. This is the
+  // compliance-mode kill-switch per migration 009.
+  if (context.entity_id || context.declaration_id) {
+    const { queryOne } = await import('@/lib/db');
+    const row = await queryOne<{ ai_mode: string | null }>(
+      context.entity_id
+        ? `SELECT COALESCE(ai_mode, 'full') AS ai_mode FROM entities WHERE id = $1`
+        : `SELECT COALESCE(e.ai_mode, 'full') AS ai_mode
+             FROM declarations d JOIN entities e ON d.entity_id = e.id WHERE d.id = $1`,
+      [context.entity_id || context.declaration_id],
+    );
+    if (row?.ai_mode === 'classifier_only') {
+      return apiError(
+        'ai_mode_restricted',
+        'The assistant is disabled for this entity (classifier-only mode).',
+        {
+          hint: 'Switch the entity\u2019s AI mode to Full to use the assistant, or consult the rule references manually.',
+          status: 409,
+        },
+      );
+    }
+  }
   const inboundThreadId =
     typeof body.thread_id === 'string' && body.thread_id.length > 0
       ? body.thread_id
