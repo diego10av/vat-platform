@@ -2,10 +2,20 @@
 
 // Home — the daily-starting-point dashboard for the VAT practitioner.
 //
-// Design intent: within 5 seconds of opening cifra, Diego must see
-// (a) what needs his attention today, (b) what's coming up, and
-// (c) a sense of momentum (this month's KPIs). The portfolio table
-// lives at the bottom for when he wants to pick a specific client.
+// Design intent (after 2026-04-18 audit per PROTOCOLS §11): every block
+// on this page must answer "if this number changes, do I act
+// differently?". Vanity stats are out. Current roster:
+//
+//   1. Priority cards: In review / AED urgent / Overdue — each click
+//      takes you to the action screen.
+//   2. Upcoming deadlines list: clickable rows.
+//   3. "Filed this month" momentum chip: informs whether we're tracking.
+//   4. Portfolio table: the drill-in for specific clients.
+//
+// Removed in the audit:
+//   - "Active clients" KPI (pure count, not actionable)
+//   - "In review" second counter (duplicates the priority card)
+//   - "AI accuracy" placeholder that never had data
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -101,7 +111,7 @@ export default function Home() {
           <Link href="/declarations">
             <Button variant="primary" size="md" icon={<PlusIcon size={14} />}>New declaration</Button>
           </Link>
-          <Link href="/entities">
+          <Link href="/clients/new">
             <Button variant="secondary" size="md" icon={<BuildingIcon size={14} />}>Add client</Button>
           </Link>
           <Link href="/aed-letters">
@@ -210,24 +220,33 @@ export default function Home() {
           </SectionCard>
         </div>
 
-        {/* KPI stack — 1/3 width */}
+        {/* Momentum chip — 1/3 width. One actionable signal only:
+            "filed this month" tells you whether you're on track. */}
         <div className="space-y-3">
-          <SectionCard title="This month" compact>
-            <div className="space-y-3">
-              <KpiRow icon={<CheckCircle2Icon size={14} />} label="Filed" value={filedThisMonth} tone="success" />
-              <KpiRow icon={<FileTextIcon size={14} />} label="In review" value={inReview.length} tone={inReview.length > 0 ? 'warning' : 'muted'} />
-              <KpiRow icon={<UsersIcon size={14} />} label="Active clients" value={entities.length} tone="neutral" />
-            </div>
-          </SectionCard>
-
-          <SectionCard title="AI accuracy" compact>
+          <SectionCard
+            title="This month"
+            subtitle="Momentum at a glance"
+            compact
+          >
             <div className="flex items-baseline gap-2">
-              <div className="text-[26px] font-bold text-ink tabular-nums tracking-tight">—</div>
-              <div className="text-[11px] text-ink-muted">% auto-classifications kept</div>
+              <div className="text-[34px] font-bold text-ink tabular-nums leading-none tracking-tight">
+                {filedThisMonth}
+              </div>
+              <div className="text-[12px] text-ink-muted">declarations filed</div>
             </div>
-            <p className="text-[11px] text-ink-muted mt-2 leading-relaxed">
-              Tracked from your review decisions. Available once you have approved at least one declaration.
-            </p>
+            {filedThisMonth === 0 ? (
+              <p className="text-[11.5px] text-ink-muted mt-3 leading-relaxed">
+                Nothing filed yet this month. If you have declarations
+                ready, they&apos;ll show up in the In-review card above.
+              </p>
+            ) : (
+              <Link
+                href="/declarations?status=filed"
+                className="inline-flex items-center gap-1 mt-3 text-[12px] font-medium text-brand-600 hover:text-brand-700"
+              >
+                See filed list <ArrowRightIcon size={12} />
+              </Link>
+            )}
           </SectionCard>
         </div>
       </section>
@@ -239,7 +258,7 @@ export default function Home() {
             <h2 className="text-[16px] font-semibold text-ink tracking-tight">Your portfolio</h2>
             <p className="text-[12px] text-ink-muted mt-0.5">Every client entity you manage, sorted by next deadline.</p>
           </div>
-          <Link href="/entities" className="text-[12px] font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1">
+          <Link href="/clients" className="text-[12px] font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1">
             Manage clients <ArrowRightIcon size={12} />
           </Link>
         </div>
@@ -249,10 +268,10 @@ export default function Home() {
             <EmptyState
               icon={<SparklesIcon size={22} />}
               title="No clients yet"
-              description="Create your first client entity. You can import a prior-year Excel to seed precedents so the classifier reuses your historical judgement."
+              description="Start by creating your first client. Entities hang off clients — you add entities once the client exists."
               action={
-                <Link href="/entities">
-                  <Button variant="primary" icon={<PlusIcon size={14} />}>Create client</Button>
+                <Link href="/clients/new">
+                  <Button variant="primary" icon={<PlusIcon size={14} />}>Create first client</Button>
                 </Link>
               }
             />

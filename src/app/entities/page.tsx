@@ -1,58 +1,79 @@
 'use client';
 
+// ════════════════════════════════════════════════════════════════════════
+// /entities — flat cross-client list of every Luxembourg entity.
+//
+// 2026-04-18 rewrite (per Diego's feedback + PROTOCOLS §11):
+// - Removed the four decorative KPI cards (Entities / Unique clients /
+//   Simplified regime / Ordinary regime). None of them answered the
+//   "if this changes, do I do something different?" test. Kept only
+//   the pending-registration filter, which IS actionable.
+// - Removed the inline create form. "New entity" now routes to
+//   /entities/new, which demands a client first (the app's new source
+//   of truth — entities can't exist without a client).
+// - Added a Client column (links to /clients/[id]).
+//
+// This page stays useful as a flat search / audit view — "find me
+// every entity in ordinary regime, quarterly, status pending" — which
+// you can't easily do from the hierarchical /clients page.
+// ════════════════════════════════════════════════════════════════════════
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { PlusIcon, PencilIcon, Trash2Icon, ArrowRightIcon, BuildingIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { PlusIcon, Trash2Icon, ArrowRightIcon, BuildingIcon, SearchIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Field, Input, Select, Label, Textarea } from '@/components/ui/Input';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageSkeleton } from '@/components/ui/Skeleton';
-import { Card, CardHeader, CardBody } from '@/components/ui/Card';
-import { Stat } from '@/components/ui/Stat';
+import { Card } from '@/components/ui/Card';
 
 interface Entity {
-  id: string; name: string; vat_number: string | null; matricule: string | null;
-  rcs_number: string | null; legal_form: string | null; entity_type: string | null;
-  regime: string; frequency: string; address: string | null;
-  bank_iban: string | null; bank_bic: string | null; tax_office: string | null;
-  client_name: string | null; client_email: string | null;
-  csp_name: string | null; csp_email: string | null;
-  has_fx: number; has_outgoing: number; has_recharges: number;
-  notes: string | null; created_at: string;
+  id: string;
+  name: string;
+  client_id: string | null;
+  client_name: string | null; // legacy inline column (still populated pre-005)
+  vat_number: string | null;
+  matricule: string | null;
+  rcs_number: string | null;
+  legal_form: string | null;
+  entity_type: string | null;
+  regime: string;
+  frequency: string;
   vat_status: 'registered' | 'pending_registration' | 'not_applicable';
 }
 
-const EMPTY = {
-  name: '', vat_number: '', matricule: '', rcs_number: '',
-  legal_form: '', entity_type: '', regime: 'simplified', frequency: 'annual',
-  address: '', bank_iban: '', bank_bic: '', tax_office: '',
-  client_name: '', client_email: '', csp_name: '', csp_email: '',
-  has_fx: false, has_outgoing: false, has_recharges: false, notes: '',
-  // 'registered' = already has a LU VAT number and files returns.
-  // 'pending_registration' = new entity that needs to be registered
-  //   with the AED (registration workflow kicks in).
-  // 'not_applicable' = entity out of scope (rare — group treasury
-  //   SPV etc.).
-  vat_status: 'registered' as 'registered' | 'pending_registration' | 'not_applicable',
-};
+interface ClientRow {
+  id: string;
+  name: string;
+}
 
 type VatFilter = 'all' | 'registered' | 'pending';
 
 export default function EntitiesPage() {
+  const router = useRouter();
   const [entities, setEntities] = useState<Entity[] | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState(EMPTY);
+  const [clients, setClients] = useState<Map<string, ClientRow>>(new Map());
   const [vatFilter, setVatFilter] = useState<VatFilter>('all');
+  const [q, setQ] = useState('');
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
+
   async function load() {
-    const res = await fetch('/api/entities');
-    setEntities(await res.json());
+    try {
+      const [entRes, clRes] = await Promise.all([
+        fetch('/api/entities').then(r => r.ok ? r.json() : []),
+        fetch('/api/clients').then(r => r.ok ? r.json() : { clients: [] }),
+      ]);
+      setEntities(entRes as Entity[]);
+      const m = new Map<string, ClientRow>();
+      for (const c of (clRes?.clients ?? []) as ClientRow[]) m.set(c.id, c);
+      setClients(m);
+    } catch {
+      setEntities([]);
+    }
   }
-  function reset() { setForm(EMPTY); setEditId(null); }
 
   async function handleDelete(entity: Entity) {
     if (!confirm(`Delete "${entity.name}"? This hides it from the list but keeps the data for audit.`)) return;
@@ -60,247 +81,103 @@ export default function EntitiesPage() {
       method: 'DELETE', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason: 'user_deleted' }),
     });
-    load();
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const url = editId ? `/api/entities/${editId}` : '/api/entities';
-    await fetch(url, {
-      method: editId ? 'PUT' : 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    });
-    reset();
-    setShowForm(false);
-    load();
-  }
-
-  function handleEdit(e: Entity) {
-    setForm({
-      name: e.name || '', vat_number: e.vat_number || '', matricule: e.matricule || '',
-      rcs_number: e.rcs_number || '', legal_form: e.legal_form || '', entity_type: e.entity_type || '',
-      regime: e.regime || 'simplified', frequency: e.frequency || 'annual',
-      address: e.address || '', bank_iban: e.bank_iban || '', bank_bic: e.bank_bic || '',
-      tax_office: e.tax_office || '', client_name: e.client_name || '', client_email: e.client_email || '',
-      csp_name: e.csp_name || '', csp_email: e.csp_email || '',
-      has_fx: !!e.has_fx, has_outgoing: !!e.has_outgoing, has_recharges: !!e.has_recharges,
-      notes: e.notes || '',
-      vat_status: (e.vat_status as typeof form.vat_status) || 'registered',
-    });
-    setEditId(e.id);
-    setShowForm(true);
+    await load();
   }
 
   if (!entities) return <PageSkeleton />;
 
+  const pendingCount = entities.filter(e => e.vat_status === 'pending_registration').length;
+  const registeredCount = entities.filter(e => e.vat_status !== 'pending_registration').length;
+
+  const filtered = entities.filter(e => {
+    if (vatFilter === 'registered' && e.vat_status === 'pending_registration') return false;
+    if (vatFilter === 'pending' && e.vat_status !== 'pending_registration') return false;
+    if (q.trim()) {
+      const needle = q.trim().toLowerCase();
+      const clientName = e.client_id ? clients.get(e.client_id)?.name : e.client_name;
+      const blob = [e.name, clientName, e.vat_number, e.matricule].filter(Boolean).join(' ').toLowerCase();
+      if (!blob.includes(needle)) return false;
+    }
+    return true;
+  });
+
   return (
     <div>
       <PageHeader
-        title="Clients"
-        subtitle="The Luxembourg legal entities you file VAT for. Grouped by client when a client_name is recorded. Set the regime and frequency once — the rest flows automatically."
+        title="All entities"
+        subtitle="Cross-client list of every Luxembourg entity. Use this when you need to search across clients — otherwise work from Clients → drill in."
         actions={
           <Button
             variant="primary"
             icon={<PlusIcon size={14} />}
-            onClick={() => { reset(); setShowForm(!showForm); }}
+            onClick={() => router.push('/entities/new')}
           >
-            {showForm ? 'Cancel' : 'New entity'}
+            New entity
           </Button>
         }
       />
 
-      {/* KPI row */}
+      {/* Empty state */}
+      {entities.length === 0 && (
+        <Card>
+          <EmptyState
+            icon={<BuildingIcon size={22} />}
+            title="No entities yet"
+            description="Start by creating a client. Entities hang off clients — you can't create an entity without one."
+            action={
+              <div className="flex gap-2 justify-center">
+                <Link
+                  href="/clients/new"
+                  className="h-9 px-4 rounded-md bg-brand-500 text-white text-[12.5px] font-semibold hover:bg-brand-600 inline-flex items-center gap-1.5"
+                >
+                  <PlusIcon size={13} /> Create first client
+                </Link>
+              </div>
+            }
+          />
+        </Card>
+      )}
+
+      {/* Filter + search bar — only when there's data */}
       {entities.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-          <Stat
-            label="Entities"
-            value={entities.length}
-          />
-          <Stat
-            label="Unique clients"
-            value={new Set(entities.map(e => e.client_name || e.name)).size}
-            tone="neutral"
-          />
-          <Stat
-            label="Simplified regime"
-            value={entities.filter(e => e.regime === 'simplified').length}
-            tone="info"
-          />
-          <Stat
-            label="Ordinary regime"
-            value={entities.filter(e => e.regime === 'ordinary').length}
-            tone="brand"
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="relative flex-1 min-w-[220px] max-w-xs">
+            <SearchIcon size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search name, client, VAT, matricule"
+              className="w-full h-8 pl-8 pr-3 text-[12.5px] border border-border-strong rounded-md bg-surface focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </div>
+          <FilterChip active={vatFilter === 'all'}        onClick={() => setVatFilter('all')}        label={`All (${entities.length})`} />
+          <FilterChip active={vatFilter === 'registered'} onClick={() => setVatFilter('registered')} label={`Registered (${registeredCount})`} />
+          <FilterChip
+            active={vatFilter === 'pending'}
+            onClick={() => setVatFilter('pending')}
+            label={`Pending registration (${pendingCount})`}
+            urgent={pendingCount > 0}
           />
         </div>
       )}
 
-      {showForm && (
-        <Card className="mb-6 animate-fadeIn">
-          <CardHeader title={editId ? 'Edit entity' : 'New entity'} />
-          <CardBody>
-            <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Entity name *">
-                  <Input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
-                </Field>
-                <Field label="VAT number">
-                  <Input value={form.vat_number} onChange={e => setForm({ ...form, vat_number: e.target.value })} placeholder="LU12345678" />
-                </Field>
-                <Field label="Matricule">
-                  <Input value={form.matricule} onChange={e => setForm({ ...form, matricule: e.target.value })} />
-                </Field>
-                <Field label="RCS number">
-                  <Input value={form.rcs_number} onChange={e => setForm({ ...form, rcs_number: e.target.value })} />
-                </Field>
-                <Field label="Legal form">
-                  <Select value={form.legal_form} onChange={e => setForm({ ...form, legal_form: e.target.value })}>
-                    <option value="">Select…</option>
-                    <option value="SARL">SARL</option>
-                    <option value="SCA">SCA</option>
-                    <option value="SCS">SCS</option>
-                    <option value="SA">SA</option>
-                    <option value="SCSp">SCSp</option>
-                  </Select>
-                </Field>
-                <Field label="Entity type">
-                  <Select value={form.entity_type} onChange={e => setForm({ ...form, entity_type: e.target.value })}>
-                    <option value="">Select…</option>
-                    <option value="fund">Fund (UCITS / SIF / RAIF / SICAR / Part II)</option>
-                    <option value="manco">Management company (AIFM / UCITS ManCo)</option>
-                    <option value="gp">General partner</option>
-                    <option value="active_holding">Active holding (Marle / Larentia+Minerva)</option>
-                    <option value="passive_holding">Passive holding (Polysar / Cibo)</option>
-                    <option value="other">Other</option>
-                  </Select>
-                </Field>
-                <Field label="Regime *">
-                  <Select value={form.regime} onChange={e => setForm({ ...form, regime: e.target.value })}>
-                    <option value="simplified">Simplified</option>
-                    <option value="ordinary">Ordinary</option>
-                  </Select>
-                </Field>
-                <Field label="Frequency *">
-                  <Select value={form.frequency} onChange={e => setForm({ ...form, frequency: e.target.value })}>
-                    <option value="annual">Annual</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="monthly">Monthly</option>
-                  </Select>
-                </Field>
-                <Field label="VAT registration *" className="col-span-2">
-                  <Select
-                    value={form.vat_status}
-                    onChange={e => setForm({ ...form, vat_status: e.target.value as typeof form.vat_status })}
-                  >
-                    <option value="registered">Already registered — has LU VAT number, files returns</option>
-                    <option value="pending_registration">Needs to be registered — open registration workflow</option>
-                    <option value="not_applicable">Not applicable — out of VAT scope</option>
-                  </Select>
-                </Field>
-                <Field label="Address" className="col-span-2">
-                  <Input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
-                </Field>
-                <Field label="Bank IBAN">
-                  <Input value={form.bank_iban} onChange={e => setForm({ ...form, bank_iban: e.target.value })} />
-                </Field>
-                <Field label="Bank BIC">
-                  <Input value={form.bank_bic} onChange={e => setForm({ ...form, bank_bic: e.target.value })} />
-                </Field>
-                <Field label="Tax office">
-                  <Input value={form.tax_office} onChange={e => setForm({ ...form, tax_office: e.target.value })} />
-                </Field>
-                <Field label="Client name">
-                  <Input value={form.client_name} onChange={e => setForm({ ...form, client_name: e.target.value })} />
-                </Field>
-                <Field label="Client email">
-                  <Input value={form.client_email} onChange={e => setForm({ ...form, client_email: e.target.value })} />
-                </Field>
-                <Field label="CSP name">
-                  <Input value={form.csp_name} onChange={e => setForm({ ...form, csp_name: e.target.value })} />
-                </Field>
-                <Field label="CSP email" className="col-span-2">
-                  <Input value={form.csp_email} onChange={e => setForm({ ...form, csp_email: e.target.value })} />
-                </Field>
-              </div>
-
-              <div className="mt-5 pt-4 border-t border-divider">
-                <Label>Traits</Label>
-                <div className="flex flex-wrap gap-5 mt-1">
-                  <Check label="Has FX invoices" checked={form.has_fx} onChange={v => setForm({ ...form, has_fx: v })} />
-                  <Check label="Has outgoing invoices" checked={form.has_outgoing} onChange={v => setForm({ ...form, has_outgoing: v })} />
-                  <Check label="Has recharges" checked={form.has_recharges} onChange={v => setForm({ ...form, has_recharges: v })} />
-                </div>
-              </div>
-
-              <Field label="Notes" className="mt-4">
-                <Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} />
-              </Field>
-
-              <div className="mt-5 flex gap-2">
-                <Button type="submit" variant="primary">{editId ? 'Save changes' : 'Create entity'}</Button>
-                <Button type="button" variant="secondary" onClick={() => { reset(); setShowForm(false); }}>Cancel</Button>
-              </div>
-            </form>
-          </CardBody>
+      {/* Empty filter results */}
+      {entities.length > 0 && filtered.length === 0 && (
+        <Card>
+          <EmptyState
+            icon={<BuildingIcon size={22} />}
+            title={q ? 'No matches' : (vatFilter === 'pending' ? 'No pending registrations' : 'No matches')}
+            description={
+              vatFilter === 'pending' && !q
+                ? 'All entities are already VAT-registered.'
+                : 'Adjust the search or switch filter to see more.'
+            }
+          />
         </Card>
       )}
 
-      {/* Filter bar: surfaces entities still awaiting VAT registration
-          with the AED. Pending-registration clients carry their own
-          mini-workflow inside /entities/[id] rather than living in a
-          separate top-level nav item. */}
-      {entities.length > 0 && (() => {
-        const pendingCount = entities.filter(e => e.vat_status === 'pending_registration').length;
-        const registeredCount = entities.filter(e => e.vat_status !== 'pending_registration').length;
-        return (
-          <div className="flex flex-wrap items-center gap-1 mb-4">
-            <FilterChip active={vatFilter === 'all'}        onClick={() => setVatFilter('all')}>
-              All <Count active={vatFilter === 'all'}         value={entities.length} />
-            </FilterChip>
-            <FilterChip active={vatFilter === 'registered'} onClick={() => setVatFilter('registered')}>
-              Registered <Count active={vatFilter === 'registered'} value={registeredCount} />
-            </FilterChip>
-            <FilterChip
-              active={vatFilter === 'pending'}
-              onClick={() => setVatFilter('pending')}
-              tone={pendingCount > 0 ? 'brand' : 'neutral'}
-            >
-              Pending registration <Count active={vatFilter === 'pending'} value={pendingCount} />
-            </FilterChip>
-          </div>
-        );
-      })()}
-
-      {(() => {
-        const filtered = entities.filter(e => {
-          if (vatFilter === 'registered') return e.vat_status !== 'pending_registration';
-          if (vatFilter === 'pending')    return e.vat_status === 'pending_registration';
-          return true;
-        });
-
-        if (entities.length === 0) return (
-          <Card>
-            <EmptyState
-              icon={<BuildingIcon size={22} />}
-              title="No clients yet"
-              description="Clients are the Luxembourg legal entities you file VAT for. Start by creating one."
-              action={<Button variant="primary" icon={<PlusIcon size={14} />} onClick={() => setShowForm(true)}>Create client</Button>}
-            />
-          </Card>
-        );
-        if (filtered.length === 0) return (
-          <Card>
-            <EmptyState
-              icon={<BuildingIcon size={22} />}
-              title={vatFilter === 'pending' ? 'No pending registrations' : 'No matches'}
-              description={vatFilter === 'pending'
-                ? 'All your clients are already registered for VAT. When you onboard a new client you\u2019ll see them here.'
-                : 'Switch filter to see the full list.'}
-            />
-          </Card>
-        );
-
-        return (
+      {/* List */}
+      {filtered.length > 0 && (
         <Card className="overflow-hidden">
           <table className="w-full text-[12.5px]">
             <thead className="bg-surface-alt border-b border-divider text-ink-muted">
@@ -315,105 +192,96 @@ export default function EntitiesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(entity => (
-                <tr key={entity.id} className="border-b border-divider last:border-0 hover:bg-surface-alt/60 transition-colors duration-150">
-                  <td className="px-4 py-3 text-ink-soft">{entity.client_name || <span className="text-ink-faint">—</span>}</td>
-                  <td className="px-4 py-3">
-                    <Link href={`/entities/${entity.id}`} className="font-medium text-ink hover:text-brand-600 transition-colors">
-                      {entity.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <VatStatusBadge status={entity.vat_status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge tone={entity.regime === 'simplified' ? 'info' : 'violet'}>{entity.regime}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-ink-soft capitalize">{entity.frequency}</td>
-                  <td className="px-4 py-3 text-ink-soft font-mono text-[11.5px]">{entity.vat_number || <span className="text-ink-faint">—</span>}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link href={`/entities/${entity.id}`} className="p-1.5 rounded-md text-ink-muted hover:text-brand-600 hover:bg-surface-alt transition-colors" title="Open">
-                        <ArrowRightIcon size={14} />
+              {filtered.map(entity => {
+                const client = entity.client_id ? clients.get(entity.client_id) : null;
+                return (
+                  <tr key={entity.id} className="border-b border-divider last:border-0 hover:bg-surface-alt/60 transition-colors duration-150">
+                    <td className="px-4 py-3">
+                      {client ? (
+                        <Link
+                          href={`/clients/${client.id}`}
+                          className="text-ink-soft hover:text-brand-600 hover:underline transition-colors"
+                        >
+                          {client.name}
+                        </Link>
+                      ) : entity.client_name ? (
+                        <span className="text-ink-soft">{entity.client_name}</span>
+                      ) : (
+                        <span className="text-ink-faint italic">no client</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Link href={`/entities/${entity.id}`} className="font-medium text-ink hover:text-brand-600 transition-colors">
+                        {entity.name}
                       </Link>
-                      <button onClick={() => handleEdit(entity)} className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-surface-alt transition-colors" title="Edit">
-                        <PencilIcon size={14} />
-                      </button>
-                      <button onClick={() => handleDelete(entity)} className="p-1.5 rounded-md text-ink-muted hover:text-danger-700 hover:bg-danger-50 transition-colors" title="Delete">
-                        <Trash2Icon size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3">
+                      <VatStatusBadge status={entity.vat_status} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge tone={entity.regime === 'simplified' ? 'info' : 'violet'}>{entity.regime}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-ink-soft capitalize">{entity.frequency}</td>
+                    <td className="px-4 py-3 text-ink-soft font-mono text-[11.5px]">
+                      {entity.vat_number || <span className="text-ink-faint">—</span>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          href={`/entities/${entity.id}`}
+                          className="p-1.5 rounded-md text-ink-muted hover:text-brand-600 hover:bg-surface-alt transition-colors"
+                          title="Open"
+                          aria-label={`Open ${entity.name}`}
+                        >
+                          <ArrowRightIcon size={14} />
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(entity)}
+                          className="p-1.5 rounded-md text-ink-muted hover:text-danger-700 hover:bg-danger-50 transition-colors"
+                          title="Delete"
+                          aria-label={`Delete ${entity.name}`}
+                        >
+                          <Trash2Icon size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </Card>
-        );
-      })()}
+      )}
     </div>
   );
 }
+
+// ───────────────────────────── subcomponents ─────────────────────────────
 
 function Th({ children }: { children?: React.ReactNode }) {
   return <th className="px-4 py-2.5 text-left font-medium text-[10.5px] uppercase tracking-[0.06em]">{children}</th>;
 }
 
-function Check({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <label className="inline-flex items-center gap-2 cursor-pointer text-[12.5px] text-ink-soft hover:text-ink transition-colors">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={e => onChange(e.target.checked)}
-        className="w-4 h-4 rounded border-border accent-brand-500 cursor-pointer"
-      />
-      {label}
-    </label>
-  );
-}
-
 function VatStatusBadge({ status }: { status: Entity['vat_status'] }) {
-  if (status === 'pending_registration') {
-    return <Badge tone="warning">Pending registration</Badge>;
-  }
-  if (status === 'not_applicable') {
-    return <Badge tone="neutral">N/A</Badge>;
-  }
+  if (status === 'pending_registration') return <Badge tone="warning">Pending</Badge>;
+  if (status === 'not_applicable')       return <Badge tone="neutral">N/A</Badge>;
   return <Badge tone="success">Registered</Badge>;
 }
 
 function FilterChip({
-  active, onClick, tone = 'neutral', children,
-}: {
-  active: boolean; onClick: () => void;
-  tone?: 'neutral' | 'brand';
-  children: React.ReactNode;
-}) {
-  const activeCls =
-    tone === 'brand' && !active
-      ? 'bg-brand-50 border border-brand-200 text-brand-700 hover:bg-brand-100'
-      : active
-        ? 'bg-brand-500 text-white shadow-xs'
-        : 'bg-surface border border-border text-ink-soft hover:bg-surface-alt';
+  label, active, onClick, urgent,
+}: { label: string; active: boolean; onClick: () => void; urgent?: boolean }) {
+  const cls = active
+    ? 'bg-brand-500 text-white shadow-xs'
+    : urgent
+      ? 'bg-brand-50 text-brand-700 border border-brand-200 hover:bg-brand-100'
+      : 'bg-surface text-ink-soft border border-border hover:bg-surface-alt';
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12.5px] font-medium transition-all ${activeCls}`}
+      className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-md text-[12.5px] font-medium transition-all ${cls}`}
     >
-      {children}
+      {label}
     </button>
-  );
-}
-
-function Count({ active, value }: { active: boolean; value: number }) {
-  return (
-    <span
-      className={`tabular-nums inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10.5px] font-semibold ${
-        active ? 'bg-white/20 text-white' : 'bg-brand-50 text-brand-700'
-      }`}
-    >
-      {value}
-    </span>
   );
 }
