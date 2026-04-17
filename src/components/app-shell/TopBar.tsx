@@ -1,13 +1,20 @@
 'use client';
 
 // Top bar sitting above the main content column. Holds global search,
-// a notifications bell (placeholder for now), and responsive hamburger
-// on mobile (sidebar is hidden below md). Height 56px.
+// the Inbox (reviewer's action queue), "Ask cifra" chat trigger, and a
+// mobile hamburger. Height 56px.
+//
+// 2026-04-18: replaced the placeholder BellIcon with the Inbox button
+// (see ./InboxButton.tsx). The bell used to render without ever doing
+// anything, which created false expectation of notifications. The
+// Inbox replaces it with a real feed — items that need the reviewer's
+// next action, now.
 
 import { useState } from 'react';
-import { MenuIcon, BellIcon, XIcon, SparklesIcon } from 'lucide-react';
+import { MenuIcon, XIcon, SparklesIcon } from 'lucide-react';
 import SearchBar from '@/components/SearchBar';
 import { Sidebar, type SidebarBadges } from './Sidebar';
+import { InboxButton } from './InboxButton';
 
 interface TopBarProps {
   badges: SidebarBadges;
@@ -36,7 +43,7 @@ export function TopBar({ badges, onOpenChat, chatOpen = false }: TopBarProps) {
 
           <div className="flex items-center gap-1 shrink-0">
             <AskCifraButton onClick={onOpenChat} active={chatOpen} />
-            <NotificationsButton />
+            <InboxButton />
           </div>
         </div>
       </header>
@@ -62,18 +69,6 @@ export function TopBar({ badges, onOpenChat, chatOpen = false }: TopBarProps) {
         </div>
       )}
     </>
-  );
-}
-
-function NotificationsButton() {
-  // Placeholder — hooked up in Phase 3 once AED + validator inboxes are consolidated.
-  return (
-    <button
-      className="relative w-8 h-8 inline-flex items-center justify-center rounded-md hover:bg-surface-alt text-ink-soft"
-      aria-label="Notifications"
-    >
-      <BellIcon size={16} strokeWidth={1.8} />
-    </button>
   );
 }
 
