@@ -9,6 +9,7 @@ import { anthropicCreate, maskKey } from '@/lib/anthropic-wrapper';
 import { createJob, updateJob, finishJob, isCancelRequested } from '@/lib/jobs';
 import { apiError, apiOk, apiFail } from '@/lib/api-errors';
 import { requireBudget } from '@/lib/budget-guard';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 export const maxDuration = 300;
@@ -77,6 +78,12 @@ async function readPromptFile(name: string): Promise<string> {
 // The caller then polls GET /api/jobs/:id to see progress.
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 extraction batches per minute per IP. Extraction is
+    // the heaviest Anthropic call; a burst beyond this is almost
+    // certainly a bug or abuse, not legitimate workload.
+    const rl = checkRateLimit(request, { max: 5, windowMs: 60_000 });
+    if (!rl.ok) return rl.response;
+
     await initializeSchema();
     const { declaration_id } = await request.json();
 

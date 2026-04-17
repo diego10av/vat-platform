@@ -3,6 +3,7 @@ import { queryOne, query } from '@/lib/db';
 import { apiError, apiOk, apiFail } from '@/lib/api-errors';
 import { runValidator } from '@/lib/validator';
 import { requireBudget } from '@/lib/budget-guard';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 // Opus second-opinion review. Opt-in (reviewer clicks a button in the
 // UI); this endpoint is never called automatically. Expensive — ~€0.05
@@ -16,6 +17,12 @@ const LOCKED_STATUSES = new Set(['approved', 'filed', 'paid']);
 // Returns: { run_id, findings_count, by_severity }
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 10 Opus validations per minute per IP. Validator runs
+    // take 30-120s each and cost €0.05-€0.15; limiting the burst rate
+    // is a cheap hedge against UI double-click storms.
+    const rl = checkRateLimit(request, { max: 10, windowMs: 60_000 });
+    if (!rl.ok) return rl.response;
+
     const { declaration_id } = await request.json();
     if (!declaration_id || typeof declaration_id !== 'string') {
       return apiError('declaration_id_required', 'declaration_id is required.', { status: 400 });

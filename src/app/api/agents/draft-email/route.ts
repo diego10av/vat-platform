@@ -5,6 +5,7 @@ import { query, queryOne } from '@/lib/db';
 import { computeECDF } from '@/lib/ecdf';
 import { generatePaymentReference } from '@/lib/payment-ref';
 import { anthropicCreate } from '@/lib/anthropic-wrapper';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const PRIMARY_MODEL = 'claude-haiku-4-5-20251001';
 const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
@@ -20,6 +21,11 @@ async function readPrompt(name: string): Promise<string> {
 // Returns: { subject, body, full_text, model, observations_data }
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 15 email drafts per minute per IP. Haiku is cheap
+    // but this is user-triggered, so a stampede suggests a UI bug.
+    const rl = checkRateLimit(request, { max: 15, windowMs: 60_000 });
+    if (!rl.ok) return rl.response;
+
     return await handleDraft(request);
   } catch (e) {
     const err = e as { status?: number; message?: string; stack?: string };
