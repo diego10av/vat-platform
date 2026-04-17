@@ -10,6 +10,9 @@ import { createJob, updateJob, finishJob, isCancelRequested } from '@/lib/jobs';
 import { apiError, apiOk, apiFail } from '@/lib/api-errors';
 import { requireBudget } from '@/lib/budget-guard';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
+
+const log = logger.bind('agents/extract');
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 export const maxDuration = 300;
@@ -126,7 +129,12 @@ export async function POST(request: NextRequest) {
     // maxDuration and the client polls the job record).
     const jobId = await createJob({ kind: 'extract', declaration_id, total: documents.length });
 
-    console.log(`[extract] job=${jobId} starting for decl=${declaration_id}, docs=${documents.length}, key=${maskKey(process.env.ANTHROPIC_API_KEY)}`);
+    log.info('extraction job starting', {
+      job_id: jobId,
+      declaration_id,
+      docs: documents.length,
+      api_key_masked: maskKey(process.env.ANTHROPIC_API_KEY),
+    });
 
     // Fire and continue — but we must await for Vercel to keep the function running.
     const run = runExtraction({
@@ -502,7 +510,7 @@ async function runExtraction(params: {
         rejectedCount += 1;
       }
     } catch (error) {
-      console.error(`[extract] ERROR processing ${doc.filename} (id=${doc.id}):`, error);
+      log.error('doc processing failed', error, { doc_id: doc.id, filename: doc.filename });
       let errMsg = 'Unknown error';
       const err = error as { status?: number; message?: string; stack?: string };
       if (err.status === 401) errMsg = `Anthropic API 401: invalid x-api-key (check ANTHROPIC_API_KEY)`;
@@ -519,7 +527,7 @@ async function runExtraction(params: {
   try {
     classificationSummary = await classifyDeclaration(declaration_id) as unknown as Record<string, unknown>;
   } catch (e) {
-    console.error('[extract] classification failed:', e);
+    log.error('classification failed', e, { declaration_id });
   }
 
   // Move declaration forward

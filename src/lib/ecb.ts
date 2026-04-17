@@ -11,6 +11,10 @@
 // In-memory cache keyed by (currency, date) avoids hammering the ECB during
 // batch operations. Cache is per-server-instance and ephemeral.
 
+import { logger } from '@/lib/logger';
+
+const log = logger.bind('ecb');
+
 // Cache only SUCCESSFUL fetches. Previously we also cached nulls from
 // failed / no-rate-available responses, which meant that a transient ECB
 // outage poisoned the cache for the life of the server instance — the
@@ -44,7 +48,7 @@ export async function fetchECBRate(currency: string, isoDate: string): Promise<n
       rate = extractLatestRate(data);
     }
   } catch (e) {
-    console.error('[ecb] fetch failed', cur, isoDate, e);
+    log.error('ECB fetch failed', e, { currency: cur, iso_date: isoDate });
   }
 
   if (rate != null && rate > 0) cache.set(key, rate);

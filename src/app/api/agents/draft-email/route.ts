@@ -6,6 +6,9 @@ import { computeECDF } from '@/lib/ecdf';
 import { generatePaymentReference } from '@/lib/payment-ref';
 import { anthropicCreate } from '@/lib/anthropic-wrapper';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { logger } from '@/lib/logger';
+
+const log = logger.bind('agents/draft-email');
 
 const PRIMARY_MODEL = 'claude-haiku-4-5-20251001';
 const FALLBACK_MODEL = 'claude-haiku-4-5-20251001';
@@ -28,8 +31,8 @@ export async function POST(request: NextRequest) {
 
     return await handleDraft(request);
   } catch (e) {
-    const err = e as { status?: number; message?: string; stack?: string };
-    console.error('[draft-email] FATAL', err.status, err.message, err.stack?.split('\n').slice(0, 5).join(' | '));
+    const err = e as { status?: number; message?: string };
+    log.error('fatal in draft-email POST', e, { err_status: err.status });
     return NextResponse.json({
       error: err.message || String(e),
       status: err.status || 500,
@@ -168,7 +171,7 @@ Draft the email per your instructions.`;
         messages: [{ role: 'user', content: userMsg }],
       }, { agent: 'drafter', declaration_id });
     } else {
-      console.error('[draft-email] error:', err.status, err.message);
+      log.error('drafter call failed', e, { err_status: err.status });
       throw e;
     }
   }

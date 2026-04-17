@@ -4,6 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { anthropicCreate } from '@/lib/anthropic-wrapper';
+import { logger } from '@/lib/logger';
+
+const log = logger.bind('aed/upload');
 
 export const maxDuration = 90;
 
@@ -73,7 +76,7 @@ export async function POST(request: NextRequest) {
       }
     }
   } catch (e) {
-    console.error('[aed/upload] reader failed', e);
+    log.error('AED reader failed', e);
   }
 
   if (entityId) {

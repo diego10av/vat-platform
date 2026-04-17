@@ -8,6 +8,9 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { execute, generateId } from '@/lib/db';
+import { logger } from '@/lib/logger';
+
+const log = logger.bind('anthropic-wrapper');
 
 // Approximate EUR/USD conversion used for coarse estimates. Anthropic bills in
 // USD; we store EUR for the UI. Update as FX shifts.
@@ -160,6 +163,9 @@ async function logApiCall(args: {
     );
   } catch (e) {
     // Never let logging failures break the actual request
-    console.error('[anthropic-wrapper] failed to log call', e);
+    log.error('failed to persist api_call row', e, {
+      agent: args.agent,
+      model: args.model,
+    });
   }
 }

@@ -14,6 +14,9 @@
 // human sentence to display.
 
 import { NextResponse } from 'next/server';
+import { logger } from '@/lib/logger';
+
+const log = logger.bind('api-errors');
 
 export type ApiErrorShape = {
   code: string;
@@ -38,10 +41,14 @@ export function apiOk<T extends Record<string, unknown>>(body: T, status = 200) 
 }
 
 // Convert any thrown error into the envelope. Never leak stack traces or
-// database errors verbatim — those go to console.error for Vercel logs.
+// database errors verbatim — those go to the structured logger, which
+// forwards to stderr for Vercel's log drawer.
 export function apiFail(error: unknown, where: string, status = 500) {
   const err = error as { code?: string; message?: string; stack?: string; status?: number };
-  console.error(`[${where}] FAIL`, err.code || '', err.message || err, err.stack?.split('\n').slice(0, 6).join(' | '));
+  log.error('api route failed', error, {
+    where,
+    err_code: err.code,
+  });
   return NextResponse.json(
     {
       error: {

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, queryOne, execute, logAudit, initializeSchema } from '@/lib/db';
 import { canTransition, type DeclarationStatus } from '@/lib/lifecycle';
 import { upsertPrecedentsFromDeclaration } from '@/lib/precedents';
+import { logger } from '@/lib/logger';
+
+const log = logger.bind('declarations/[id]');
 
 // GET /api/declarations/:id
 export async function GET(
@@ -129,7 +132,7 @@ export async function PATCH(
       try {
         precedentReport = await upsertPrecedentsFromDeclaration(id);
       } catch (e) {
-        console.error('[declarations.PATCH] precedent upsert failed:', e);
+        log.error('precedent upsert failed', e, { declaration_id: id });
       }
     }
   }

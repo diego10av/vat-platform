@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, execute, generateId, logAudit, initializeSchema } from '@/lib/db';
 import { createClient } from '@supabase/supabase-js';
+import { logger } from '@/lib/logger';
+
+const log = logger.bind('documents/upload');
 
 function getFileType(filename: string): 'pdf' | 'image' | 'word' {
   const ext = filename.toLowerCase().split('.').pop();
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
+      log.error('Supabase upload failed', uploadError, { filename: file.name });
       // Continue with other files
       continue;
     }
