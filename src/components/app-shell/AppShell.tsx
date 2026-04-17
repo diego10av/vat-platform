@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar, type SidebarBadges } from './Sidebar';
 import { TopBar } from './TopBar';
+import { OfflineBanner } from './OfflineBanner';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
 import { FeedbackWidget } from '@/components/feedback/FeedbackWidget';
 
@@ -62,6 +63,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen">
+      <OfflineBanner />
       <Sidebar badges={badges} />
       <div className="md:pl-[232px]">
         <TopBar
