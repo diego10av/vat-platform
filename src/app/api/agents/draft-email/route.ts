@@ -197,11 +197,39 @@ Draft the email per your instructions.`;
     subject = `VAT declaration — ${decl.entity_name} — ${decl.year} ${decl.period}`;
   }
 
+  // Approvers — same lookup as the share-link endpoint. Tolerant of
+  // migration 005 not applied (returns empty list).
+  interface Approver {
+    id: string; name: string; email: string | null;
+    role: string | null; organization: string | null;
+    country: string | null; approver_type: 'client' | 'csp' | 'other';
+    is_primary: boolean;
+  }
+  let approvers: Approver[] = [];
+  try {
+    approvers = await query<Approver>(
+      `SELECT a.id, a.name, a.email, a.role, a.organization,
+              a.country, a.approver_type, a.is_primary
+         FROM entity_approvers a
+         JOIN declarations d ON a.entity_id = d.entity_id
+        WHERE d.id = $1
+        ORDER BY a.is_primary DESC, a.sort_order ASC`,
+      [declaration_id],
+    );
+  } catch {
+    // schema missing — approvers stays empty
+  }
+  const primary = approvers.find(a => a.is_primary && a.email) ?? null;
+  const ccs = approvers.filter(a => !a.is_primary && a.email);
+
   return NextResponse.json({
     subject,
     body: bodyText || text.trim(),
     full_text: text.trim(),
     model: usedModel,
     observations_data: observations,
+    approvers,
+    primary_email: primary?.email ?? null,
+    cc_emails: ccs.map(a => a.email!).filter(Boolean),
   });
 }

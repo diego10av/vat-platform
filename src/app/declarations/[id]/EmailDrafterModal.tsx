@@ -10,12 +10,32 @@
 import { useEffect, useState } from 'react';
 import { IconBtn, Spinner } from './_atoms';
 
+interface ApproverSlim {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
+  organization: string | null;
+  country: string | null;
+  approver_type: 'client' | 'csp' | 'other';
+  is_primary: boolean;
+}
+
+interface DraftResponse {
+  subject: string;
+  body: string;
+  model: string;
+  approvers: ApproverSlim[];
+  primary_email: string | null;
+  cc_emails: string[];
+}
+
 export function EmailDrafterModal({
   declarationId, onClose,
 }: { declarationId: string; onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ subject: string; body: string; model: string } | null>(null);
+  const [draft, setDraft] = useState<DraftResponse | null>(null);
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [expertNotes, setExpertNotes] = useState('');
@@ -29,7 +49,7 @@ export function EmailDrafterModal({
         body: JSON.stringify({ declaration_id: declarationId, expert_notes: expertNotes || null }),
       });
       if (!res.ok) throw new Error((await res.json()).error || 'Failed');
-      const d = await res.json();
+      const d = await res.json() as DraftResponse;
       setDraft(d);
       setSubject(d.subject);
       setBody(d.body);
@@ -49,7 +69,12 @@ export function EmailDrafterModal({
   }
 
   function openInMail() {
-    const url = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    // Pre-fill To / Cc from the entity's approvers when available.
+    const to = draft?.primary_email ? encodeURIComponent(draft.primary_email) : '';
+    const cc = draft?.cc_emails && draft.cc_emails.length > 0
+      ? `&cc=${encodeURIComponent(draft.cc_emails.join(','))}`
+      : '';
+    const url = `mailto:${to}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
     window.location.href = url;
   }
 
@@ -113,6 +138,38 @@ export function EmailDrafterModal({
 
           {draft && (
             <div className="space-y-3">
+              {/* Approvers preview — so the reviewer knows who the mail
+                  client will address when they click "Open in mail". */}
+              {draft.approvers.length > 0 ? (
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wide font-semibold text-ink-muted mb-1.5">
+                    Recipients (from entity approvers)
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {draft.approvers.map(a => (
+                      <span
+                        key={a.id}
+                        className={[
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px]',
+                          a.is_primary
+                            ? 'bg-brand-50 text-brand-700 border-brand-200'
+                            : 'bg-surface-alt text-ink-soft border-border',
+                        ].join(' ')}
+                      >
+                        <span className="text-[9px] font-bold uppercase">{a.is_primary ? 'To' : 'Cc'}</span>
+                        <span className="font-medium">{a.name}</span>
+                        {a.email && <span className="text-ink-muted font-mono text-[10px]">{a.email}</span>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11.5px] text-warning-800 bg-warning-50 border border-warning-200 rounded px-3 py-2">
+                  No approvers configured for this entity. Add them on the
+                  entity page so "Open in mail" can pre-fill To / Cc.
+                </div>
+              )}
+
               <div>
                 <label className="block text-[11px] uppercase tracking-wide font-semibold text-ink-muted mb-1.5">Subject</label>
                 <input

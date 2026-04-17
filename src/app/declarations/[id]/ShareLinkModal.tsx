@@ -16,12 +16,26 @@
 import { useEffect, useState } from 'react';
 import { XIcon, CopyIcon, CheckIcon, ShareIcon, Loader2Icon, AlertCircleIcon } from 'lucide-react';
 
+interface ApproverSlim {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
+  organization: string | null;
+  country: string | null;
+  approver_type: 'client' | 'csp' | 'other';
+  is_primary: boolean;
+}
+
 interface ShareLinkResult {
   url: string;
   expires_at: string;
   expires_at_unix: number;
   nonce: string;
   expiry_days: number;
+  approvers: ApproverSlim[];
+  primary_email: string | null;
+  cc_emails: string[];
 }
 
 export function ShareLinkModal({
@@ -86,7 +100,15 @@ export function ShareLinkModal({
       '',
       'Thanks.',
     ].join('\n');
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    // Pre-fill the To / Cc fields from the entity's approvers. Primary
+    // gets "To:", the rest are "Cc:". If no approvers are configured,
+    // user fills it manually (old behaviour).
+    const to = result.primary_email ? encodeURIComponent(result.primary_email) : '';
+    const cc = result.cc_emails.length > 0
+      ? `&cc=${encodeURIComponent(result.cc_emails.join(','))}`
+      : '';
+    window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}${cc}&body=${encodeURIComponent(body)}`;
   }
 
   return (
@@ -193,9 +215,45 @@ export function ShareLinkModal({
                   {new Date(result.expires_at).toLocaleString('en-GB', {
                     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
                   })}
-                </span>{' '}
-                · nonce <span className="font-mono">{result.nonce}</span>
+                </span>
               </div>
+
+              {/* Approvers preview — tells the user exactly who will
+                  receive the email when they click "Draft email". */}
+              {result.approvers.length > 0 ? (
+                <div className="mt-4">
+                  <div className="text-[11px] uppercase tracking-wide font-semibold text-ink-muted mb-2">
+                    Will send to
+                  </div>
+                  <div className="space-y-1.5">
+                    {result.approvers.map(a => (
+                      <div key={a.id} className="flex items-center gap-2 text-[12px]">
+                        <span className={[
+                          'text-[9.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0',
+                          a.is_primary
+                            ? 'bg-brand-500 text-white'
+                            : 'bg-surface-alt text-ink-soft border border-border',
+                        ].join(' ')}>
+                          {a.is_primary ? 'To' : 'Cc'}
+                        </span>
+                        <span className="text-ink font-medium">{a.name}</span>
+                        {a.role && <span className="text-ink-muted">· {a.role}</span>}
+                        {a.email ? (
+                          <span className="text-ink-muted font-mono text-[11px]">{a.email}</span>
+                        ) : (
+                          <span className="text-warning-700 text-[11px]">(no email)</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 text-[11.5px] text-warning-800 bg-warning-50 border border-warning-200 rounded px-3 py-2">
+                  No approvers configured for this entity.
+                  Add them on the entity page so "Draft email" can
+                  pre-fill To / Cc automatically.
+                </div>
+              )}
 
               <div className="mt-5 flex gap-2 justify-end">
                 <button

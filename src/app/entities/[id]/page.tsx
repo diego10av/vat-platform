@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { PageSkeleton } from '@/components/ui/Skeleton';
+import { ApproversCard } from '@/components/entity/ApproversCard';
 
 interface TimelineData {
   entity: {
@@ -63,6 +64,8 @@ export default function EntityDetailPage() {
           </Link>
         </div>
       </div>
+
+      <ApproversCard entityId={id} />
 
       <NotesCard
         kind="entity"
