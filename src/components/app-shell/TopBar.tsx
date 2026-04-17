@@ -5,11 +5,17 @@
 // on mobile (sidebar is hidden below md). Height 56px.
 
 import { useState } from 'react';
-import { MenuIcon, BellIcon, XIcon } from 'lucide-react';
+import { MenuIcon, BellIcon, XIcon, SparklesIcon } from 'lucide-react';
 import SearchBar from '@/components/SearchBar';
 import { Sidebar, type SidebarBadges } from './Sidebar';
 
-export function TopBar({ badges }: { badges: SidebarBadges }) {
+interface TopBarProps {
+  badges: SidebarBadges;
+  onOpenChat?: () => void;
+  chatOpen?: boolean;
+}
+
+export function TopBar({ badges, onOpenChat, chatOpen = false }: TopBarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -29,6 +35,7 @@ export function TopBar({ badges }: { badges: SidebarBadges }) {
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
+            <AskCifraButton onClick={onOpenChat} active={chatOpen} />
             <NotificationsButton />
           </div>
         </div>
@@ -66,6 +73,30 @@ function NotificationsButton() {
       aria-label="Notifications"
     >
       <BellIcon size={16} strokeWidth={1.8} />
+    </button>
+  );
+}
+
+// "Ask cifra" trigger — opens the right-side ChatDrawer. Uses the
+// sparkles icon to mark AI + compact label to keep the topbar quiet.
+function AskCifraButton({ onClick, active }: { onClick?: () => void; active: boolean }) {
+  if (!onClick) return null;
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label="Open cifra assistant"
+      title="Ask cifra (AI assistant)"
+      className={[
+        'inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md text-[12px] font-medium',
+        'transition-colors duration-150',
+        active
+          ? 'bg-brand-50 text-brand-700 border border-brand-100'
+          : 'text-ink-soft hover:bg-surface-alt hover:text-ink border border-transparent',
+      ].join(' ')}
+    >
+      <SparklesIcon size={13} strokeWidth={2} />
+      <span className="hidden sm:inline">Ask cifra</span>
     </button>
   );
 }

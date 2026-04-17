@@ -27,7 +27,7 @@ const PRICING_USD: Record<string, { input: number; output: number; cache_read?: 
   'claude-opus-4-5-20250929':         { input: 15.0, output: 75.0, cache_read: 1.5, cache_write: 18.75 },
 };
 
-function priceCall(model: string, usage: {
+export function priceCall(model: string, usage: {
   input_tokens?: number; output_tokens?: number;
   cache_read_input_tokens?: number; cache_creation_input_tokens?: number;
 }): number {
@@ -56,7 +56,10 @@ export function maskKey(k: string | undefined): string {
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export interface AnthropicCallContext {
-  agent: 'triage' | 'extractor' | 'classifier' | 'drafter' | 'aed_reader' | 'validator' | 'other';
+  agent:
+    | 'triage' | 'extractor' | 'classifier' | 'drafter' | 'aed_reader' | 'validator'
+    | 'chat-haiku' | 'chat-opus'
+    | 'other';
   declaration_id?: string | null;
   entity_id?: string | null;
   /**

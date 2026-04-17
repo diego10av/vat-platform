@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Sidebar, type SidebarBadges } from './Sidebar';
 import { TopBar } from './TopBar';
+import { ChatDrawer } from '@/components/chat/ChatDrawer';
 
 // Routes that render without the shell (login, public…)
 const BARE_ROUTES = ['/login'];
@@ -22,6 +23,7 @@ interface Deadline { is_overdue: boolean; bucket: string; }
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '/';
   const [badges, setBadges] = useState<SidebarBadges>({});
+  const [chatOpen, setChatOpen] = useState(false);
 
   // Refresh badges when the user navigates. Cheap: these endpoints are
   // already indexed and most returns are < 50 rows. No streaming needed.
@@ -60,11 +62,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen">
       <Sidebar badges={badges} />
       <div className="md:pl-[232px]">
-        <TopBar badges={badges} />
+        <TopBar
+          badges={badges}
+          onOpenChat={() => setChatOpen(true)}
+          chatOpen={chatOpen}
+        />
         <main className="px-4 md:px-8 py-6 md:py-8 max-w-[1400px]">
           {children}
         </main>
       </div>
+      <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 }
