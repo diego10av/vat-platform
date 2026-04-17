@@ -97,7 +97,16 @@ Things worth remembering but not actionable yet:
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
 
-**2026-04-18 (daytime, 08:00 → 08:15)** — Second autonomous stint (Diego with kids)
+**2026-04-18 (daytime cont., 08:45 → 09:10)** — Fourth autonomous stint (Diego at breakfast)
+- ✅ **Thread rename UI** — hover a conversation in the history panel → pencil icon opens an inline editor; Enter saves, Escape cancels. Reuses the existing PATCH /api/chat/threads/[id] endpoint.
+- ✅ **Streaming SSE in chat** — new `/api/chat/stream` POST endpoint returns Server-Sent Events; replies appear token-by-token. Same gates (rate limit / per-user / firm-wide). Typing indicator hides once first delta lands — the growing bubble IS the feedback now.
+- ✅ **Admin UI at `/settings/users`** — per-user cap management with the ladder (€1 / €2 / €5 / €10 / €20 / €30). Add / edit / role-toggle / deactivate. Guardrail refuses to demote or deactivate the last active admin. New API: GET/POST `/api/users`, GET/PATCH/DELETE `/api/users/[id]`. Schema-missing banner guides Diego to apply migration 001 if not yet run.
+- ✅ **Tests for output generators** (+29): ecdf-xml (17), excel (5), front-page-pdf (7). Each round-trips the output through its parser (pdf-lib, ExcelJS) to catch shape regressions.
+- ✅ **Declaration page refactor continued**: extracted DocRow + its four pills (StatusBadge, DocStatusTag, TriageTag, FileIcon) + TreatmentBadge. page.tsx now 1,552 lines (from original 2,637 → 41% reduction). ReviewTable/TableRow/MoveDropdown/BulkActionBar stay because they're coupled to page state.
+- ✅ **Tests +60 total this stint** — 437 → 497. Full suite green.
+- ✅ Seven commits pushed
+
+**2026-04-18 (daytime, 08:00 → 08:45)** — Second + third autonomous stints (Diego with kids)
 - ✅ **Client approval portal (P0 #4) shipped** — HMAC-signed self-contained tokens + public `/portal/[token]` review page + "Share for approval" button in declaration action bar + `ShareLinkModal` with selectable expiry (1–30 days) + copy-link + draft-email helpers. Eliminates the 3-5 email back-and-forth per declaration. No new DB table (token is its own truth, signed with AUTH_SECRET).
 - ✅ **Chat markdown-lite rendering** — Claude's replies now render **bold**, `inline code`, bulleted + numbered lists, paragraph breaks. Pure parser (`render-markdown.ts`) + React walker. Legal-ref pills preserved.
 - ✅ **+45 tests** (approval-tokens +12, render-markdown +18, ecb +15, ui-errors +8, rate-limit +6, api-errors +9, lifecycle +16 NEW during day; chat-context +7, budget-guard +13, logger +7, rate-limit +8 shipped overnight). **Total 372/372.**
