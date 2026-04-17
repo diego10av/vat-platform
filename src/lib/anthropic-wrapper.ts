@@ -133,7 +133,9 @@ export async function anthropicCreate(
   return message;
 }
 
-async function logApiCall(args: {
+// Exported so callers that orchestrate streaming (which can't use
+// `anthropicCreate`) can still write the same row into api_calls.
+export async function logApiCall(args: {
   declaration_id?: string | null;
   entity_id?: string | null;
   user_id?: string | null;

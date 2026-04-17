@@ -26,7 +26,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   XIcon, SendIcon, SparklesIcon, Loader2Icon, MessageSquareIcon,
-  HistoryIcon, PlusIcon, Trash2Icon, ChevronLeftIcon,
+  HistoryIcon, PlusIcon, Trash2Icon, ChevronLeftIcon, PencilIcon, CheckIcon,
 } from 'lucide-react';
 import { parseBlocks, type InlineNode, type BlockNode } from './render-markdown';
 
@@ -125,11 +125,26 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     return () => { cancelled = true; };
   }, [open]);
 
-  const sendTurn = useCallback(
-    async (outgoing: ChatMessage[], useOpus: boolean) => {
+  // ── Streaming turn sender ──
+  //
+  // Opens POST /api/chat/stream, parses Server-Sent Events, pipes
+  // text deltas to `onDelta` so the UI can progressively append to
+  // the live assistant bubble. Resolves with the final metadata
+  // (or null on error / 429).
+  const streamTurn = useCallback(
+    async (
+      outgoing: ChatMessage[],
+      useOpus: boolean,
+      onDelta: (chunk: string) => void,
+    ): Promise<{
+      reply: string;
+      model: string;
+      cost_eur: number;
+      thread_id: string | null;
+    } | null> => {
       setError(null);
       try {
-        const res = await fetch('/api/chat', {
+        const res = await fetch('/api/chat/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -139,8 +154,11 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
             thread_id: threadId,
           }),
         });
-        const data = await res.json();
+
+        // Gate rejections (rate limit, budget, validation) come back as
+        // regular JSON with non-2xx; handle them like the old endpoint.
         if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
           const errMsg =
             data?.error?.message ||
             data?.error?.hint ||
@@ -148,20 +166,75 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           setError(errMsg);
           return null;
         }
-        if (data.budget) setBudget((prev) => ({ ...(prev || {} as BudgetSnapshot), ...data.budget }));
-        // The server may create or swap the thread id (e.g. first turn
-        // auto-creates; stale inbound id gets a fresh thread). Keep
-        // our local copy in sync.
-        if (typeof data.thread_id === 'string') {
-          setThreadId(data.thread_id);
+        if (!res.body) {
+          setError('Chat endpoint returned no stream body.');
+          return null;
         }
-        return data as {
-          reply: string;
-          model: string;
-          cost_eur: number;
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let accumulated = '';
+        let finalPayload: {
+          reply: string; model: string; cost_eur: number;
           thread_id: string | null;
-          tokens: { input: number; output: number; cache_read: number };
-        };
+          tokens?: { input: number; output: number; cache_read: number };
+          budget?: BudgetSnapshot;
+        } | null = null;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          // SSE events are separated by a double newline.
+          let sep: number;
+          while ((sep = buffer.indexOf('\n\n')) !== -1) {
+            const raw = buffer.slice(0, sep);
+            buffer = buffer.slice(sep + 2);
+            const dataLine = raw.split('\n').find((l) => l.startsWith('data:'));
+            if (!dataLine) continue;
+            const json = dataLine.slice(5).trim();
+            if (!json) continue;
+            try {
+              const ev = JSON.parse(json) as
+                | { type: 'text_delta'; text: string }
+                | { type: 'done'; reply: string; model: string; cost_eur: number;
+                    thread_id: string | null; tokens: { input: number; output: number; cache_read: number };
+                    budget: BudgetSnapshot }
+                | { type: 'error'; message: string };
+              if (ev.type === 'text_delta') {
+                accumulated += ev.text;
+                onDelta(ev.text);
+              } else if (ev.type === 'done') {
+                finalPayload = ev;
+                if (ev.budget) {
+                  setBudget((prev) => ({ ...(prev || {} as BudgetSnapshot), ...ev.budget }));
+                }
+                if (typeof ev.thread_id === 'string') {
+                  setThreadId(ev.thread_id);
+                }
+              } else if (ev.type === 'error') {
+                setError(ev.message);
+                return null;
+              }
+            } catch {
+              // skip malformed event rather than abort the whole stream
+            }
+          }
+        }
+
+        if (!finalPayload) {
+          // Stream closed without a done event — fall back to the
+          // accumulated text as the reply.
+          return {
+            reply: accumulated,
+            model: useOpus ? 'claude-opus-4-5' : 'claude-haiku-4-5',
+            cost_eur: 0,
+            thread_id: threadId,
+          };
+        }
+        return finalPayload;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setError(`Network error: ${msg}`);
@@ -176,23 +249,39 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     if (!text || sending) return;
 
     const userMsg: ChatMessage = { id: genId(), role: 'user', content: text };
-    const next = [...messages, userMsg];
-    setMessages(next);
+    // Insert a placeholder assistant bubble that we'll stream into.
+    const assistantId = genId();
+    const assistantPlaceholder: ChatMessage = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+    };
+    const outgoing = [...messages, userMsg];
+    setMessages([...outgoing, assistantPlaceholder]);
     setInput('');
     setSending(true);
 
-    const result = await sendTurn(next, false);
+    const result = await streamTurn(outgoing, false, (chunk) => {
+      // Append to the placeholder's content as each delta arrives.
+      setMessages((cur) =>
+        cur.map((m) =>
+          m.id === assistantId ? { ...m, content: m.content + chunk } : m,
+        ),
+      );
+    });
+
     if (result) {
-      setMessages((cur) => [
-        ...cur,
-        {
-          id: genId(),
-          role: 'assistant',
-          content: result.reply,
-          model: result.model,
-          cost_eur: result.cost_eur,
-        },
-      ]);
+      // Finalise the placeholder with canonical model + cost fields.
+      setMessages((cur) =>
+        cur.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: result.reply, model: result.model, cost_eur: result.cost_eur }
+            : m,
+        ),
+      );
+    } else {
+      // Failure — drop the empty placeholder so the UI doesn't show a blank bubble.
+      setMessages((cur) => cur.filter((m) => m.id !== assistantId));
     }
     setSending(false);
   }
@@ -207,18 +296,34 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     const realIdx = messages.length - 1 - lastAssistantIdx;
     const preceding = messages.slice(0, realIdx);
 
+    const assistantId = genId();
+    const placeholder: ChatMessage = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      escalated_to_opus: true,
+    };
+    setMessages([...preceding, placeholder]);
     setAskingOpus(true);
-    const result = await sendTurn(preceding, true);
+
+    const result = await streamTurn(preceding, true, (chunk) => {
+      setMessages((cur) =>
+        cur.map((m) =>
+          m.id === assistantId ? { ...m, content: m.content + chunk } : m,
+        ),
+      );
+    });
+
     if (result) {
-      const opusMsg: ChatMessage = {
-        id: genId(),
-        role: 'assistant',
-        content: result.reply,
-        model: result.model,
-        cost_eur: result.cost_eur,
-        escalated_to_opus: true,
-      };
-      setMessages([...preceding, opusMsg]);
+      setMessages((cur) =>
+        cur.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: result.reply, model: result.model, cost_eur: result.cost_eur }
+            : m,
+        ),
+      );
+    } else {
+      setMessages((cur) => cur.filter((m) => m.id !== assistantId));
     }
     setAskingOpus(false);
   }
@@ -301,6 +406,23 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
     }
   }
 
+  async function renameThread(id: string, title: string) {
+    const safe = title.trim().slice(0, 200);
+    if (!safe) return;
+    // Optimistic update — flip the cached list before the server responds.
+    setThreads((cur) => cur.map((t) => (t.id === id ? { ...t, title: safe } : t)));
+    try {
+      await fetch(`/api/chat/threads/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: safe }),
+      });
+    } catch {
+      // silent — the optimistic title stays locally; next history load
+      // would reconcile if the server rejected.
+    }
+  }
+
   if (!open) return null;
 
   const capReached =
@@ -344,6 +466,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
             currentThreadId={threadId}
             onPick={switchToThread}
             onArchive={archiveCurrentThread}
+            onRename={renameThread}
             loading={loadingThread}
           />
         ) : (
@@ -358,15 +481,22 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
                 message={m}
                 isLast={i === messages.length - 1}
                 onAskOpus={
-                  m.role === 'assistant' && !m.escalated_to_opus && i === messages.length - 1
+                  m.role === 'assistant' && !m.escalated_to_opus && i === messages.length - 1 && !sending && !askingOpus
                     ? handleAskOpus
                     : undefined
                 }
                 askingOpus={askingOpus}
               />
             ))}
-            {sending && <TypingIndicator model="Haiku" />}
-            {askingOpus && <TypingIndicator model="Opus" />}
+            {/* Show the "Haiku/Opus is thinking" indicator only until the
+                first delta lands — after that the streamed bubble itself
+                is the live feedback, and a second spinner is noise. */}
+            {(sending || askingOpus) && (() => {
+              const last = messages[messages.length - 1];
+              const bubbleIsGrowing = last?.role === 'assistant' && last.content.length > 0;
+              if (bubbleIsGrowing) return null;
+              return <TypingIndicator model={askingOpus ? 'Opus' : 'Haiku'} />;
+            })()}
           </div>
         )}
 
@@ -515,14 +645,17 @@ function Header({
 }
 
 function HistoryPanel({
-  threads, currentThreadId, onPick, onArchive, loading,
+  threads, currentThreadId, onPick, onArchive, onRename, loading,
 }: {
   threads: ThreadSummary[];
   currentThreadId: string | null;
   onPick: (id: string) => void;
   onArchive: (id: string) => void;
+  onRename: (id: string, title: string) => void;
   loading: boolean;
 }) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center text-[12px] text-ink-muted gap-2">
@@ -556,37 +689,118 @@ function HistoryPanel({
             year: updated.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined,
           });
           const isActive = t.id === currentThreadId;
+          const isEditing = editingId === t.id;
           return (
             <li key={t.id} className={isActive ? 'bg-brand-50/50' : ''}>
               <div className="flex items-start gap-1 px-4 py-3 group">
-                <button
-                  onClick={() => onPick(t.id)}
-                  className="flex-1 text-left min-w-0"
-                >
-                  <div className="text-[13px] font-medium text-ink truncate">{t.title || 'Untitled'}</div>
-                  <div className="text-[11px] text-ink-muted mt-0.5 flex items-center gap-2">
-                    <span>{niceDate}</span>
-                    {t.total_cost_eur > 0 && (
-                      <>
-                        <span className="text-ink-faint">·</span>
-                        <span className="tabular-nums">€{t.total_cost_eur.toFixed(2)}</span>
-                      </>
-                    )}
-                  </div>
-                </button>
-                <button
-                  onClick={() => onArchive(t.id)}
-                  className="opacity-0 group-hover:opacity-100 w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-surface-alt text-ink-muted hover:text-danger-600 transition-opacity"
-                  aria-label="Archive conversation"
-                  title="Archive"
-                >
-                  <Trash2Icon size={13} />
-                </button>
+                {isEditing ? (
+                  <InlineTitleEditor
+                    initial={t.title}
+                    onSave={(title) => {
+                      onRename(t.id, title);
+                      setEditingId(null);
+                    }}
+                    onCancel={() => setEditingId(null)}
+                  />
+                ) : (
+                  <button
+                    onClick={() => onPick(t.id)}
+                    className="flex-1 text-left min-w-0"
+                  >
+                    <div className="text-[13px] font-medium text-ink truncate">{t.title || 'Untitled'}</div>
+                    <div className="text-[11px] text-ink-muted mt-0.5 flex items-center gap-2">
+                      <span>{niceDate}</span>
+                      {t.total_cost_eur > 0 && (
+                        <>
+                          <span className="text-ink-faint">·</span>
+                          <span className="tabular-nums">€{t.total_cost_eur.toFixed(2)}</span>
+                        </>
+                      )}
+                    </div>
+                  </button>
+                )}
+                {!isEditing && (
+                  <>
+                    <button
+                      onClick={() => setEditingId(t.id)}
+                      className="opacity-0 group-hover:opacity-100 w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-surface-alt text-ink-muted hover:text-ink transition-opacity"
+                      aria-label="Rename conversation"
+                      title="Rename"
+                    >
+                      <PencilIcon size={13} />
+                    </button>
+                    <button
+                      onClick={() => onArchive(t.id)}
+                      className="opacity-0 group-hover:opacity-100 w-7 h-7 inline-flex items-center justify-center rounded-md hover:bg-surface-alt text-ink-muted hover:text-danger-600 transition-opacity"
+                      aria-label="Archive conversation"
+                      title="Archive"
+                    >
+                      <Trash2Icon size={13} />
+                    </button>
+                  </>
+                )}
               </div>
             </li>
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+// Inline editor used inside a thread row. Enter saves, Escape cancels,
+// blur saves (but save suppresses if the value is unchanged).
+function InlineTitleEditor({
+  initial, onSave, onCancel,
+}: { initial: string; onSave: (title: string) => void; onCancel: () => void }) {
+  const [value, setValue] = useState(initial);
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    ref.current?.focus();
+    ref.current?.select();
+  }, []);
+
+  function commit() {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      onCancel();
+      return;
+    }
+    if (trimmed === initial.trim()) {
+      onCancel();
+      return;
+    }
+    onSave(trimmed);
+  }
+
+  return (
+    <div className="flex-1 flex items-center gap-1">
+      <input
+        ref={ref}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            commit();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
+        onBlur={commit}
+        maxLength={200}
+        className="flex-1 bg-surface border border-brand-300 rounded px-2 py-1 text-[13px] text-ink focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+      />
+      <button
+        onClick={commit}
+        onMouseDown={(e) => e.preventDefault()} // prevent blur → commit order race
+        className="w-7 h-7 inline-flex items-center justify-center rounded-md text-brand-700 hover:bg-brand-50"
+        aria-label="Save title"
+      >
+        <CheckIcon size={13} />
+      </button>
     </div>
   );
 }
