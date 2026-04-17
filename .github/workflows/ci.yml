@@ -1,0 +1,109 @@
+# ════════════════════════════════════════════════════════════════════════
+# CI — runs on every push + every PR to main.
+#
+# Three parallel jobs:
+#   1. typecheck — tsc --noEmit (fast, fails the run on any type error)
+#   2. test      — vitest run (full suite, ~5s)
+#   3. build     — next build (catches runtime-only regressions)
+#
+# Why three separate jobs (vs. one script): parallelism + clear red/green
+# signal in GitHub's PR check UI. A typecheck failure shouldn't hide
+# a build failure that surfaces only later.
+#
+# Node 20 matches the local @types/node version in package.json.
+# Vercel also uses Node 20 by default for Next 16.
+#
+# Env vars required for the build step are stubbed with dummy values —
+# the app's `build` phase only needs them to exist (Next reads them at
+# runtime from process.env). If Diego later adds real runtime validation
+# we can promote these to GitHub repo secrets.
+# ════════════════════════════════════════════════════════════════════════
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel older in-flight runs on the same branch when new commits arrive.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    env:
+      # Stubs so `next build` doesn't fail on missing runtime config.
+      # Real values live in Vercel env. These are never used because CI
+      # only type-checks + bundles; actual HTTP requests don't fire.
+      AUTH_SECRET: ci-dummy-secret-at-least-32-chars-long-for-hmac
+      AUTH_PASSWORD: ci-dummy-password
+      DATABASE_URL: postgres://ci:ci@localhost:5432/ci
+      NEXT_PUBLIC_SUPABASE_URL: https://ci.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-dummy-service-key
+      ANTHROPIC_API_KEY: ci-dummy-anthropic-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+
+  # Guard against accidentally committing secrets — the .env.local should
+  # never be tracked. If it ever is, fail loudly so Diego notices.
+  # Also checks for committed API keys by pattern (Anthropic keys start
+  # with `sk-ant-`, GitHub PATs with `ghp_`, etc.).
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure no .env files tracked
+        run: |
+          if git ls-files | grep -E '^(\.env(\..+)?)$'; then
+            echo "::error::Environment files committed to git — remove them."
+            exit 1
+          fi
+      - name: Scan for API-key patterns in code
+        run: |
+          # Allow-list the check itself by excluding .github/ and node_modules/.
+          # Looks for common key shapes, not substrings — fewer false positives.
+          PATTERNS='sk-ant-[A-Za-z0-9_-]{40,}|ghp_[A-Za-z0-9]{30,}|eyJ[A-Za-z0-9_-]{40,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}'
+          if git grep -nE "$PATTERNS" \
+              -- ':!.github/*' ':!node_modules' ':!package-lock.json' 2>/dev/null; then
+            echo "::error::Possible secret/API key committed. Review the matches above."
+            exit 1
+          else
+            echo "No obvious secrets found."
+          fi
