@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed:demo": "tsx --env-file=.env.local scripts/seed-demo.ts",
+    "seed:reset": "tsx --env-file=.env.local scripts/seed-demo.ts --reset"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",
@@ -39,6 +41,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.4"
   }
