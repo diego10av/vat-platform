@@ -27,6 +27,7 @@ import { DocRow, StatusBadge, TriageTag, FileIcon } from './DocRow';
 import { TreatmentBadge } from './TreatmentBadge';
 import { AuditTrailPanel } from './AuditTrailPanel';
 import { BulkEditModal } from './BulkEditModal';
+import { ExcelImportModal } from './ExcelImportModal';
 
 // ═══════════════════════════════════════════════════════════════
 // Page
@@ -66,6 +67,7 @@ export default function DeclarationDetailPage() {
   const [validatorOpen, setValidatorOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState<null | 'incoming' | 'outgoing'>(null);
+  const [excelImportOpen, setExcelImportOpen] = useState(false);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const precedentInput = useRef<HTMLInputElement>(null);
@@ -665,7 +667,7 @@ export default function DeclarationDetailPage() {
 
           {/* Upload zones — only in Documents tab */}
           {activeTab === 'documents' && ['created', 'uploading', 'review'].includes(data.status) && (
-            <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="grid grid-cols-3 gap-3 mb-4">
               {/* Invoice upload */}
               <div
                 className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-150 ${
@@ -681,6 +683,17 @@ export default function DeclarationDetailPage() {
                 <div className="text-[11px] text-ink-faint uppercase tracking-wide font-semibold mb-1">Invoices</div>
                 <div className="text-[12px] text-ink-soft">
                   {uploading ? 'Uploading…' : 'Drop PDFs here or click to browse'}
+                </div>
+              </div>
+
+              {/* Client Excel import — invoices delivered as a spreadsheet. */}
+              <div
+                className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-150 border-border-strong bg-surface hover:border-brand-400 hover:bg-surface-alt"
+                onClick={() => setExcelImportOpen(true)}
+              >
+                <div className="text-[11px] text-ink-faint uppercase tracking-wide font-semibold mb-1">Client Excel</div>
+                <div className="text-[12px] text-ink-soft">
+                  Client sent a spreadsheet instead of PDFs? Import it with AI mapping.
                 </div>
               </div>
 
@@ -1004,6 +1017,15 @@ export default function DeclarationDetailPage() {
             setSelectedLineIds(new Set());
             await loadData();
           }}
+        />
+      )}
+
+      {/* ─────────── EXCEL IMPORT MODAL ─────────── */}
+      {excelImportOpen && (
+        <ExcelImportModal
+          declarationId={id}
+          onClose={() => setExcelImportOpen(false)}
+          onImported={() => { void loadData(); }}
         />
       )}
     </div>
