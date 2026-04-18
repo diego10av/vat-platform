@@ -197,12 +197,184 @@ export async function buildAuditTrailPDF(declarationId: string): Promise<AuditPD
     y = drawEventRow(page, fonts, row, y);
   }
 
+  // ─── Supporting documents section ───
+  // Each attached contract / engagement letter / advisor email
+  // gets its own stanza with the reviewer's legal-basis reference,
+  // free-text note, and (if run) cifra's analysis + citations.
+  // This is what turns "trust me, I thought about it" into
+  // "here's the document, here's why, here's the citation".
+  const attachments = await query<{
+    id: string; invoice_id: string; kind: string; filename: string;
+    user_note: string | null; legal_basis: string | null;
+    ai_summary: string | null; ai_suggested_treatment: string | null;
+    ai_citations: Array<{ legal_id: string; quote?: string; reason?: string }> | null;
+    created_at: string;
+    invoice_provider: string | null;
+  }>(
+    `SELECT a.id, a.invoice_id, a.kind, a.filename,
+            a.user_note, a.legal_basis,
+            a.ai_summary, a.ai_suggested_treatment, a.ai_citations,
+            a.created_at::text AS created_at,
+            i.provider AS invoice_provider
+       FROM invoice_attachments a
+       JOIN invoices i ON a.invoice_id = i.id
+      WHERE i.declaration_id = $1 AND a.deleted_at IS NULL
+      ORDER BY i.provider, a.created_at DESC
+      LIMIT 500`,
+    [declarationId],
+  );
+
+  if (attachments.length > 0) {
+    // Page break if we're close to the bottom
+    if (y < MARGIN + 120) {
+      drawFooter(page, fonts);
+      page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+      y = PAGE_H - MARGIN;
+    } else {
+      y -= 14;
+    }
+
+    page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_W - MARGIN, y }, thickness: 0.5, color: BORDER });
+    y -= 18;
+    page.drawText('SUPPORTING DOCUMENTS', { x: MARGIN, y, size: 8, font: fonts.bold, color: GREY });
+    page.drawText(`(${attachments.length} attached)`, {
+      x: MARGIN + 160, y, size: 8, font: fonts.oblique, color: GREY,
+    });
+    y -= 12;
+
+    for (const att of attachments) {
+      const estH = estimateAttachmentHeight(att);
+      if (y - estH < MARGIN + 30) {
+        drawFooter(page, fonts);
+        page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+        y = PAGE_H - MARGIN;
+      }
+      y = drawAttachmentRow(page, fonts, att, y);
+    }
+  }
+
   drawFooter(page, fonts);
 
   const arrayBuffer = await pdfDoc.save();
   const safeEntity = (decl.entity_name || 'entity').replace(/[^A-Za-z0-9_-]+/g, '_');
   const filename = `cifra_audit_${safeEntity}_${decl.year}_${decl.period}.pdf`;
   return { buffer: Buffer.from(arrayBuffer), filename };
+}
+
+// ────────────────────────── attachment rendering ──────────────────────────
+
+interface PdfAttachment {
+  filename: string;
+  kind: string;
+  user_note: string | null;
+  legal_basis: string | null;
+  ai_summary: string | null;
+  ai_suggested_treatment: string | null;
+  ai_citations: Array<{ legal_id: string; quote?: string; reason?: string }> | null;
+  invoice_provider: string | null;
+}
+
+function estimateAttachmentHeight(a: PdfAttachment): number {
+  let h = 32; // header + filename + top/bottom padding
+  if (a.legal_basis) h += 11;
+  if (a.user_note) {
+    // ~1 line per 90 chars
+    h += 12 + Math.ceil(a.user_note.length / 90) * 11;
+  }
+  if (a.ai_summary) {
+    h += 14 + Math.ceil(a.ai_summary.length / 90) * 11;
+  }
+  if (a.ai_suggested_treatment) h += 12;
+  if (a.ai_citations && a.ai_citations.length > 0) {
+    h += 12 + a.ai_citations.length * 14;
+  }
+  return h;
+}
+
+function drawAttachmentRow(page: PDFPage, fonts: FontSet, a: PdfAttachment, startY: number): number {
+  let y = startY;
+  const boxX = MARGIN;
+  const boxW = PAGE_W - MARGIN * 2;
+
+  // Header line — filename, kind, invoice provider
+  const kindPretty = a.kind.replace(/_/g, ' ');
+  const header = `${a.filename}   · ${kindPretty}   · ${a.invoice_provider ?? '(no provider)'}`;
+  page.drawText(clip(header, 100), { x: boxX + 6, y: y - 10, size: 9.5, font: fonts.bold, color: DARK });
+  y -= LINE_H + 2;
+
+  if (a.legal_basis) {
+    page.drawText(`Legal basis: ${clip(a.legal_basis, 90)}`, {
+      x: boxX + 6, y: y - 10, size: 9, font: fonts.regular, color: NAVY,
+    });
+    y -= LINE_H;
+  }
+
+  if (a.user_note) {
+    page.drawText('Reviewer note:', { x: boxX + 6, y: y - 10, size: 8.5, font: fonts.bold, color: GREY });
+    y -= LINE_H;
+    y = drawWrappedText(page, fonts.oblique, a.user_note, boxX + 12, y, boxW - 18, 9);
+  }
+
+  if (a.ai_summary) {
+    page.drawText('cifra analysis:', { x: boxX + 6, y: y - 10, size: 8.5, font: fonts.bold, color: BRAND });
+    y -= LINE_H;
+    y = drawWrappedText(page, fonts.regular, a.ai_summary, boxX + 12, y, boxW - 18, 9);
+  }
+
+  if (a.ai_suggested_treatment) {
+    page.drawText(`Suggested treatment: ${a.ai_suggested_treatment}   (reviewer decides)`, {
+      x: boxX + 12, y: y - 10, size: 8.5, font: fonts.regular, color: NAVY,
+    });
+    y -= LINE_H;
+  }
+
+  if (a.ai_citations && a.ai_citations.length > 0) {
+    page.drawText('Citations:', { x: boxX + 6, y: y - 10, size: 8.5, font: fonts.bold, color: GREY });
+    y -= LINE_H;
+    for (const c of a.ai_citations) {
+      const line = c.reason
+        ? `• ${c.legal_id} — ${clip(c.reason, 80)}`
+        : `• ${c.legal_id}`;
+      page.drawText(line, {
+        x: boxX + 12, y: y - 10, size: 8.5, font: fonts.regular, color: NAVY,
+      });
+      y -= LINE_H;
+    }
+  }
+
+  // Separator
+  page.drawLine({
+    start: { x: boxX, y: y - 3 },
+    end:   { x: boxX + boxW, y: y - 3 },
+    thickness: 0.3, color: BORDER,
+  });
+  y -= 10;
+  return y;
+}
+
+/** Simple greedy word-wrap text drawer. Returns the new y after drawing. */
+function drawWrappedText(
+  page: PDFPage, font: PDFFont, text: string, x: number, startY: number, maxWidth: number, size: number,
+): number {
+  const words = text.replace(/\s+/g, ' ').split(' ');
+  let y = startY;
+  let cur = '';
+  for (const w of words) {
+    const candidate = cur ? `${cur} ${w}` : w;
+    const width = font.widthOfTextAtSize(candidate, size);
+    if (width > maxWidth && cur) {
+      page.drawText(cur, { x, y: y - 10, size, font, color: DARK });
+      y -= LINE_H;
+      cur = w;
+    } else {
+      cur = candidate;
+    }
+  }
+  if (cur) {
+    page.drawText(cur, { x, y: y - 10, size, font, color: DARK });
+    y -= LINE_H;
+  }
+  return y;
 }
 
 // ────────────────────────── row rendering ──────────────────────────

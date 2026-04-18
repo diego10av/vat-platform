@@ -28,6 +28,7 @@ import { TreatmentBadge } from './TreatmentBadge';
 import { AuditTrailPanel } from './AuditTrailPanel';
 import { BulkEditModal } from './BulkEditModal';
 import { ExcelImportModal } from './ExcelImportModal';
+import { AttachmentsModal } from './AttachmentsModal';
 
 // ═══════════════════════════════════════════════════════════════
 // Page
@@ -68,6 +69,10 @@ export default function DeclarationDetailPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState<null | 'incoming' | 'outgoing'>(null);
   const [excelImportOpen, setExcelImportOpen] = useState(false);
+  // When non-null, holds the invoice_id whose Attachments modal is open
+  // (plus a label for the title). Invoice-level, not line-level — one
+  // modal per invoice even if multiple of its lines are on screen.
+  const [attachmentsOpen, setAttachmentsOpen] = useState<null | { invoiceId: string; label: string }>(null);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const precedentInput = useRef<HTMLInputElement>(null);
@@ -767,6 +772,7 @@ export default function DeclarationDetailPage() {
               editingLine={editingLine} setEditingLine={setEditingLine}
               onUpdate={handleLineUpdate} onMove={handleMoveLine}
               onOpenPreview={openPreviewForLine}
+              onOpenAttachments={(invoiceId, label) => setAttachmentsOpen({ invoiceId, label })}
               selectedRowKey={preview?.rowKey}
               pendingAction={pendingAction}
               isLocked={locked}
@@ -799,6 +805,7 @@ export default function DeclarationDetailPage() {
               editingLine={editingLine} setEditingLine={setEditingLine}
               onUpdate={handleLineUpdate} onMove={handleMoveLine}
               onOpenPreview={openPreviewForLine}
+              onOpenAttachments={(invoiceId, label) => setAttachmentsOpen({ invoiceId, label })}
               selectedRowKey={preview?.rowKey}
               pendingAction={pendingAction}
               isLocked={locked}
@@ -1028,6 +1035,19 @@ export default function DeclarationDetailPage() {
           onImported={() => { void loadData(); }}
         />
       )}
+
+      {/* ─────────── ATTACHMENTS MODAL ─────────── */}
+      {attachmentsOpen && (
+        <AttachmentsModal
+          invoiceId={attachmentsOpen.invoiceId}
+          invoiceLabel={attachmentsOpen.label}
+          // The AI-analyse button hides itself in classifier-only
+          // mode. We read it from the loaded declaration.entity_ai_mode
+          // (added to TimelineData in a parallel tweak).
+          aiModeEntity={(data?.entity_ai_mode as 'full' | 'classifier_only') || 'full'}
+          onClose={() => setAttachmentsOpen(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1038,6 +1058,7 @@ export default function DeclarationDetailPage() {
 // ═══════════════════════════════════════════════════════════════
 function ReviewTable({
   lines, direction, hasFx, compact, editingLine, setEditingLine, onUpdate, onMove, onOpenPreview,
+  onOpenAttachments,
   selectedRowKey, pendingAction, isLocked, selectedIds, onSelectionChange,
 }: {
   lines: InvoiceLine[];
@@ -1049,6 +1070,7 @@ function ReviewTable({
   onUpdate: (id: string, updates: Record<string, unknown>) => void;
   onMove: (id: string, target: 'incoming' | 'outgoing' | 'excluded') => void;
   onOpenPreview: (line: InvoiceLine) => void;
+  onOpenAttachments?: (invoiceId: string, label: string) => void;
   selectedRowKey: string | undefined;
   pendingAction: string | null;
   isLocked: boolean;
@@ -1129,6 +1151,7 @@ function ReviewTable({
                 onUpdate={onUpdate}
                 onMove={onMove}
                 onOpenPreview={onOpenPreview}
+                onOpenAttachments={onOpenAttachments}
                 isSelected={selectedRowKey === line.id}
                 moveLoading={pendingAction === `move-${line.id}`}
                 isLocked={isLocked}
@@ -1158,6 +1181,7 @@ function Th({ children, right, center, width }: { children?: React.ReactNode; ri
 // ═══════════════════════════════════════════════════════════════
 function TableRow({
   line, treatments, hasFx, compact, isEditing, onEditToggle, onUpdate, onMove, onOpenPreview,
+  onOpenAttachments,
   isSelected, moveLoading, isLocked, direction,
   selectable, selected, onToggleSelect,
 }: {
@@ -1170,6 +1194,8 @@ function TableRow({
   onUpdate: (id: string, updates: Record<string, unknown>) => void;
   onMove: (id: string, target: 'incoming' | 'outgoing' | 'excluded') => void;
   onOpenPreview: (line: InvoiceLine) => void;
+  /** Opens the AttachmentsModal for this row's parent invoice. */
+  onOpenAttachments?: (invoiceId: string, label: string) => void;
   isSelected: boolean;
   moveLoading: boolean;
   isLocked: boolean;
@@ -1214,17 +1240,35 @@ function TableRow({
       )}
       {/* Preview icon */}
       <td className="px-1 py-1.5 text-center">
-        <button
-          onClick={e => { e.stopPropagation(); onOpenPreview(line); }}
-          className="inline-flex w-6 h-6 items-center justify-center rounded text-ink-faint hover:text-brand-600 hover:bg-surface-alt transition-all duration-150 cursor-pointer"
-          title={line.document_id ? `Preview: ${line.source_filename}` : 'No source document (manual)'}
-        >
-          {line.document_id ? (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          ) : (
-            <ManualIcon />
+        <div className="inline-flex items-center gap-0.5">
+          <button
+            onClick={e => { e.stopPropagation(); onOpenPreview(line); }}
+            className="inline-flex w-6 h-6 items-center justify-center rounded text-ink-faint hover:text-brand-600 hover:bg-surface-alt transition-all duration-150 cursor-pointer"
+            title={line.document_id ? `Preview: ${line.source_filename}` : 'No source document (manual)'}
+          >
+            {line.document_id ? (
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            ) : (
+              <ManualIcon />
+            )}
+          </button>
+          {onOpenAttachments && line.invoice_id && (
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                onOpenAttachments(
+                  line.invoice_id as string,
+                  `${line.provider ?? 'Invoice'} · ${line.description?.slice(0, 40) ?? ''}`,
+                );
+              }}
+              className="inline-flex w-6 h-6 items-center justify-center rounded text-ink-faint hover:text-brand-600 hover:bg-surface-alt transition-all duration-150 cursor-pointer"
+              title="Attach a contract / engagement letter / advisor email"
+            >
+              {/* paperclip */}
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57a4 4 0 0 1 5.66 5.66l-8.58 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+            </button>
           )}
-        </button>
+        </div>
       </td>
 
       {/* Provider */}

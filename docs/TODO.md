@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-18 (eighth stint — first customer feedback → 3 features shipped)
+> Last updated: 2026-04-18 (ninth stint — Excel ingestion + Contract attach L1+L2+L3)
 
 ---
 
@@ -93,6 +93,85 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-18 (overnight, 23:30 → 07:00)** — Ninth autonomous stint: Excel ingestion + Contract attach L1+L2+L3
+
+Diego brought 2 more ideas from the same customer meeting: (1) clients
+often send Excel files instead of PDFs, cifra should ingest those too;
+(2) reviewers want to attach contracts / engagement letters / advisor
+emails to specific invoices, get AI analysis with legal citations, and
+have everything included in the audit PDF. Diego vetoed my "validate
+first, build next week" plan with "vamossss" and I built both overnight.
+
+**Features shipped**:
+
+1. **Excel ingestion** (`commit 58ef7c3`)
+   - `POST /api/declarations/[id]/excel/preview` — parses xlsx/xlsm/csv
+     with exceljs, asks Claude Haiku to map columns to canonical
+     invoice fields, returns parsed rows + warnings. Nothing written.
+   - Heuristic column-name matcher (EN/FR/DE/ES aliases) as fallback
+     when classifier-only mode, budget exhausted, or AI call fails.
+     Never blocks the reviewer.
+   - Tolerant parsers: European decimals (",") → JS numbers, % VAT
+     rates normalised (17 or 0.17), country names → ISO-2, Excel
+     serial dates, DD/MM/YY, ISO.
+   - `POST /api/declarations/[id]/excel/import` — atomic insert of
+     confirmed rows. 1 invoice + 1 invoice_line each,
+     extraction_source='excel_import'. Per-row audit entries.
+   - `ExcelImportModal.tsx` — 5-phase state machine (pick → previewing
+     → review → importing → done). Review phase shows editable mapping
+     grid (required fields outlined if unmapped), live-remapped
+     preview table, valid/skipped counts.
+   - 3rd upload zone in Documents tab: "Client Excel".
+
+2. **Contract attach L1 + L2 + L3** (this commit)
+   - Migration 010: `invoice_attachments` table with kind
+     (contract/engagement_letter/advisory_email/other), file info,
+     L1 fields (user_note, legal_basis), L2/L3 fields (ai_analysis,
+     ai_summary, ai_suggested_treatment, ai_citations, ai_analyzed_at,
+     ai_model). RLS enabled, updated_at trigger, cascade delete from
+     invoices.
+   - `POST /api/invoices/[id]/attachments` — multipart upload to
+     Supabase storage (bucket 'documents', path 'attachments/…'),
+     inserts row, writes audit.
+   - `GET /api/invoices/[id]/attachments` — list.
+   - `PATCH /api/invoices/[id]/attachments/[attId]` — update
+     kind/note/legal_basis.
+   - `DELETE /api/invoices/[id]/attachments/[attId]` — soft delete.
+   - `GET /api/invoices/[id]/attachments/[attId]/download` —
+     60s-signed Supabase URL (no permanent public URLs).
+   - `POST /api/invoices/[id]/attachments/[attId]/analyze` — Claude
+     reads the PDF/TXT/EML attachment, returns JSON:
+     { ai_summary, ai_analysis (markdown), ai_suggested_treatment,
+       ai_citations: [{legal_id, quote, reason}] }. Citations are
+     validated against cifra's canonical legal map (LU_LAW, EU_LAW,
+     CIRCULARS, CASES_EU, CASES_LU — invalid ids dropped). Treatment
+     code validated against TREATMENT_CODES — hallucinated codes
+     dropped. Respects ai_mode gate.
+   - `AttachmentsModal.tsx` — list + upload form (file + kind +
+     optional note + legal basis), per-row actions (view, edit,
+     analyse, delete), collapsible analysis panel with citations +
+     suggested treatment + model/timestamp.
+   - Paperclip icon button added to each row in the Review table
+     (alongside the Preview icon).
+   - `audit-trail-pdf.ts` extended: new "SUPPORTING DOCUMENTS"
+     section after events, one stanza per attachment with filename,
+     kind, legal basis, reviewer note (wrapped), cifra analysis
+     summary (wrapped), suggested treatment, numbered citations.
+     Automatic page breaks.
+
+**Stats**:
+- 2 commits pusheados (58ef7c3, [pending])
+- 2 migraciones nuevas aplicadas (010)
+- 502/502 tests verdes · 0 lint · tsc clean
+- Deploy automático vivo en `app.cifracompliance.com`
+
+**Demo story para la 2ª reunión**:
+*"Excel del cliente llega → cifra lo mapea con AI → review preview →
+importar. Y en cualquier factura: adjuntar contrato → cifra lo analiza
+→ cita LTVA Art. 44§1 d + CJEU C-169/04 → todo al PDF de auditoría."*
+
+---
 
 **2026-04-18 (late evening, 22:30 → 23:30)** — Eighth autonomous stint: post-first-customer-meeting execution
 

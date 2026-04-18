@@ -59,6 +59,10 @@ export interface DeclarationData {
   id: string;
   entity_id: string;
   entity_name: string;
+  /** AI-mode of the owning entity — 'full' by default, 'classifier_only'
+   *  gates AI-backed features (extract, validator, chat, attachment analysis).
+   *  Backed by entities.ai_mode (migration 009). */
+  entity_ai_mode?: 'full' | 'classifier_only' | null;
   year: number;
   period: string;
   status: string;

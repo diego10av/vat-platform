@@ -16,7 +16,8 @@ export async function GET(
 
   const declaration = await queryOne(
     `SELECT d.*, e.name as entity_name, e.regime, e.frequency, e.has_fx, e.has_outgoing, e.has_recharges,
-            e.vat_number, e.matricule
+            e.vat_number, e.matricule,
+            COALESCE(e.ai_mode, 'full') AS entity_ai_mode
      FROM declarations d JOIN entities e ON d.entity_id = e.id WHERE d.id = $1`,
     [id]
   );
