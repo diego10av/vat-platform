@@ -16,101 +16,38 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { NextResponse } from 'next/server';
-import * as Sentry from '@sentry/nextjs';
+import { reportMessage, reportError } from '@/lib/sentry-send';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * POST-fix verification. This exercises the *new* envelope helper
+ * (src/lib/sentry-send.ts) instead of the busted @sentry/nextjs SDK.
+ * Both calls should return event ids that then appear in the Sentry
+ * dashboard within a couple of seconds.
+ */
 export async function GET() {
-  const diagnostics: Record<string, string> = {
-    dsn_present_server: process.env.SENTRY_DSN ? 'yes' : 'no',
-    dsn_present_public: process.env.NEXT_PUBLIC_SENTRY_DSN ? 'yes' : 'no',
-    node_env: process.env.NODE_ENV ?? 'unknown',
+  const diagnostics: Record<string, string | null> = {
+    dsn_present: process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN ? 'yes' : 'no',
     vercel_env: process.env.VERCEL_ENV ?? 'unknown',
   };
 
-  // Layer 1: captureMessage (the most basic signal)
-  try {
-    const id = Sentry.captureMessage(
-      'cifra Sentry verification — captureMessage path',
-      'info',
-    );
-    diagnostics.captureMessage_id = id ?? 'no-id-returned';
-  } catch (e) {
-    diagnostics.captureMessage_error = (e as Error).message;
-  }
+  diagnostics.message_id = await reportMessage(
+    'cifra Sentry verification — envelope helper (message path)',
+    'info',
+    { tags: { source: 'debug-endpoint' } },
+  );
 
-  // Layer 2: captureException
-  try {
-    const id = Sentry.captureException(new Error(
-      'cifra Sentry verification — captureException path',
-    ));
-    diagnostics.captureException_id = id ?? 'no-id-returned';
-  } catch (e) {
-    diagnostics.captureException_error = (e as Error).message;
-  }
+  diagnostics.error_id = await reportError(
+    new Error('cifra Sentry verification — envelope helper (exception path)'),
+    { tags: { source: 'debug-endpoint' } },
+  );
 
-  // Layer 3: flush — critical for serverless. Without this, the Lambda
-  // process may be frozen before Sentry's async HTTP POST completes.
-  try {
-    const flushed = await Sentry.flush(5000);
-    diagnostics.flush_ok = flushed ? 'yes' : 'timeout';
-  } catch (e) {
-    diagnostics.flush_error = (e as Error).message;
-  }
-
-  // Layer 4: direct fetch to Sentry's ingest endpoint. If THIS fails,
-  // the Lambda can't reach Sentry at all (network / egress / DNS). If
-  // it succeeds but the SDK events never arrive, the SDK transport
-  // is broken while the network path is fine.
-  const dsn = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN || '';
-  const dsnMatch = dsn.match(/^https:\/\/([^@]+)@([^/]+)\/(.+)$/);
-  if (dsnMatch) {
-    const [, publicKey, host, projectId] = dsnMatch;
-    const ingestUrl = `https://${host}/api/${projectId}/envelope/`;
-    try {
-      const started = Date.now();
-      const res = await fetch(ingestUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-sentry-envelope',
-          'X-Sentry-Auth': `Sentry sentry_version=7, sentry_client=cifra-debug/1.0, sentry_key=${publicKey}`,
-        },
-        // Minimal valid envelope: header + item header + item body.
-        body: [
-          JSON.stringify({
-            event_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-            sent_at: new Date().toISOString(),
-            dsn,
-          }),
-          JSON.stringify({
-            type: 'event',
-            content_type: 'application/json',
-          }),
-          JSON.stringify({
-            event_id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-            level: 'info',
-            platform: 'javascript',
-            message: { message: 'cifra direct-fetch envelope test' },
-            timestamp: Date.now() / 1000,
-          }),
-        ].join('\n'),
-        signal: AbortSignal.timeout(8000),
-      });
-      diagnostics.direct_fetch_status = String(res.status);
-      diagnostics.direct_fetch_ms = String(Date.now() - started);
-      diagnostics.direct_fetch_body = (await res.text()).slice(0, 200);
-    } catch (e) {
-      diagnostics.direct_fetch_error = (e as Error).message;
-    }
-  } else {
-    diagnostics.direct_fetch_error = 'Could not parse DSN';
-  }
-
-  // Return JSON diagnostics — easier to read than an HTML error page
-  // when iterating on the config.
   return NextResponse.json({
     ok: true,
-    message: 'Sentry test fired. Check https://sentry.io for 2 events (message + exception).',
+    message:
+      'Two events sent via the envelope helper. Both should appear in Sentry within seconds. ' +
+      'If they don\'t, it\'s the ingest URL or DSN (not the SDK). Remove this endpoint once verified.',
     diagnostics,
   });
 }
