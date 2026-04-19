@@ -152,3 +152,69 @@ export async function PATCH(
   );
   return NextResponse.json({ ...(updated as object), precedent_report: precedentReport });
 }
+
+// DELETE /api/declarations/:id
+//
+// Only allowed in statuses 'created' or 'review' — i.e. BEFORE the
+// reviewer has approved. Once approved / filed / paid, the declaration
+// is legally committed and we never delete: the reviewer must Reopen
+// and then transition through the lifecycle if something needs fixing.
+//
+// Added stint 11 (2026-04-19) — blocked tomorrow's real-use test
+// because mistakes-during-creation had no exit path.
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  await initializeSchema();
+  const { id } = await params;
+
+  const decl = await queryOne<{
+    id: string; status: string; year: number; period: string; entity_id: string;
+  }>(
+    `SELECT id, status, year, period, entity_id FROM declarations WHERE id = $1`,
+    [id],
+  );
+  if (!decl) return NextResponse.json({ error: 'Declaration not found' }, { status: 404 });
+
+  // Guard: approved/filed/paid → refuse.
+  if (decl.status === 'approved' || decl.status === 'filed' || decl.status === 'paid') {
+    return NextResponse.json({
+      error: 'declaration_locked',
+      message: `Cannot delete a ${decl.status} declaration. Reopen it to review first, then contact support if it needs to be permanently removed.`,
+    }, { status: 409 });
+  }
+
+  // The schema's FK cascades don't chain through declarations →
+  // invoices → invoice_lines (NO ACTION all the way — verified via
+  // information_schema 2026-04-19). We delete explicitly in
+  // dependency order inside a transaction to keep it atomic.
+  await execute(
+    `WITH deleted_lines AS (
+       DELETE FROM invoice_lines WHERE declaration_id = $1 RETURNING id
+     ),
+     deleted_invoices AS (
+       DELETE FROM invoices WHERE declaration_id = $1 RETURNING id
+     ),
+     deleted_documents AS (
+       DELETE FROM documents WHERE declaration_id = $1 RETURNING id
+     ),
+     deleted_findings AS (
+       DELETE FROM validator_findings WHERE declaration_id = $1 RETURNING id
+     )
+     DELETE FROM declarations WHERE id = $1`,
+    [id],
+  );
+
+  await logAudit({
+    entityId: decl.entity_id,
+    declarationId: id,
+    action: 'delete',
+    targetType: 'declaration',
+    targetId: id,
+    oldValue: JSON.stringify({ status: decl.status, year: decl.year, period: decl.period }),
+  });
+
+  log.info('declaration deleted', { declaration_id: id, status: decl.status });
+  return NextResponse.json({ ok: true });
+}

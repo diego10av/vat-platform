@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { TREATMENT_CODES, INCOMING_TREATMENTS, OUTGOING_TREATMENTS, type TreatmentCode } from '@/config/treatment-codes';
 import { useToast } from '@/components/Toaster';
 import { describeApiError } from '@/lib/ui-errors';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { LifecycleStepper } from '@/components/ui/LifecycleStepper';
 import { Tabs, type TabDef } from '@/components/ui/Tabs';
-import { FileTextIcon, ClipboardCheckIcon, DownloadCloudIcon, FolderArchiveIcon, RefreshCwIcon, CheckCircle2Icon, RotateCcwIcon, SparklesIcon, ShareIcon, ShieldCheckIcon } from 'lucide-react';
+import { FileTextIcon, ClipboardCheckIcon, DownloadCloudIcon, FolderArchiveIcon, RefreshCwIcon, CheckCircle2Icon, RotateCcwIcon, SparklesIcon, ShareIcon, ShieldCheckIcon, Trash2Icon } from 'lucide-react';
 import { ValidatorPanel } from '@/components/validator/ValidatorPanel';
 
 // ───── extracted modules (2026-04-18 refactor) ─────
@@ -37,6 +37,7 @@ import { track } from '@/lib/posthog-client';
 // ═══════════════════════════════════════════════════════════════
 export default function DeclarationDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const toast = useToast();
 
@@ -612,6 +613,36 @@ export default function DeclarationDetailPage() {
                 >
                   <RotateCcwIcon size={13} />
                   Reopen
+                </button>
+              )}
+              {(data.status === 'created' || data.status === 'review') && (
+                <button
+                  onClick={async () => {
+                    const confirmed = confirm(
+                      `Delete this declaration (${data.year} ${data.period})?\n\n`
+                      + `This removes the declaration + all its invoices + classified lines. `
+                      + `The audit log keeps the deletion record. This cannot be undone.`,
+                    );
+                    if (!confirmed) return;
+                    try {
+                      const res = await fetch(`/api/declarations/${id}`, { method: 'DELETE' });
+                      if (!res.ok) {
+                        const body = await res.json().catch(() => ({}));
+                        const msg: string = (body?.message || body?.error || 'Could not delete.') as string;
+                        toast.error(msg);
+                        return;
+                      }
+                      toast.success('Declaration deleted.');
+                      router.push('/declarations');
+                    } catch {
+                      toast.error('Network error while deleting.');
+                    }
+                  }}
+                  className="h-8 px-3 rounded-md border border-danger-200 text-[12.5px] font-medium text-ink-muted hover:bg-danger-50 hover:text-danger-700 hover:border-danger-400 transition-all duration-150 inline-flex items-center gap-1.5"
+                  title="Delete this declaration (only allowed before approval)"
+                >
+                  <Trash2Icon size={13} />
+                  Delete
                 </button>
               )}
             </div>
