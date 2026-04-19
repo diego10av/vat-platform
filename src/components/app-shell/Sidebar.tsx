@@ -8,6 +8,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   HomeIcon, Building2Icon, FileTextIcon, CalendarIcon,
   BookOpenIcon,
@@ -25,13 +26,17 @@ export interface SidebarBadges {
   deadlinesUrgent?: number;
 }
 
+type Role = 'admin' | 'reviewer' | 'junior' | 'client';
+
 type NavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
   badge?: number | undefined;
+  /** Roles that can see this item. Defaults to all roles. */
+  roles?: readonly Role[];
 };
-type NavGroup = { label?: string; items: NavItem[] };
+type NavGroup = { label?: string; items: NavItem[]; roles?: readonly Role[] };
 
 function buildGroups(badges: SidebarBadges): NavGroup[] {
   return [
@@ -59,6 +64,7 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
     },
     {
       label: 'Library',
+      roles: ['admin', 'reviewer'],
       items: [
         // Two items previously lived here that no longer do:
         //   · Registrations  →  folded into Client lifecycle (vat_status =
@@ -71,6 +77,7 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
     },
     {
       label: 'Operations',
+      roles: ['admin', 'reviewer'],
       items: [
         { href: '/metrics',  label: 'Metrics', icon: BarChart3Icon },
         { href: '/audit',    label: 'Audit',   icon: ShieldCheckIcon },
@@ -80,9 +87,30 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
   ];
 }
 
+function filterForRole(groups: NavGroup[], role: Role): NavGroup[] {
+  return groups
+    .filter(g => !g.roles || g.roles.includes(role))
+    .map(g => ({
+      ...g,
+      items: g.items.filter(item => !item.roles || item.roles.includes(role)),
+    }))
+    .filter(g => g.items.length > 0);
+}
+
 export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
   const pathname = usePathname() || '/';
-  const groups = buildGroups(badges);
+  const [role, setRole] = useState<Role>('admin');
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!cancelled && data?.role) setRole(data.role);
+      })
+      .catch(() => { /* swallow — defaults to admin */ });
+    return () => { cancelled = true; };
+  }, []);
+  const groups = filterForRole(buildGroups(badges), role);
 
   // Match rule: exact "/" for Home; otherwise startsWith for nested routes
   // (so /declarations/xyz still lights up the Declarations item).
@@ -164,25 +192,29 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
 
       {/* Footer — user + logout */}
       <div className="px-3 pb-3 pt-2 border-t border-divider shrink-0">
-        <UserMenu />
+        <UserMenu role={role} />
       </div>
     </aside>
   );
 }
 
-function UserMenu() {
-  // Minimalist text-only user chip (à la Linear). No avatar circle —
-  // the previous "D" circle competed visually with the "c" logomark
-  // at the top of the sidebar. Typography carries identification; a
-  // profile photo can replace this cleanly later without re-doing
-  // the layout.
+function UserMenu({ role }: { role: Role }) {
+  // Minimalist text-only user chip (à la Linear). Shows the session
+  // role so Diego can tell at a glance whether he's looking at the
+  // admin view or the junior-restricted view.
+  const label = role === 'junior' ? 'Junior' : role === 'reviewer' ? 'Reviewer' : 'Diego';
+  const tagline = role === 'junior'
+    ? 'cifra · client view'
+    : role === 'reviewer'
+    ? 'cifra · reviewer'
+    : 'cifra · founder';
   return (
     <div className="flex flex-col px-3 py-1.5 rounded-md hover:bg-surface-alt transition-colors cursor-pointer">
       <div className="text-[12.5px] font-medium text-ink truncate leading-tight">
-        Diego
+        {label}
       </div>
       <div className="text-[10.5px] text-ink-muted truncate leading-tight mt-0.5">
-        cifra · founder
+        {tagline}
       </div>
     </div>
   );

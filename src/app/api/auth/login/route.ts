@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { issueSessionCookie } from '@/lib/auth';
+import { issueSessionCookie, type Role } from '@/lib/auth';
 
 // Per-instance rate limit. Ephemeral on cold start but slows brute-force
 // while a container is warm.
@@ -25,6 +25,27 @@ function timingSafeEqualString(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/**
+ * Match the submitted password against configured role passwords.
+ *
+ *   AUTH_PASSWORD           → role 'admin'  (Diego, full access)
+ *   AUTH_PASSWORD_REVIEWER  → role 'reviewer' (internal colleague)
+ *   AUTH_PASSWORD_JUNIOR    → role 'junior' (client-facing view only)
+ *
+ * Returns null when no configured password matches.
+ */
+function matchRole(submitted: string): Role | null {
+  const candidates: Array<[string | undefined, Role]> = [
+    [process.env.AUTH_PASSWORD, 'admin'],
+    [process.env.AUTH_PASSWORD_REVIEWER, 'reviewer'],
+    [process.env.AUTH_PASSWORD_JUNIOR, 'junior'],
+  ];
+  for (const [expected, role] of candidates) {
+    if (expected && timingSafeEqualString(submitted, expected)) return role;
+  }
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   const ip =
     request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
@@ -38,14 +59,14 @@ export async function POST(request: NextRequest) {
   let body: { password?: unknown };
   try { body = await request.json(); } catch { body = {}; }
   const password = typeof body.password === 'string' ? body.password : '';
-  const expected = process.env.AUTH_PASSWORD || '';
 
-  if (!expected || !timingSafeEqualString(password, expected)) {
+  const role = matchRole(password);
+  if (!role) {
     return NextResponse.json({ error: 'Invalid password' }, { status: 401 });
   }
 
-  const cookie = await issueSessionCookie();
-  const response = NextResponse.json({ success: true });
+  const cookie = await issueSessionCookie(role);
+  const response = NextResponse.json({ success: true, role });
   response.cookies.set(cookie.name, cookie.value, {
     httpOnly: true,
     secure: true,
