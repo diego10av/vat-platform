@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-19 (Sentry + PostHog both live in production — EU region)
+> Last updated: 2026-04-19 (eleventh stint in progress: directors/pro-rata/SPV classification + multi-user + multi-contact + landing page)
 
 ---
 
@@ -21,7 +21,7 @@
 
 ### Next 48h
 
-- [ ] 🎯 **Self-test the app for 30-60 min** — `git pull && npm run seed:demo -- --reset && npm run dev`, login (pwd in `.env.local`), walk through /clients → Acme Capital Group → both its entities → add a real declaration, send a portal link. Note what feels off with the `?` shortcut. Then decide: ready to show a VAT colleague (30-min Zoom demo) or another round of internal fixes first?
+- [ ] 🎯 **Self-test the eleventh-stint deliverables** — new classifier rules (directors, SPV, carry), pro-rata UI, multi-contact inheritance, junior-role user, landing page at `cifracompliance.com` root. Walk through /clients/[id] Contacts card, /entities/[id] approvers picker, /declarations/[id] pro-rata section, and give the junior a `/login` credential to see the restricted view.
 - [ ] 📞 **Call 2 notaries for SARL-S quote** — Alex Schmitt, Bonn
       Steichen, Notaire Hellinckx or cheaper alternative. Need at
       least 2 quotes to compare. Expected €1,500-2,500 one-off.
@@ -93,6 +93,23 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-19 (late evening → overnight)** — Eleventh autonomous stint: Gassner-grade execution of the 8-point strategic dump
+
+Context: Diego gave a long strategic-dump message (landing page, CSP vs in-house, multi-contact + auto-inherit, directors natural+legal per C-288/22, pro-rata mixed-use funds, SPV passive holding, "casuísticas fund managers") with the override "QUIERO QUE HAGAS TODO LO QUE PUEDAS ESTA NOCHE. LO QUE DICEN NO DEJES PARA MAÑANA LO QUE PUEDAS HACER HOY". Subsequent clarification: landing page "muy top" Factorial + Veeva + Linear-inspired, no public distribution planned yet; multi-user if free; Gassner/Veeva as the mental model (vertical-deep + premium + multi-product arc); preserve optionality for adjacent verticals.
+
+**Stint plan (in execution order):**
+
+1. **Living docs rewrite** (§13 custody): positioning.md Veeva-first + CSP vs in-house ICP split + multi-product arc + landing direction. ROADMAP.md P0 items #11-16 queued (multi-contact, directors, pro-rata, landing unparked, SPV hardening, carry). TODO.md stint log. CLAUDE.md §4 + §8 update.
+2. **Deep technical research** (documented in code + `docs/legal-watch.md` / new `docs/directors.md`): CJEU C-288/22 TP (directors natural persons — not taxable), C-420/18 IO (Dutch supervisory board — not taxable), AED Circ. 781-1/2 (LU directors position), legal-person directors (still taxable per AED, debated post-C-288/22 — flag for reviewer), Art. 50 LTVA pro-rata methodology (general + direct-attribution + Art. 49§2 exception for non-LU financial supplies), Polysar C-60/90 + Cibo C-16/00 (passive holding not taxable person), PRACTICE.PRAC_CARRY_INTEREST + PRAC_WATERFALL classification paths.
+3. **Migrations 011-013**: entity_prorata, client_contacts + entity_approvers.client_contact_id FK, users.role = 'junior'/'reviewer'/'admin'/'client' expansion.
+4. **Classification rules**: RULE 32 Independent director (natural + legal persons with flag), RULE 33 Carry interest, RULE 34 Waterfall distribution, RULE 35 Cost-sharing cross-border (Kaplan), SPV passive-holding hardening. New fixtures.
+5. **Pro-rata UI**: section in `/declarations/[id]` showing total input VAT → ratio → deductible / non-deductible / method. Included in audit-trail-pdf.ts.
+6. **Multi-contact per client**: `/clients/[id]` Contacts card (add/edit/delete/main-toggle). Entity approvers UI gets "Pick from client contacts" dropdown → FK link.
+7. **Multi-user with junior role**: middleware role check. Hide /settings/*, /metrics, /legal-watch, /settings/users for non-admin. Give Diego a separate junior@cifracompliance.com credential (he asked for this).
+8. **Landing page at `cifracompliance.com` root**: Factorial + Veeva + Linear inspiration. New routes at root (not under /app). NO name, NO about-us, NO team, NO marketing chatbot. Copy anchors per positioning.md §Landing.
+
+---
 
 **2026-04-19 (afternoon-evening, 16:00 → 19:30)** — Tenth autonomous stint: Tier 1 hardening
 

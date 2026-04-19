@@ -173,20 +173,49 @@ clients → entities → declarations → invoices → invoice_lines
 
 ## 4 · Current state (keep this section fresh on each stint)
 
-**As of 2026-04-19, 10th stint shipped.** Status:
+**As of 2026-04-19, 11th stint in progress.** Status:
 
-- ✅ Tier 1 hardening complete: Sentry (custom envelope sender
-  bypasses SDK bug), PostHog, classifier-accuracy dashboard,
+### Shipped (by stint)
+- ✅ Tier 1 hardening (stint 10, 2026-04-19): Sentry (custom envelope
+  sender bypasses SDK bug), PostHog, classifier-accuracy dashboard,
   onboarding banner, Playwright scaffold.
-- ✅ Ai-override audit PDF + bulk edit + Excel import + contract
-  attach (L1+L2+L3) shipped in the overnight sprint 2026-04-18.
-- ✅ Clients/entities/approvers restructure (Fase 1) shipped.
-- ✅ Inbox replaces the bell (Fase 3).
+- ✅ AI-override audit PDF + bulk edit + Excel import + contract
+  attach L1+L2+L3 (stints 8-9, 2026-04-18).
+- ✅ Clients/entities/approvers restructure Fase 1 (stint 6).
+- ✅ Inbox replaces the bell (Fase 3, stint 6).
 - ✅ `ai_mode` toggle per entity for compliance-sensitive clients.
 - ✅ 10 migrations applied, RLS on every public table.
+- ✅ Governance: PROTOCOLS §13 living-docs custody (with deeply-held-position checkpoint).
+
+### In-flight (stint 11, 2026-04-19 overnight)
+- 🟡 Classification: independent directors (natural + legal
+  persons per CJEU C-288/22 TP + AED Circ. 781), SPV passive
+  holding hardening, carry interest + waterfall distributions,
+  cost-sharing cross-border (Kaplan C-77/19).
+- 🟡 Pro-rata computation + UI (Art. 50 LTVA) for mixed-use fund
+  managers — loans inside LU (no deduction) vs outside LU
+  (Art. 49§2 full deduction).
+- 🟡 Multi-contact per client + auto-inheritance to entity approvers
+  (new `client_contacts` table + FK).
+- 🟡 Multi-user with **junior role** — restricted view (no
+  /settings, no /metrics, no /legal-watch). Diego wants to give a
+  junior testing credential.
+- 🟡 Landing page at `cifracompliance.com` root — Factorial + Veeva
+  + Linear inspiration. **No public distribution planned yet**;
+  Diego wants a "muy top" first landing to show privately.
+
+### Strategic orientation
+- **Veeva-style positioning**: vertical-deep (only LU, only
+  compliance), premium pricing, multi-product arc (VAT →
+  Peppol → subscription tax → FATCA/CRS → AIFMD → direct tax).
+  See `docs/positioning.md` for the full framing.
+- **Two client-type shapes** supported architecturally:
+  CSP (fiduciary serves many end-clients → entities) vs in-house
+  (AIFM/holding group → their own entities, no "clients" layer).
+  `org_type` toggle hides the Clients sidebar in in-house mode.
 - 🟡 Customer discovery: 1 meeting done (2 prospects: bank NL,
-  fintech UK), features built from their feedback. 2nd meeting
-  TBD. Go-to-market is the critical path now.
+  fintech UK), features built from feedback. 2nd meeting TBD.
+  Go-to-market is the critical path now.
 
 **Real-time check**: `git log --oneline -10` + `docs/TODO.md` top
 section ("Done this week") tell you what shipped since this doc
@@ -297,13 +326,13 @@ deferred for a reason.
 - **AWS Bedrock / on-prem deployment** — only when an enterprise
   prospect has a signed contract asking for it. Building speculatively
   wastes days. See `ai_mode=classifier_only` as today's answer.
-- **Multi-tenant (per-firm isolation)** — P0 #2, build when the
-  2nd paying customer is about to onboard. Zero value before.
-- **Landing page** at `cifracompliance.com` — TBD. Currently `app.`
-  subdomain IS the product. Don't build a marketing page before
-  there's anyone to send there.
+- **Multi-tenant (per-firm isolation)** — P2, build when the
+  2nd paying CSP firm is about to onboard. Zero value before.
+  NOT the same as multi-user (which IS in flight, stint 11 —
+  adds reviewer / junior roles, single-tenant still).
 - **Mobile / responsive UI** — parked. Users are desktop-only
-  (VAT workflow happens at a desk with 2 monitors).
+  (VAT workflow happens at a desk with 2 monitors). iPad read-only
+  is on P1.5 but not yet built.
 - **New language coverage** — English only. Switching to FR/DE/ES
   is a distraction before product-market fit.
 - **Dark mode + keyboard shortcuts** — nice-to-have. Build when a
@@ -316,6 +345,24 @@ deferred for a reason.
 - **GDPR tooling** (data export / erasure UI) — parked until a
   prospect explicitly asks. The underlying data model supports it;
   it's just UI plumbing.
+- **Adjacent jurisdictions (BE/NL/DE)** — year-2 decision. Veeva
+  principle: go deep in one vertical before going wide. LU must be
+  dominant first.
+- **Adjacent verticals (HR, CRM, finance-ops SaaS)** — permanently
+  off-limits. cifra is Luxembourg compliance. Peer firms pivoting to
+  "AI for everything" lose the moat.
+
+### Recently UNPARKED (stint 11, 2026-04-19)
+
+- **Landing page** at `cifracompliance.com` — **unparked**. Diego
+  wants a "muy top" first landing, Factorial + Veeva + Linear
+  inspired. No public distribution planned yet — it's the private
+  artifact he'll show privately to prospects. NO company name / NO
+  about-us / NO team section / NO marketing chatbot.
+- **Multi-user + roles** — **unparked** (was P0 #2, gated on paying
+  customer). Diego wants a junior-role credential to let his junior
+  test the app with the restricted view a client would see.
+  Supabase Auth free tier (50k MAU) is sufficient; no cost.
 
 See `docs/ROADMAP.md` for the full prioritised backlog.
 
