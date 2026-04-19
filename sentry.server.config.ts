@@ -28,6 +28,14 @@ if (DSN) {
       return event;
     },
 
-    debug: false,
+    // Temporarily on while we debug the serverless-flush issue.
+    // Flip back to false once events arrive in the Sentry dashboard.
+    debug: true,
+
+    // Vercel serverless: make the transport as resilient as possible.
+    // Sentry's queueSize defaults to 30; we want to drain everything we
+    // have before the Lambda freezes. shutdownTimeout gives the
+    // transport 3s to flush on process shutdown.
+    shutdownTimeout: 3000,
   });
 }
