@@ -15,8 +15,13 @@ const PUBLIC_PATHS = new Set<string>([
  *
  * /portal/*       → client approval portal (fund manager, no login)
  * /api/portal/*   → the endpoints the portal page calls
+ * /api/debug/*    → one-shot verification endpoints (Sentry test, etc).
+ *                   Intentionally public so we can verify wiring
+ *                   without needing a logged-in session. These endpoints
+ *                   should be REMOVED after their single use — don't
+ *                   leave debug surfaces open in production for long.
  */
-const PUBLIC_PREFIXES = ['/portal/', '/api/portal/'];
+const PUBLIC_PREFIXES = ['/portal/', '/api/portal/', '/api/debug/'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
