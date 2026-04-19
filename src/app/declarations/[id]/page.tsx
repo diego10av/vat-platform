@@ -26,6 +26,7 @@ import { ShareLinkModal } from './ShareLinkModal';
 import { DocRow, StatusBadge, TriageTag, FileIcon } from './DocRow';
 import { TreatmentBadge } from './TreatmentBadge';
 import { AuditTrailPanel } from './AuditTrailPanel';
+import { ProrataPanel } from '@/components/declaration/ProrataPanel';
 import { BulkEditModal } from './BulkEditModal';
 import { ExcelImportModal } from './ExcelImportModal';
 import { AttachmentsModal } from './AttachmentsModal';
@@ -631,6 +632,9 @@ export default function DeclarationDetailPage() {
           )}
 
           <DeclarationNotes declarationId={id} initial={data.notes} />
+
+          {/* ─── Pro-rata panel — input VAT deductible / non-deductible split ─── */}
+          <ProrataPanel declarationId={id} entityId={data.entity_id} />
 
           {precedentToast && (
             <div className="mb-4 px-3 py-2 rounded-md border border-success-500/30 bg-success-50 text-success-700 text-[12px] flex items-center gap-2 animate-fadeIn">
