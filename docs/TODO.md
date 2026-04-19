@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-18 (ninth stint — Excel ingestion + Contract attach L1+L2+L3)
+> Last updated: 2026-04-19 (tenth stint — Tier 1 hardening: observability + dashboard + onboarding + E2E)
 
 ---
 
@@ -93,6 +93,99 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-19 (afternoon-evening, 16:00 → 19:30)** — Tenth autonomous stint: Tier 1 hardening
+
+After Diego's request for a full strategic review ("revisa todo lo
+construido + plan para optimizar + go-to-market fast"), I delivered
+a ~3000-word diagnosis + plan. Diego gave unconditional green light
+on Tier 1 + headed out for a few hours. I executed all 5 items
+autonomously.
+
+**Five commits pushed**:
+
+1. **Observability: Sentry + PostHog, env-guarded** (`commit f0135ee`)
+   - Sentry: client/server/edge config files + `instrumentation.ts`.
+     Complete no-ops when DSN is absent. Wrapped next.config.ts
+     with `withSentryConfig`. Tunnel route `/monitoring`. 10% trace
+     sampling in prod, 100% in dev. Session replay disabled pending DPA.
+   - PostHog: `posthog-client.ts` with idempotent init + no-op when
+     key absent. EU region (eu.i.posthog.com). Person_profiles
+     identified-only, autocapture=false, respects DNT.
+   - `PostHogProvider.tsx` mounted in root layout. Manual $pageview
+     capture on client-side route changes (Suspense-wrapped for Next 15+).
+   - First instrumented event: `declaration.status_changed` on
+     lifecycle transitions.
+   - CSP updated: connect-src adds *.ingest.sentry.io + *.sentry.io +
+     *.i.posthog.com. img-src adds PostHog assets. script-src adds
+     PostHog toolbar assets.
+   - `.env.example` created documenting every var.
+   - **Diego action tonight**: paste SENTRY_DSN + POSTHOG_KEY into
+     Vercel env, redeploy, both activate.
+
+2. **Classifier accuracy dashboard at /settings/classifier** (`commit 05fe0db`)
+   - `src/lib/classifier-accuracy.ts` — pure function runs all 60
+     fixtures from synthetic-corpus + returns pass/fail/duration +
+     per-archetype breakdown + full failure list with legal_ref.
+   - `GET /api/metrics/classifier` wraps it, 30s cache header.
+   - UI page: headline "X/60 (Y%)" in tone emerald/warning/danger,
+     archetype progress bars, drill-down table of failures with
+     expected/got chips side-by-side, rules-exercised footer.
+   - Settings index gets a 4th tile linking in.
+   - **Catches regressions from Claude model swaps, rule edits,
+     legal-sources updates** — the single health signal we now track
+     per commit.
+
+3. **Onboarding banner + one-click demo seed** (`commit cd0f93f`)
+   - `POST /api/onboarding/seed` — idempotent minimal seed (1 client
+     + 1 entity + 2 approvers + 1 review declaration + 4 classified
+     invoices covering treatment variety). Guards: refuses if any
+     real client already exists. Uses `onboard-` prefix so seeded
+     data is distinguishable from `demo-` (scripts/seed-demo.ts).
+   - Home-page banner: renders only when `entities.length===0 &&
+     !localStorage[dismissed]`. Three actions: Load demo / Create my
+     first client / Skip. Dismiss persists per device.
+   - **Kills cold-empty-state abandonment** — no more "I open cifra
+     and there's nothing here, what now?" for a tester.
+
+4. **Playwright E2E scaffolding + 5 read-only specs** (`commit 0c05ee4`)
+   - `playwright.config.ts` with two target modes: `local` (spawns
+     npm run dev, localhost:3000) and `prod` (runs against
+     app.cifracompliance.com, read-only only).
+   - Specs: `auth.spec.ts` (3 tests — login works, wrong pwd errors,
+     correct pwd lands home); `navigation.spec.ts` (4 tests — sidebar
+     routes for Clients/Declarations/Settings + regression guard that
+     AED is NOT top-level anymore); `classifier-dashboard.spec.ts`
+     (2 tests — page renders + API returns shape with 0 failures);
+     `inbox.spec.ts` (opens + shows rows or clear state);
+     `portal.spec.ts` (public portal with garbage token doesn't crash
+     + doesn't leak authed app shell).
+   - 12 tests total, all read-only, safe against prod.
+   - NPM scripts: `test:e2e`, `test:e2e:ui`, `test:e2e:prod`.
+   - `e2e/README.md` documents flipping to CI once staging exists.
+   - NOT in CI yet — waiting for a staging Supabase project (P1 #23).
+
+5. **Excel import polish: sort_order + currency_amount** (`commit 764d00d`)
+   - Fixed sort_order collision: new imports now offset past
+     MAX(sort_order), so imported rows sort after existing ones in
+     the Review tab.
+   - Fixed currency_amount semantics: was writing the EUR-equivalent
+     into the "foreign currency amount" column, misleading downstream
+     FX validator. Now null when currency != EUR (and FX validator
+     correctly flags "needs FX").
+
+**Stats**:
+- 5 commits pushed · 2 new packages (@sentry/nextjs, posthog-js/node,
+  @playwright/test) · 502/502 unit tests · 0 lint · tsc clean.
+- Deploy automático vivo en `app.cifracompliance.com`.
+
+**Tier 1 complete**. Tier 2 starts when Diego returns with:
+- Sentry DSN + PostHog key pasted (activates observability)
+- 2ª reunión agendada (tells us whether to prioritize polish visible
+  or harder E2E tests)
+- Excel real del amigo (if received, refine parser with real data)
+
+---
 
 **2026-04-18 (overnight, 23:30 → 07:00)** — Ninth autonomous stint: Excel ingestion + Contract attach L1+L2+L3
 
