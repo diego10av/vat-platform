@@ -20,6 +20,7 @@ import {
   ChevronRightIcon, PencilIcon, CheckIcon, Trash2Icon,
 } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
+import { ContactsCard } from '@/components/clients/ContactsCard';
 
 interface Client {
   id: string;
@@ -162,6 +163,9 @@ export default function ClientDetailPage() {
         {/* Left: profile */}
         <div className="col-span-2 space-y-4">
           <ProfileCard client={client} onUpdated={load} />
+
+          {/* Multi-contact roster — stint 11 (2026-04-19). */}
+          <ContactsCard clientId={client.id} />
 
           {/* Entities list */}
           <div className="bg-surface border border-border rounded-lg">

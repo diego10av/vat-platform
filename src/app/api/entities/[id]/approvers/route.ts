@@ -29,7 +29,7 @@ export async function GET(
     const rows = await query(
       `SELECT id, entity_id, name, email, phone, role,
               organization, country, approver_type, is_primary,
-              sort_order, notes,
+              sort_order, notes, client_contact_id,
               created_at::text AS created_at,
               updated_at::text AS updated_at
          FROM entity_approvers
@@ -69,7 +69,37 @@ export async function POST(
       approver_type?: string;
       is_primary?: boolean;
       notes?: string | null;
+      client_contact_id?: string | null;  // stint 11 — reuse a client_contact
     };
+
+    // If client_contact_id is supplied, pre-fill missing fields from the
+    // stored contact. The reviewer can still override any field; the FK
+    // just records the origin for future syncing.
+    let clientContactId: string | null = null;
+    if (typeof body.client_contact_id === 'string' && body.client_contact_id.trim()) {
+      clientContactId = body.client_contact_id.trim();
+      try {
+        const cc = await queryOne<{
+          name: string | null; email: string | null; phone: string | null;
+          role: string | null; organization: string | null; country: string | null;
+        }>(
+          `SELECT name, email, phone, role, organization, country
+             FROM client_contacts WHERE id = $1`,
+          [clientContactId],
+        );
+        if (cc) {
+          body.name = body.name ?? cc.name ?? undefined;
+          body.email = body.email ?? cc.email;
+          body.phone = body.phone ?? cc.phone;
+          body.role = body.role ?? cc.role;
+          body.organization = body.organization ?? cc.organization;
+          body.country = body.country ?? cc.country;
+        }
+      } catch {
+        // client_contacts table might not exist (migration 012 not run) —
+        // fall through with whatever was in the body.
+      }
+    }
 
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return apiError('bad_name', 'Approver name is required.', { status: 400 });
@@ -118,8 +148,9 @@ export async function POST(
     await execute(
       `INSERT INTO entity_approvers
          (id, entity_id, name, email, phone, role, organization,
-          country, approver_type, is_primary, sort_order, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          country, approver_type, is_primary, sort_order, notes,
+          client_contact_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
         id, entityId, name, email,
         body.phone?.trim() || null,
@@ -130,6 +161,7 @@ export async function POST(
         isPrimary,
         sortOrder,
         body.notes?.trim() || null,
+        clientContactId,
       ],
     );
 

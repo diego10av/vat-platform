@@ -297,6 +297,17 @@ function ApproverRow({
   );
 }
 
+interface ClientContactLite {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  role: string | null;
+  organization: string | null;
+  country: string | null;
+  is_main: boolean;
+}
+
 function ApproverEditor({
   entityId, approver, onClose, onSaved, fresh,
 }: {
@@ -320,6 +331,40 @@ function ApproverEditor({
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  // ───────────── Pick-from-client-contacts ─────────────
+  // Only surfaced when adding (not editing). We fetch the parent
+  // client's contacts lazily the first time the dropdown is opened.
+  const [contactsOpen, setContactsOpen] = useState(false);
+  const [contacts, setContacts] = useState<ClientContactLite[] | null>(null);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+
+  async function loadContacts() {
+    if (contacts) return;
+    try {
+      const res = await fetch(`/api/entities/${entityId}/client-contacts`);
+      const data = await res.json();
+      setContacts(Array.isArray(data?.contacts) ? data.contacts : []);
+    } catch {
+      setContacts([]);
+    }
+  }
+
+  function pickContact(c: ClientContactLite) {
+    setSelectedContactId(c.id);
+    setForm({
+      name: c.name,
+      email: c.email ?? '',
+      phone: c.phone ?? '',
+      role: c.role ?? '',
+      organization: c.organization ?? '',
+      country: c.country ?? '',
+      approver_type: form.approver_type,
+      is_primary: form.is_primary,
+      notes: form.notes,
+    });
+    setContactsOpen(false);
+  }
+
   async function save() {
     if (!form.name.trim()) {
       setErr('Name is required.');
@@ -338,6 +383,9 @@ function ApproverEditor({
         approver_type: form.approver_type,
         is_primary: form.is_primary,
         notes: form.notes.trim() || null,
+        // Propagate the FK only when the user picked from client contacts.
+        // We only do this on create — editing doesn't re-link for safety.
+        client_contact_id: !approver ? selectedContactId : undefined,
       };
       const url = approver
         ? `/api/entities/${entityId}/approvers/${approver.id}`
@@ -377,6 +425,75 @@ function ApproverEditor({
       </div>
 
       <div className="space-y-3">
+        {/* Pick from client contacts — only on create */}
+        {!approver && (
+          <div className="mb-1 relative">
+            <button
+              type="button"
+              onClick={() => {
+                setContactsOpen(!contactsOpen);
+                if (!contacts) loadContacts();
+              }}
+              className="w-full h-8 px-3 rounded border border-dashed border-border-strong bg-surface text-[11.5px] font-medium text-ink-soft hover:text-ink hover:border-brand-300 inline-flex items-center justify-between gap-2"
+            >
+              <span>
+                {selectedContactId
+                  ? `Linked to client contact · click to change`
+                  : 'Pick from client contacts →'}
+              </span>
+              <span className="text-ink-faint text-[10px]">{contactsOpen ? '▲' : '▼'}</span>
+            </button>
+            {contactsOpen && (
+              <div className="absolute z-10 mt-1 left-0 right-0 max-h-56 overflow-y-auto bg-surface border border-border-strong rounded-md shadow-lg">
+                {!contacts ? (
+                  <div className="px-3 py-2 text-[11.5px] text-ink-muted">Loading…</div>
+                ) : contacts.length === 0 ? (
+                  <div className="px-3 py-2 text-[11.5px] text-ink-muted">
+                    No contacts on file for this client. Add some on the
+                    client page for quicker reuse next time.
+                  </div>
+                ) : (
+                  <ul className="divide-y divide-divider">
+                    {contacts.map(c => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => pickContact(c)}
+                          className="w-full text-left px-3 py-2 hover:bg-surface-alt/60"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-[12.5px] font-medium text-ink truncate">{c.name}</span>
+                            {c.is_main && (
+                              <span className="text-[9px] uppercase tracking-wide bg-brand-50 text-brand-700 px-1 rounded border border-brand-100">
+                                Main
+                              </span>
+                            )}
+                            {c.role && <span className="text-[10.5px] text-ink-muted">· {c.role}</span>}
+                          </div>
+                          {c.email && (
+                            <div className="text-[11px] text-ink-muted truncate mt-0.5">{c.email}</div>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {selectedContactId && (
+              <div className="mt-1 flex items-center gap-2 text-[10.5px] text-brand-700">
+                <CheckIcon size={10} /> fields pre-filled · you can still edit
+                <button
+                  onClick={() => { setSelectedContactId(null); }}
+                  className="ml-auto text-[10.5px] text-ink-muted hover:text-ink underline-offset-2 underline"
+                >
+                  unlink
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <Field label="Name" required>
           <input
             value={form.name}
