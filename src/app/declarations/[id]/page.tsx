@@ -29,6 +29,7 @@ import { AuditTrailPanel } from './AuditTrailPanel';
 import { BulkEditModal } from './BulkEditModal';
 import { ExcelImportModal } from './ExcelImportModal';
 import { AttachmentsModal } from './AttachmentsModal';
+import { track } from '@/lib/posthog-client';
 
 // ═══════════════════════════════════════════════════════════════
 // Page
@@ -369,6 +370,12 @@ export default function DeclarationDetailPage() {
       );
       setTimeout(() => setPrecedentToast(null), 7000);
     }
+    // Analytics: track lifecycle transitions. PostHog no-ops if not configured.
+    track('declaration.status_changed', {
+      declaration_id: id,
+      new_status: newStatus,
+      previous_status: data?.status,
+    });
     loadData();
   }
   async function handleProofUpload(file: File) {

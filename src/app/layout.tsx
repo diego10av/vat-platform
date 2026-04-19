@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { AppShell } from '@/components/app-shell/AppShell';
+import { PostHogProvider } from '@/components/PostHogProvider';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -21,7 +22,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`h-full ${inter.variable}`}>
       <body className="min-h-full bg-canvas text-ink antialiased">
-        <AppShell>{children}</AppShell>
+        <PostHogProvider>
+          <AppShell>{children}</AppShell>
+        </PostHogProvider>
       </body>
     </html>
   );

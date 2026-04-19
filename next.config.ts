@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { withSentryConfig } from '@sentry/nextjs';
 
 // ════════════════════════════════════════════════════════════════════════
 // Security headers — locked down for a tax-data SaaS.
@@ -27,11 +28,14 @@ import type { NextConfig } from 'next';
 
 const ContentSecurityPolicy = [
   `default-src 'self'`,
-  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com`,
+  `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://va.vercel-scripts.com https://eu-assets.i.posthog.com https://us-assets.i.posthog.com`,
   `style-src 'self' 'unsafe-inline'`,
-  `img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in`,
+  `img-src 'self' data: blob: https://*.supabase.co https://*.supabase.in https://*.i.posthog.com`,
   `font-src 'self' data:`,
-  `connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.anthropic.com https://data-api.ecb.europa.eu https://vercel.live https://vitals.vercel-insights.com`,
+  // connect-src: every external we POST/GET to. Added 2026-04-19:
+  //   - *.sentry.io / *.ingest.sentry.io — error + perf ingest
+  //   - *.i.posthog.com                   — product analytics + feature flags
+  `connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://api.anthropic.com https://data-api.ecb.europa.eu https://vercel.live https://vitals.vercel-insights.com https://*.ingest.sentry.io https://*.sentry.io https://*.i.posthog.com`,
   `frame-ancestors 'none'`,
   `frame-src 'self' https://*.supabase.co`,
   `object-src 'none'`,
@@ -74,4 +78,38 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// ════════════════════════════════════════════════════════════════════════
+// Sentry wrap.
+//
+// withSentryConfig uploads source maps at build time (makes stack
+// traces in Sentry point to the original source) and injects a
+// tunnel route so ad-blockers don't swallow error reports.
+//
+// If SENTRY_AUTH_TOKEN is absent (local dev, unconfigured deploys),
+// the wrapper downgrades to a no-op shim — no uploads, no build
+// errors. Safe to ship without the env var; errors still go to
+// Sentry if NEXT_PUBLIC_SENTRY_DSN is set, just without source maps.
+// ════════════════════════════════════════════════════════════════════════
+
+export default withSentryConfig(nextConfig, {
+  // Silences build log spam.
+  silent: true,
+
+  // Org + project only used for source-map upload. Absent = skip upload.
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Tunnel through our own domain so ad-blockers don't swallow
+  // reports. Requires Next 15+; doesn't break if Sentry is off.
+  tunnelRoute: '/monitoring',
+
+  // Strip the Sentry SDK logger from client bundles in prod.
+  disableLogger: true,
+
+  // Upload sourcemaps only if we have an auth token. Stops the build
+  // from failing with a warning on deployments that don't have one.
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+  },
+});
