@@ -19,15 +19,21 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   PlusIcon, FileTextIcon, InboxIcon, CalendarIcon,
   ArrowRightIcon, AlertTriangleIcon, ClockIcon,
   SparklesIcon, TrendingUpIcon, BuildingIcon,
+  WandIcon, Loader2Icon, XIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageSkeleton } from '@/components/ui/Skeleton';
+
+// Local-storage key for the "first-time seed offer" dismiss state.
+// Bumps to v2 if we ever change the banner copy materially.
+const ONBOARDING_DISMISS_KEY = 'cifra_onboarding_dismissed_v1';
 
 interface Entity { id: string; name: string; client_name: string | null; regime: string; frequency: string }
 interface Declaration {
@@ -47,10 +53,21 @@ interface AedLetter {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [entities, setEntities] = useState<Entity[] | null>(null);
   const [declarations, setDeclarations] = useState<Declaration[] | null>(null);
   const [deadlines, setDeadlines] = useState<DeadlineRow[] | null>(null);
   const [aed, setAed] = useState<AedLetter[] | null>(null);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+  const [seedError, setSeedError] = useState<string | null>(null);
+
+  // Read the dismiss flag once on mount. SSR-safe (client-only component).
+  useEffect(() => {
+    try {
+      setOnboardingDismissed(localStorage.getItem(ONBOARDING_DISMISS_KEY) === '1');
+    } catch { /* noop */ }
+  }, []);
 
   useEffect(() => {
     Promise.allSettled([
@@ -91,9 +108,91 @@ export default function Home() {
   const entityById = new Map(entities.map(e => [e.id, e]));
 
   const greeting = getGreeting(now);
+  const isFirstTime = entities.length === 0 && !onboardingDismissed;
+
+  async function handleSeedDemo() {
+    setSeedError(null);
+    setSeeding(true);
+    try {
+      const res = await fetch('/api/onboarding/seed', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        setSeedError(data?.error?.message ?? 'Could not create demo data.');
+        return;
+      }
+      try { localStorage.setItem(ONBOARDING_DISMISS_KEY, '1'); } catch { /* noop */ }
+      setOnboardingDismissed(true);
+      // Navigate to the Clients list so they see the new demo data
+      // right away + understand the hierarchy.
+      router.push('/clients');
+    } catch (e) {
+      setSeedError(e instanceof Error ? e.message : 'Network error.');
+    } finally { setSeeding(false); }
+  }
+
+  function handleDismissOnboarding() {
+    try { localStorage.setItem(ONBOARDING_DISMISS_KEY, '1'); } catch { /* noop */ }
+    setOnboardingDismissed(true);
+  }
 
   return (
     <div className="max-w-[1200px]">
+      {/* ── Onboarding banner (first-time only, dismissible) ──────── */}
+      {isFirstTime && (
+        <div className="mb-6 rounded-xl border border-brand-200 bg-gradient-to-br from-brand-50 via-surface to-surface p-5 relative">
+          <button
+            onClick={handleDismissOnboarding}
+            aria-label="Dismiss onboarding banner"
+            className="absolute top-3 right-3 w-7 h-7 rounded-md text-ink-faint hover:bg-surface-alt hover:text-ink inline-flex items-center justify-center"
+          >
+            <XIcon size={14} />
+          </button>
+          <div className="flex items-start gap-4 pr-8">
+            <div className="w-11 h-11 rounded-lg bg-brand-500 text-white inline-flex items-center justify-center shrink-0">
+              <WandIcon size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-[15px] font-semibold text-ink">
+                Welcome to cifra. Start with a demo, or jump straight in.
+              </h2>
+              <p className="text-[12.5px] text-ink-soft mt-1 leading-relaxed">
+                No clients yet. Load a one-click demo dataset (1 client, 1
+                entity, 1 declaration in review with 4 classified invoices) to
+                explore the product — or create your first real client from scratch.
+              </p>
+              {seedError && (
+                <div className="mt-2 text-[11.5px] text-danger-700 bg-danger-50 border border-danger-200 rounded px-3 py-1.5">
+                  {seedError}
+                </div>
+              )}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  onClick={handleSeedDemo}
+                  disabled={seeding}
+                  className="h-9 px-3.5 rounded-md bg-brand-500 text-white text-[12.5px] font-semibold hover:bg-brand-600 disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  {seeding
+                    ? (<><Loader2Icon size={13} className="animate-spin" /> Creating demo…</>)
+                    : (<><WandIcon size={13} /> Load demo data</>)}
+                </button>
+                <Link
+                  href="/clients/new"
+                  className="h-9 px-3.5 rounded-md border border-border-strong text-[12.5px] font-semibold text-ink hover:bg-surface-alt inline-flex items-center gap-1.5"
+                >
+                  <PlusIcon size={13} /> Create my first client
+                </Link>
+                <button
+                  onClick={handleDismissOnboarding}
+                  className="h-9 px-3 text-[12px] text-ink-soft hover:text-ink"
+                >
+                  Skip for now
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Hero greeting + quick actions ───────────────────────────── */}
       <header className="mb-8">
         <h1 className="text-[28px] font-bold text-ink tracking-tight leading-none" style={{ letterSpacing: '-0.02em' }}>
