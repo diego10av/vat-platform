@@ -28,14 +28,26 @@ if (DSN) {
       return event;
     },
 
-    // Temporarily on while we debug the serverless-flush issue.
-    // Flip back to false once events arrive in the Sentry dashboard.
-    debug: true,
+    debug: false,
 
-    // Vercel serverless: make the transport as resilient as possible.
-    // Sentry's queueSize defaults to 30; we want to drain everything we
-    // have before the Lambda freezes. shutdownTimeout gives the
-    // transport 3s to flush on process shutdown.
+    // ══════════════════════════════════════════════════════════════════
+    // Serverless flush fix (2026-04-19 diagnostic session)
+    //
+    // Symptom: captureMessage/captureException returned event ids but
+    //   Sentry.flush(5000) always timed out. Events never arrived.
+    // Diagnosis: a direct fetch to the Sentry ingest endpoint from the
+    //   same Lambda returned 200 in 81ms — so network is fine, but the
+    //   default @sentry/nextjs transport (Node's http module) hangs
+    //   between Vercel Lambda invocations.
+    // Fix: force the fetch-based transport instead. Vercel's runtime
+    //   fetch has proper lifecycle hooks for serverless; HTTP connections
+    //   don't leak across freeze/thaw boundaries.
+    // ══════════════════════════════════════════════════════════════════
+    transport: Sentry.makeFetchTransport,
+
+    // shutdownTimeout: how long the SDK waits for the transport to drain
+    // when the process is shutting down. 3s is aggressive but gives the
+    // fetch transport time to finish in-flight POSTs.
     shutdownTimeout: 3000,
   });
 }
