@@ -187,22 +187,30 @@ clients → entities → declarations → invoices → invoice_lines
 - ✅ 10 migrations applied, RLS on every public table.
 - ✅ Governance: PROTOCOLS §13 living-docs custody (with deeply-held-position checkpoint).
 
-### In-flight (stint 11, 2026-04-19 overnight)
-- 🟡 Classification: independent directors (natural + legal
-  persons per CJEU C-288/22 TP + AED Circ. 781), SPV passive
-  holding hardening, carry interest + waterfall distributions,
-  cost-sharing cross-border (Kaplan C-77/19).
-- 🟡 Pro-rata computation + UI (Art. 50 LTVA) for mixed-use fund
-  managers — loans inside LU (no deduction) vs outside LU
-  (Art. 49§2 full deduction).
-- 🟡 Multi-contact per client + auto-inheritance to entity approvers
-  (new `client_contacts` table + FK).
-- 🟡 Multi-user with **junior role** — restricted view (no
-  /settings, no /metrics, no /legal-watch). Diego wants to give a
-  junior testing credential.
-- 🟡 Landing page at `cifracompliance.com` root — Factorial + Veeva
-  + Linear inspiration. **No public distribution planned yet**;
-  Diego wants a "muy top" first landing to show privately.
+### Shipped in stint 11 (2026-04-19 overnight)
+- ✅ Classification: independent directors (natural = OUT_SCOPE per
+  C-288/22 TP, legal = taxable + CONTESTED flag per AED Circ. 781-2),
+  SPV passive-holding LU domestic leg (RULE 15P → LUX_17_NONDED),
+  carry interest (substance test), waterfall distributions,
+  cost-sharing cross-border (RULES 35 / 35-lu / 35-ok per Kaplan
+  C-77/19 + DNB Banka / Aviva).
+- ✅ Pro-rata computation + UI (Art. 50 LTVA) — `src/lib/prorata.ts`
+  + API endpoints + ProrataPanel on `/declarations/[id]` with
+  three-card headline (total / deductible / non-deductible) +
+  formula trail + missing-config banner. 11 new unit tests.
+- ✅ Multi-contact per client + auto-inherit to entity approvers
+  (migration 012 `client_contacts` + ApproversCard picker).
+- ✅ Multi-user + role gating — cookie format v2 (`role.id.hmac`),
+  middleware deny-list for junior on /settings/*, /metrics,
+  /legal-watch, /legal-overrides, /audit, /registrations. Three
+  password env vars: `AUTH_PASSWORD` / `_REVIEWER` / `_JUNIOR`.
+- ✅ Landing page at `/marketing` — Factorial + Linear + Veeva +
+  Stripe-inspired. Hero, Why vertical, How it works, 6-stat depth
+  grid + 6 case-law chips, 10-item product arc, mailto CTA.
+  Static-rendered, noindex/nofollow.
+- ✅ Durable research artifact: `docs/classification-research.md`
+  (456 lines) — feeds all future director / pro-rata / SPV /
+  carry / IGP work.
 
 ### Strategic orientation
 - **Veeva-style positioning**: vertical-deep (only LU, only

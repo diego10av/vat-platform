@@ -98,16 +98,45 @@ Things worth remembering but not actionable yet:
 
 Context: Diego gave a long strategic-dump message (landing page, CSP vs in-house, multi-contact + auto-inherit, directors natural+legal per C-288/22, pro-rata mixed-use funds, SPV passive holding, "casuísticas fund managers") with the override "QUIERO QUE HAGAS TODO LO QUE PUEDAS ESTA NOCHE. LO QUE DICEN NO DEJES PARA MAÑANA LO QUE PUEDAS HACER HOY". Subsequent clarification: landing page "muy top" Factorial + Veeva + Linear-inspired, no public distribution planned yet; multi-user if free; Gassner/Veeva as the mental model (vertical-deep + premium + multi-product arc); preserve optionality for adjacent verticals.
 
-**Stint plan (in execution order):**
+**Stint plan executed (seven commits pushed):**
 
-1. **Living docs rewrite** (§13 custody): positioning.md Veeva-first + CSP vs in-house ICP split + multi-product arc + landing direction. ROADMAP.md P0 items #11-16 queued (multi-contact, directors, pro-rata, landing unparked, SPV hardening, carry). TODO.md stint log. CLAUDE.md §4 + §8 update.
-2. **Deep technical research** (documented in code + `docs/legal-watch.md` / new `docs/directors.md`): CJEU C-288/22 TP (directors natural persons — not taxable), C-420/18 IO (Dutch supervisory board — not taxable), AED Circ. 781-1/2 (LU directors position), legal-person directors (still taxable per AED, debated post-C-288/22 — flag for reviewer), Art. 50 LTVA pro-rata methodology (general + direct-attribution + Art. 49§2 exception for non-LU financial supplies), Polysar C-60/90 + Cibo C-16/00 (passive holding not taxable person), PRACTICE.PRAC_CARRY_INTEREST + PRAC_WATERFALL classification paths.
-3. **Migrations 011-013**: entity_prorata, client_contacts + entity_approvers.client_contact_id FK, users.role = 'junior'/'reviewer'/'admin'/'client' expansion.
-4. **Classification rules**: RULE 32 Independent director (natural + legal persons with flag), RULE 33 Carry interest, RULE 34 Waterfall distribution, RULE 35 Cost-sharing cross-border (Kaplan), SPV passive-holding hardening. New fixtures.
-5. **Pro-rata UI**: section in `/declarations/[id]` showing total input VAT → ratio → deductible / non-deductible / method. Included in audit-trail-pdf.ts.
-6. **Multi-contact per client**: `/clients/[id]` Contacts card (add/edit/delete/main-toggle). Entity approvers UI gets "Pick from client contacts" dropdown → FK link.
-7. **Multi-user with junior role**: middleware role check. Hide /settings/*, /metrics, /legal-watch, /settings/users for non-admin. Give Diego a separate junior@cifracompliance.com credential (he asked for this).
-8. **Landing page at `cifracompliance.com` root**: Factorial + Veeva + Linear inspiration. New routes at root (not under /app). NO name, NO about-us, NO team, NO marketing chatbot. Copy anchors per positioning.md §Landing.
+1. ✅ **Living docs rewrite** (commit `b5acc3a`) — positioning.md Veeva-first with CSP vs in-house split + multi-product arc + landing direction; ROADMAP.md queued P0 #11-16; TODO.md + CLAUDE.md §4/§8 refreshed.
+
+2. ✅ **Deep technical research doc** (commit `bd71747`) — `docs/classification-research.md`, 456 lines covering six topics: directors (natural settled + legal contested), pro-rata (Art. 50 LTVA + Art. 49§2 non-EU exception), SPV passive-holding hardening, carry interest substance test, waterfall distributions, IGP cross-border + financial exclusion.
+
+3. ✅ **Classification rules + legal sources** (commit `ece13e4`) — 11 new fixtures + 20+ new legal-source entries. RULES 32a/b (directors natural/legal per C-288/22 TP), 33 (carry), 34 + 34/mixed (waterfall), 35 / 35-lu / 35-ok (IGP), 15P (passive-holding LU domestic leg → LUX_17_NONDED). 513 tests green.
+
+4. ✅ **Multi-user + role gating** (commit `e0a2640`) — migrations 011 + 012 + 013 applied via Supabase MCP. Cookie format v2 (`role.sessionId.hmac`), `/api/auth/me`, middleware deny-list for junior on /settings/*, /metrics, /legal-watch, /legal-overrides, /audit, /registrations. Role-aware sidebar. Three password env vars (AUTH_PASSWORD / _REVIEWER / _JUNIOR).
+
+5. ✅ **Landing page** (commit `4d4b07e`) — Factorial + Linear + Veeva + Stripe-inspired at `/marketing`. Hero, "Why vertical", 4-step How it works, 6-stat depth grid + case-law chip row, 10-item multi-product arc, Close CTA + mailto. Static-rendered, noindex/nofollow (private artifact).
+
+6. ✅ **Multi-contact per client + auto-inherit** (commit `cf8a5ea`) — ContactsCard on /clients/[id]; `/api/clients/[id]/contacts*` CRUD; `/api/entities/[id]/client-contacts` lightweight endpoint; ApproversCard "Pick from client contacts" dropdown pre-fills + stores FK.
+
+7. ✅ **Pro-rata library + UI** (commit `[latest]`) — `src/lib/prorata.ts` pure math module (11 new unit tests), `/api/entities/[id]/prorata` CRUD, `/api/declarations/[id]/prorata` server-side compute endpoint, ProrataPanel on /declarations/[id] with three-card headline (total / deductible / non-deductible) + formula trail + legal refs + inline editor + "missing config" red banner.
+
+**Stats**:
+- 7 commits pushed · 3 migrations applied (011 / 012 / 013) ·
+  524 unit tests green (11 new) · 75 classifier fixtures green ·
+  Typecheck clean · Production build clean.
+- Docs added: classification-research.md (456 lines) — durable record
+  for future stints.
+
+**Queued for next stint (Tier 3)**:
+- Pro-rata rendered in the audit-trail PDF
+- Entity `org_type` switch (CSP vs in-house — P1.16)
+- "Sync approvers from updated contact" button
+- Landing-page screenshots (requires real product screenshots)
+- Subscription tax module scoping (P1.18)
+
+**Diego actions next morning**:
+- 🎯 Log in once to re-issue the cookie in v2 format (existing
+  2-part cookies auto-upgrade on next login)
+- 🟡 Set `AUTH_PASSWORD_JUNIOR` in Vercel env vars to activate the
+  junior role. Share the credential with the junior.
+- 🎯 Visit `/marketing` to review the landing page privately
+- 🎯 Visit any `/clients/[id]` to add contacts; then `/entities/[id]`
+  to test the "Pick from client contacts" picker on approvers
+- 🎯 Visit any `/declarations/[id]` to see the ProrataPanel in action
 
 ---
 
