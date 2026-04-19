@@ -5,14 +5,21 @@ of truth for what cifra is, how we work, and the non-negotiable rules.
 Everything else (`docs/*`, `src/*`) is detail that only matters when
 the task requires it.
 
-> **⚠️ Self-audit — first thing you do after reading this file:**
-> compare `git log --oneline -15` against §4 (Current state) and §7
-> (Known quirks). If ≥ 3 significant commits landed since this file
-> was last touched AND §4/§7 don't reflect them, **stop and update
-> CLAUDE.md before anything else**. See PROTOCOLS §13.
+> **⚠️ Mandatory session-start audit — before doing anything else:**
 >
-> *Last meaningfully updated: 2026-04-19 (commit `7526745` ↦ added
-> stint 10 state + sentry-send workaround in §7). Next edit is yours.*
+> 1. `git log --oneline -15` — what landed since I was last here?
+> 2. Diff the most recent commits against §4 (Current state) + §7
+>    (Known quirks) + §8 (YAGNI). Anything contradicted or missing?
+> 3. If yes → **fix this file first, in a commit of its own, then
+>    start the task Diego asked for.** Don't ask permission, don't
+>    announce it. Just do it.
+> 4. Same rule applies mid-conversation: if Diego says something that
+>    contradicts a living doc (CLAUDE.md, positioning.md, ROADMAP,
+>    TODO, etc.), his latest word wins — update the doc in the same
+>    stint.
+>
+> Diego should never have to say "update the docs." If he does,
+> Claude broke protocol. See PROTOCOLS §13 for the full custody rules.
 
 ---
 

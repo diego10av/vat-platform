@@ -389,50 +389,99 @@ push notification on his phone, a physical signature).
 
 ---
 
-## 13. CLAUDE.md maintenance (**critical** per Diego, 2026-04-19)
+## 13. Living-docs custody (**critical** per Diego, 2026-04-19)
 
-`CLAUDE.md` at the repo root is the onboarding briefing that Claude
-Code auto-reads at every new session. **If it goes stale, it
-actively misleads future sessions** — worse than no doc at all.
+> *"Deberías estar encima de este tipo de cosas y que no hiciese falta
+> que yo te lo señalara. Lo que estamos haciendo o diciendo hoy puede
+> ser completamente distinto a lo que pasará en un mes. Podemos pivotar,
+> cambiar de idea, hacer cosas distintas."* — Diego, 2026-04-19
 
-**Rule**: `CLAUDE.md` is updated BY CLAUDE, at every stint end,
-BEFORE the final push of that stint. Not weekly, not on demand —
-every stint that lands ≥ 1 commit on main.
+Diego is the product decider. Claude is the **custodian of coherence**:
+the one whose job it is to keep the project's written source-of-truth
+in sync with Diego's current mental model of the product + strategy.
 
-### When to edit CLAUDE.md (mandatory)
+**Diego should never have to say "please update the docs." If docs
+are stale, Claude broke protocol.** This is not a nice-to-have — it's
+the core working contract.
 
-- A new hard rule is recorded → update §2
-- Stack / dependency / directory structure changes → update §3
-- Any feature shipped or major refactor lands → update §4 (Current
-  state) + potentially §7 (Known quirks) or §8 (YAGNI)
-- A "known quirk" gets fixed (not worked around — genuinely fixed)
-  → remove from §7
-- A previously-parked item moves into "build" → remove from §8
-- A migration pattern / working-protocol changes → update §5
+### The living docs under custody
 
-### When to leave CLAUDE.md alone
+| File | Purpose | Stale = |
+|---|---|---|
+| `CLAUDE.md` | Session-bootstrap briefing Claude auto-reads | Future sessions give wrong advice |
+| `docs/TODO.md` | Week's actions + stint log | Diego loses track of status |
+| `docs/ROADMAP.md` | Prioritised backlog | We build parked items, skip shipped ones |
+| `docs/PROTOCOLS.md` | This file — working principles | Rules don't reflect how we actually work |
+| `docs/positioning.md` | ICP + pitch + what cifra is NOT | Demos + DMs go off-brand |
+| `docs/BUSINESS_PLAN.md` | Strategy, pricing, financials | Strategic decisions contradict the plan |
+| `docs/MODELS.md` | Anthropic model matrix | Model choices drift |
+| `docs/VIDA.md` | ViDA/Peppol strategic briefing | Product-adjacent decisions misaligned |
+| User's `MEMORY.md` (~/.claude) | Cross-session personal memory | Claude forgets the human context |
 
-- Pure bugfix, test-only commit, lint cleanup, docs tweak — no
-  change in state, rules, architecture, or quirks. Leave it.
-- Cosmetic UI polish that doesn't affect user-visible behaviour.
+### What triggers an update (Claude's detection, not Diego's ask)
 
-### How to prevent drift (self-audit)
+**Code/infra changes** (detected from git activity):
+- Feature ships, major refactor lands, architectural decision made
+- A "known quirk" gets genuinely fixed (not worked around)
+- A parked item gets built, or a non-parked item gets parked
+- Stack, dependency, or directory structure changes
+- New migration, schema change, integration added/removed
 
-Every Monday morning brief (§2 of this file) Claude diffs:
-- Last `CLAUDE.md` modification date vs the 10 most recent
-  commits.
-- If ≥ 3 significant commits landed since CLAUDE.md was last
-  touched AND none of them touched CLAUDE.md → flag in the brief.
+**Strategic / conversational pivots** (detected from Diego's words):
+- *"Let's target X instead of Y"* → positioning.md, CLAUDE.md
+- *"Drop feature Z"* → ROADMAP, TODO, CLAUDE.md (YAGNI list),
+  and delete/park the code
+- *"The price is N now"* → BUSINESS_PLAN.md, positioning.md
+- *"New rule: always / never do W"* → PROTOCOLS.md + CLAUDE.md §2
+- *"I changed my mind about Q"* → update whatever doc currently says
+  the old thing
+- A customer call reveals new signal → positioning.md +/- TODO
+- **Any sentence from Diego that contradicts what a living doc
+  currently says** → the doc loses, Diego's latest word wins
 
-If Diego sees the flag, a one-line reply (*"update CLAUDE.md"*) is
-enough — Claude does the pass.
+### What doesn't trigger an update
 
-### Accountability
+- Pure bugfix, test-only, lint, cosmetic UI polish with no
+  change to state / rules / strategy
+- Temporary debug commits removed in the same stint
 
-This protocol makes CLAUDE.md maintenance **Claude's job**, not
-Diego's. Diego never has to remember to ask for it. If CLAUDE.md
-is stale, Claude broke protocol — Diego can call it out at any
-time and the correct response is an immediate update commit.
+### When Claude runs the audit (three gates, all automatic)
+
+1. **Session-start audit**: first thing after reading CLAUDE.md is
+   `git log --oneline -15` + diff against §4 / §7 / §8. If ≥ 3
+   significant commits landed untouched → **fix first, then start
+   the user's task**. Don't announce the audit; just do it.
+2. **Mid-session detection**: if Diego says something during the
+   conversation that contradicts a living doc, update that doc in
+   the same stint — before the final commit. Don't ask permission;
+   the pivot already happened, you're just writing it down.
+3. **Stint-end pass**: before the final push of any stint that
+   landed ≥ 1 commit, re-read CLAUDE.md + TODO.md + any doc whose
+   topic was touched. Update anything the stint's work invalidated.
+
+### The Monday morning brief as backstop
+
+The scheduled brief (§2) closes the loop as a safety net: if
+Claude somehow missed drift during the week, Monday's diff
+catches it. The brief auto-proposes the update in the same
+response; Diego doesn't have to do anything.
+
+### Accountability (ironclad)
+
+- Stale docs = Claude failed, not Diego.
+- If Diego notices staleness before Claude, something went wrong
+  in the session-start / mid-session / stint-end gates. Claude's
+  first move is fix the drift silently + honestly note which gate
+  failed (so we can strengthen that gate next time).
+- Diego is explicitly freed from tracking this. He decides what to
+  build / sell / pivot to; Claude keeps the written record current.
+
+### When in doubt: update more, not less
+
+A living doc should lean **aggressively current**, not
+diplomatically preserving old states. If a strategy changes, the
+doc says the new strategy — not "we used to think X but now Y".
+History belongs in git, not in the current state of a living doc.
 
 ---
 
