@@ -5,11 +5,13 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { ApproversCard } from '@/components/entity/ApproversCard';
+import { EntityEditCard } from '@/components/entity/EntityEditCard';
 
 interface TimelineData {
   entity: {
     id: string; name: string; client_name: string | null; vat_number: string | null;
     matricule: string | null; regime: string; frequency: string; address: string | null;
+    rcs_number: string | null; legal_form: string | null; entity_type: string | null;
     has_fx: boolean; has_outgoing: boolean; has_recharges: boolean;
     notes: string | null;
     ai_mode: 'full' | 'classifier_only' | null;
@@ -65,6 +67,25 @@ export default function EntityDetailPage() {
           </Link>
         </div>
       </div>
+
+      <EntityEditCard
+        entity={{
+          id: e.id,
+          name: e.name,
+          vat_number: e.vat_number,
+          matricule: e.matricule,
+          rcs_number: e.rcs_number,
+          legal_form: e.legal_form,
+          entity_type: e.entity_type,
+          regime: e.regime,
+          frequency: e.frequency,
+          address: e.address,
+          has_fx: e.has_fx,
+          has_outgoing: e.has_outgoing,
+          has_recharges: e.has_recharges,
+        }}
+        onSaved={(next) => setData(d => d ? { ...d, entity: { ...d.entity, ...next } } : d)}
+      />
 
       <ApproversCard entityId={id} />
 
