@@ -5,10 +5,10 @@
 // dashboard work), and a clean table. Creating a new declaration
 // happens here or from the home quick-actions.
 
-import { useEffect, useState, Suspense, useMemo } from 'react';
+import { useEffect, useState, Suspense, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { PlusIcon, ArrowRightIcon, FileTextIcon, SearchIcon } from 'lucide-react';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { PlusIcon, ArrowRightIcon, FileTextIcon, SearchIcon, ChevronUpIcon, ChevronDownIcon, ChevronsLeftIcon, ChevronLeftIcon, ChevronRightIcon as ChevronRightMiniIcon, ChevronsRightIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -22,6 +22,10 @@ interface Entity { id: string; name: string; regime: string; frequency: string; 
 interface Declaration { id: string; entity_id: string; entity_name: string; year: number; period: string; status: string; created_at: string }
 
 type StatusFilter = 'all' | 'active' | 'review' | 'approved' | 'filed' | 'paid';
+type SortKey = 'entity' | 'period' | 'status' | 'created';
+type SortDir = 'asc' | 'desc';
+
+const PAGE_SIZES = [25, 50, 100, 250] as const;
 
 export default function DeclarationsPage() {
   return (
@@ -33,8 +37,17 @@ export default function DeclarationsPage() {
 
 function DeclarationsContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const entityId = searchParams.get('entity_id');
   const initialStatus = (searchParams.get('status') as StatusFilter) || 'all';
+  const initialQ = searchParams.get('q') || '';
+  const initialSort = (searchParams.get('sort') as SortKey) || 'period';
+  const initialDir = (searchParams.get('dir') as SortDir) || 'desc';
+  const initialPage = Math.max(1, Number(searchParams.get('page')) || 1);
+  const initialPageSize = (() => {
+    const n = Number(searchParams.get('size'));
+    return (PAGE_SIZES as readonly number[]).includes(n) ? n : 50;
+  })();
 
   const [entities, setEntities] = useState<Entity[] | null>(null);
   const [declarations, setDeclarations] = useState<Declaration[] | null>(null);
@@ -42,7 +55,37 @@ function DeclarationsContent() {
   const [form, setForm] = useState({ entity_id: entityId || '', year: new Date().getFullYear(), period: '' });
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialQ);
+  const [sortKey, setSortKey] = useState<SortKey>(initialSort);
+  const [sortDir, setSortDir] = useState<SortDir>(initialDir);
+  const [page, setPage] = useState<number>(initialPage);
+  const [pageSize, setPageSize] = useState<number>(initialPageSize);
+
+  // Reflect current UI state into the URL so filters + pagination are
+  // shareable / back-button-friendly.
+  const syncUrl = useCallback(() => {
+    const qs = new URLSearchParams();
+    if (entityId) qs.set('entity_id', entityId);
+    if (statusFilter !== 'all') qs.set('status', statusFilter);
+    if (search.trim()) qs.set('q', search.trim());
+    if (sortKey !== 'period') qs.set('sort', sortKey);
+    if (sortDir !== 'desc') qs.set('dir', sortDir);
+    if (page > 1) qs.set('page', String(page));
+    if (pageSize !== 50) qs.set('size', String(pageSize));
+    const qstr = qs.toString();
+    const url = qstr ? `/declarations?${qstr}` : '/declarations';
+    router.replace(url, { scroll: false });
+  }, [router, entityId, statusFilter, search, sortKey, sortDir, page, pageSize]);
+
+  useEffect(() => { syncUrl(); }, [syncUrl]);
+
+  // Reset to page 1 whenever a filter / search / sort changes.
+  useEffect(() => { setPage(1); }, [statusFilter, search, sortKey, sortDir, pageSize]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
 
   useEffect(() => {
     fetch('/api/entities').then(r => r.json()).then(setEntities);
@@ -108,8 +151,8 @@ function DeclarationsContent() {
     filed:    declarations.filter(d => d.status === 'filed' || d.status === 'paid').length,
   };
 
-  // Apply filter + search
-  const visible = declarations
+  // Apply filter + search + sort
+  const filtered = declarations
     .filter(d => {
       if (statusFilter === 'all') return true;
       if (statusFilter === 'active') return ['uploading', 'extracting', 'classifying', 'review', 'approved'].includes(d.status);
@@ -118,13 +161,33 @@ function DeclarationsContent() {
     .filter(d => {
       if (!search.trim()) return true;
       const q = search.toLowerCase();
-      return d.entity_name.toLowerCase().includes(q) || String(d.year).includes(q) || d.period.toLowerCase().includes(q);
-    })
-    .sort((a, b) => {
-      // Recent periods first, then by status "hotness"
-      if (b.year !== a.year) return b.year - a.year;
-      return b.period.localeCompare(a.period);
+      return d.entity_name.toLowerCase().includes(q)
+        || String(d.year).includes(q)
+        || d.period.toLowerCase().includes(q)
+        || d.status.toLowerCase().includes(q);
     });
+
+  const sorted = [...filtered].sort((a, b) => {
+    const mul = sortDir === 'asc' ? 1 : -1;
+    if (sortKey === 'entity') {
+      return mul * a.entity_name.localeCompare(b.entity_name);
+    }
+    if (sortKey === 'status') {
+      return mul * a.status.localeCompare(b.status);
+    }
+    if (sortKey === 'created') {
+      return mul * (new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    }
+    // 'period' sort: year desc then period desc by default. Respect dir.
+    if (b.year !== a.year) return mul * (a.year - b.year);
+    return mul * a.period.localeCompare(b.period);
+  });
+
+  const totalRows = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+  const effectivePage = Math.min(page, totalPages);
+  const pageStart = (effectivePage - 1) * pageSize;
+  const visible = sorted.slice(pageStart, pageStart + pageSize);
 
   return (
     <div className="max-w-[1200px]">
@@ -250,11 +313,10 @@ function DeclarationsContent() {
           <table className="w-full text-[12.5px]">
             <thead className="bg-surface-alt border-b border-divider text-ink-muted">
               <tr>
-                <Th>Entity</Th>
-                <Th>Year</Th>
-                <Th>Period</Th>
-                <Th>Status</Th>
-                <Th>Created</Th>
+                <SortableTh active={sortKey === 'entity'} dir={sortDir} onClick={() => toggleSort('entity')}>Entity</SortableTh>
+                <SortableTh active={sortKey === 'period'} dir={sortDir} onClick={() => toggleSort('period')}>Year · Period</SortableTh>
+                <SortableTh active={sortKey === 'status'} dir={sortDir} onClick={() => toggleSort('status')}>Status</SortableTh>
+                <SortableTh active={sortKey === 'created'} dir={sortDir} onClick={() => toggleSort('created')}>Created</SortableTh>
                 <Th />
               </tr>
             </thead>
@@ -266,8 +328,7 @@ function DeclarationsContent() {
                       <span className="font-medium text-ink group-hover:text-brand-600 transition-colors">{d.entity_name}</span>
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-ink-soft tabular-nums">{d.year}</td>
-                  <td className="px-4 py-3 text-ink-soft">{d.period}</td>
+                  <td className="px-4 py-3 text-ink-soft tabular-nums">{d.year} · {d.period}</td>
                   <td className="px-4 py-3"><StatusPill status={d.status} /></td>
                   <td className="px-4 py-3 text-ink-muted text-[11.5px]">{new Date(d.created_at).toLocaleDateString('en-GB')}</td>
                   <td className="px-4 py-3 text-right">
@@ -279,6 +340,39 @@ function DeclarationsContent() {
               ))}
             </tbody>
           </table>
+          {/* Pagination footer */}
+          <div className="border-t border-divider px-4 py-2.5 flex items-center justify-between text-[11.5px] text-ink-muted bg-surface-alt/40">
+            <span>
+              <span className="font-semibold tabular-nums text-ink">{pageStart + 1}</span>
+              {' – '}
+              <span className="font-semibold tabular-nums text-ink">{Math.min(pageStart + pageSize, totalRows)}</span>
+              {' of '}
+              <span className="font-semibold tabular-nums text-ink">{totalRows}</span>
+              {' '}
+              {totalRows !== declarations.length && (
+                <span className="text-ink-faint">(filtered from {declarations.length})</span>
+              )}
+            </span>
+            <div className="flex items-center gap-3">
+              <label className="inline-flex items-center gap-1">
+                Page size
+                <select
+                  value={pageSize}
+                  onChange={e => setPageSize(Number(e.target.value))}
+                  className="ml-1 border border-border rounded px-1.5 py-0.5 bg-surface text-ink tabular-nums"
+                >
+                  {PAGE_SIZES.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
+              <div className="flex items-center gap-0.5">
+                <PageBtn disabled={effectivePage === 1} onClick={() => setPage(1)} title="First"><ChevronsLeftIcon size={12} /></PageBtn>
+                <PageBtn disabled={effectivePage === 1} onClick={() => setPage(p => Math.max(1, p - 1))} title="Previous"><ChevronLeftIcon size={12} /></PageBtn>
+                <span className="px-2 tabular-nums">{effectivePage} / {totalPages}</span>
+                <PageBtn disabled={effectivePage >= totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))} title="Next"><ChevronRightMiniIcon size={12} /></PageBtn>
+                <PageBtn disabled={effectivePage >= totalPages} onClick={() => setPage(totalPages)} title="Last"><ChevronsRightIcon size={12} /></PageBtn>
+              </div>
+            </div>
+          </div>
         </Card>
       )}
     </div>
@@ -287,6 +381,46 @@ function DeclarationsContent() {
 
 function Th({ children }: { children?: React.ReactNode }) {
   return <th className="px-4 py-2.5 text-left font-medium text-[10.5px] uppercase tracking-[0.06em]">{children}</th>;
+}
+
+function SortableTh({
+  children, active, dir, onClick,
+}: {
+  children: React.ReactNode;
+  active: boolean;
+  dir: SortDir;
+  onClick: () => void;
+}) {
+  return (
+    <th className="px-4 py-2.5 text-left font-medium text-[10.5px] uppercase tracking-[0.06em]">
+      <button
+        onClick={onClick}
+        className={`inline-flex items-center gap-1 ${active ? 'text-ink' : 'text-ink-muted hover:text-ink'}`}
+      >
+        {children}
+        {active ? (
+          dir === 'asc' ? <ChevronUpIcon size={11} /> : <ChevronDownIcon size={11} />
+        ) : (
+          <ChevronDownIcon size={11} className="opacity-30" />
+        )}
+      </button>
+    </th>
+  );
+}
+
+function PageBtn({
+  children, disabled, onClick, title,
+}: { children: React.ReactNode; disabled?: boolean; onClick: () => void; title: string }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className="w-6 h-6 inline-flex items-center justify-center rounded text-ink-muted hover:bg-surface hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
+    >
+      {children}
+    </button>
+  );
 }
 
 function FilterChip({
