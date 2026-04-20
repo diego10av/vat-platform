@@ -94,6 +94,98 @@ Things worth remembering but not actionable yet:
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
 
+**2026-04-20 (continued pre-dawn, 7am → 10am LU)** — Twelfth stint continued: all the post-audit extras Diego greenlit
+
+After the main Gassner-list commits landed, Diego asked for every
+"additional suggestion" I'd flagged. This block logs them.
+
+**Eleven commits pushed (stint 12b)**:
+
+1. ✅ Toast stacking rewrite (`[c1]`) — dedup (same msg within 3s → "×N"
+   counter), cap 6, ESC dismiss, Clear-all button. Also discovered
+   ToastProvider wasn't mounted anywhere — fixed in the keyboard
+   shortcuts commit.
+
+2. ✅ Auto-save drafts (`[c1]`) — `src/lib/use-draft.ts` hook. Wired
+   into EntityEditCard: "Unsaved draft" badge, "Discard draft" button,
+   "auto-saved 3s ago" timestamp. Tab-close no longer loses work.
+
+3. ✅ Budget warning banner on Home (`[c2]`) — tonal (amber 75-89%,
+   red 90-99%, danger ≥100%), progress bar, euro split, CTA to
+   /metrics. Silent for junior role.
+
+4. ✅ CSV export of audit trail (`[c2]`) — GET
+   /api/declarations/[id]/audit-log.csv with UTF-8 BOM for Excel.
+   AuditTrailPanel gets CSV + PDF buttons side-by-side.
+
+5. ✅ Modal primitive (`[c3]`) — Modal + ConfirmModal in
+   src/components/ui/Modal.tsx. Portal-rendered, ESC + backdrop
+   dismiss, focus management, role=dialog + aria-modal. Six+
+   existing ad-hoc modals can migrate opportunistically.
+
+6. ✅ Keyboard shortcuts (`[c4]`) — ShortcutsProvider, "?" help
+   overlay, "g x" leader nav (h/c/e/d/i/p/l/a/s). Also mounted
+   the missing ToastProvider in the root layout (big silent fix —
+   all existing toast.* calls were no-ops until now).
+
+7. ✅ Empty-state illustrations (`[c5]`) — EmptyState upgraded to
+   accept `illustration` prop. 7 inline-SVG illustrations
+   (inbox / clients / declarations / deadlines / search /
+   documents / approved) themed via currentColor. Pages wired:
+   /declarations, /entities, /deadlines, /aed-letters.
+
+8. ✅ Entities + Clients list parity (`[c6]`) — URL-synced filters
+   + sort (column headers for entities table, dropdown for
+   clients cards) + pagination via useListState + ListFooter
+   primitives. Refactor-friendly for declarations too.
+
+9. ✅ Cross-entity provider suggestions API (`[c7]`) — GET
+   /api/providers/suggestions?provider=X&country=Y. Returns
+   dominant treatment + variance across other entities. Backend
+   only; UI deferred (needs thought to avoid misleading reviewers).
+
+10. ✅ Closing dashboard (`[c8]`) — /closing + /api/closing. Period
+    picker (quarters + year), 6 metric cards, one-row-per-entity
+    grid with status pills + VAT payable + Start/Open CTAs. Red-
+    tinted rows for "expected but not started". Sidebar +
+    command palette + `g p` shortcut wired.
+
+11. ✅ E2E happy-path spec (`[c9]`) — login → seed → view client
+    → open declaration → verify pro-rata + treatment chips. Local-
+    only (skipped in prod). First mutating spec.
+
+**Stats**:
+- 9 commits pushed · 0 migrations · 529 tests green · typecheck
+  clean · production build clean.
+
+**Architecture seeds planted (used by future stints)**:
+- useDraft — drop-in autosave for any form
+- useListState + paginate() — URL-synced list logic
+- ListFooter — shared pagination control
+- Modal + ConfirmModal — the default dialog primitive
+- ShortcutsProvider — central keyboard routing + help overlay
+- EmptyState.illustration API — 7 SVGs + an extensible kind set
+
+**Deferred (consciously)**:
+- Cross-entity suggestions UI — needs thought; backend ready.
+- Responsive ≤720px — ROADMAP P1.5, intentionally next stint.
+- Dark mode — ROADMAP P2.4, tokens ready, deferred.
+- Declaration-page row-level shortcuts (j/k/a/r) — documented in
+  "?" overlay; binding requires a focus-scoped provider on the
+  page. Non-blocking.
+
+**Diego actions when he wakes**:
+- 🎯 Hit `?` → skim the shortcuts list.
+- 🎯 Hit `⌘K` → type "clo" → hit Enter → see the closing dashboard.
+- 🎯 Hit `g d` → go to declarations. Then sort + paginate.
+- 🎯 Open any declaration → hover a treatment chip → see the rich
+  legal tooltip light up on lines re-classified after migration 014.
+- 🎯 Run the CSV audit export on an approved declaration.
+- 🟡 Stint 11 carry-overs still outstanding: AUTH_PASSWORD_JUNIOR
+  env var + cifracompliance.com DNS.
+
+---
+
 **2026-04-19 / 04-20 (overnight, 4am → 7am LU)** — Twelfth autonomous stint: the Gassner-audit punch list to zero
 
 Context: Diego read the Gassner debrief (commit `4a2161c`), agreed fully,

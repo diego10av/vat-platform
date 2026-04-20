@@ -187,6 +187,22 @@ clients → entities → declarations → invoices → invoice_lines
 - ✅ 10 migrations applied, RLS on every public table.
 - ✅ Governance: PROTOCOLS §13 living-docs custody (with deeply-held-position checkpoint).
 
+### Shipped in stint 12b (2026-04-20 continued)
+Post-audit extras batch (9 commits):
+- Toast stacking w/ dedup + cap + ESC + Clear-all
+- ToastProvider mounted at root (silent bug fix)
+- useDraft hook for autosave (EntityEditCard first consumer)
+- Budget warning banner on Home (tonal, 75/90/100% thresholds)
+- CSV audit export alongside PDF
+- Modal + ConfirmModal primitives
+- ShortcutsProvider (? help overlay + g-leader nav + g h/c/e/d/i/p/l/a/s)
+- EmptyState illustrations (7 inline-SVG kinds)
+- Entities + Clients list URL-sync + sort + pagination
+- useListState hook + ListFooter component (reusable)
+- /api/providers/suggestions cross-entity intel endpoint
+- /closing dashboard + /api/closing (quarter-at-a-glance)
+- E2E happy-path spec (login → seed → open declaration)
+
 ### Shipped in stint 12 (2026-04-20 pre-dawn)
 Executed the Gassner-audit punch list (`docs/gassner-audit-2026-04-19.md`) to zero:
 - ✅ Reopen + Un-file confirmations (approved / filed / paid → review
