@@ -94,6 +94,26 @@ Things worth remembering but not actionable yet:
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
 
+**2026-04-20 (evening)** — Stint 16: classifier deep-dive · Versãofast, SV entity type, SOPARFI clarification
+
+Context: Diego flagged three linked issues. (1) Recent CJEU on credit intermediation (Versãofast T-657/24, GC 2025-11-26) not yet reflected — "hace poco una sentencia muy relevante… negociación del crédito para un broker portugués". (2) SOPARFI handling wrong — pure passive SOPARFIs cannot register for VAT; the platform was treating them as generic holdings. (3) Securitisation vehicles (SV) missing entirely — common LU structure with its own Art. 44§1 d pathway via Fiscale Eenheid X C-595/13. Instruction: "pásate el tiempo que haga falta, una hora, dos, tres, dos días, pero hazlo bien. El clasificador como Dios manda… vivo, vivo, vivo."
+
+**Three commits, 553/553 tests green, typecheck clean:**
+
+1. **`382f3c6` — Legal foundations.** classification-research.md §9–§13 written (Versãofast, SOPARFI, SV, fund-vehicle taxonomy, legal-watch live protocol). legal-sources.ts VERSAOFAST corrected (was mis-attributed to "referral fees"), six new CJEU + one LU law entry added (LUDWIG C-453/05, ASPIRO C-40/15, FRANCK C-801/19, BBL C-8/03, WHEELS C-424/11, SV_LAW_2004). Four new PRACTICE entries (SOPARFI default-not-registered, SV management exempt, SV servicer split, credit intermediation safe harbour). New keyword families: CREDIT_INTERMEDIATION, SECURITIZATION_MGMT, SECURITIZATION_SERVICER.
+
+2. **`8cf0e8e` — Classifier engine.** EntityContext.entity_type adds `securitization_vehicle`. New `isQualifyingForArt44D(ctx)` helper centralises the "qualifying fund for Art. 44§1 d" test — returns true for both `fund` and `securitization_vehicle`. RULES 10 / 12 route via helper with SV-specific reason strings (citing Fiscale Eenheid X + Loi 2004/2022). INFERENCE C / D same. RULE 22 (platform deemed supplier) cleaned: Versãofast citation removed, Fenix C-695/20 stays. NEW RULE 36 (credit intermediation): LU→LUX_00 / EU→RC_EU_EX / non-EU→RC_NONEU_EX, always flagged with Versãofast reasoning, defers to direct-evidence RULE 7A when explicit Art. 44§1(a) reference captured. NEW RULE 37 (SV servicer): Aspiro-C-40/15 split flag when `securitization_vehicle` + servicer/debt-collection keywords — returns null treatment, forces reviewer apportionment. RULE 35 `isFinancialRecipient` extended to include SV for DNB Banka / Aviva exclusion. **24 new fixtures F072–F095** covering RULE 36 / 37 paths, SV entity, BlackRock single-supply rule (F086–F087), margin-scheme Art. 56bis (F088–F089), Wheels DB pension non-qualifying (F091), passive-holding + credit intermediation edge case (F090).
+
+3. **`e7ca83d` — UI + seed cleanup.** EntityEditCard dropdown gets "Securitisation vehicle (Loi 2004/2022)" option; per-type advisory notes surface under the dropdown at selection; amber warning banner fires when entity_type = passive_holding AND VAT number / matricule is filled ("pure passive SOPARFI is not a VAT taxable person — Polysar C-60/90 — confirm Cibo-type services or switch to active_holding or remove the entity from cifra"). VALID_ENTITY_TYPES (bulk-import) adds `securitization_vehicle`. SearchBar ⌘K keywords + hint updated. /entities/new + /clients/new Type-field hints fixed (were misleadingly saying "soparfi / aifm / holding" — now list the full valid enum). Seed data (scripts/seed-demo.ts + api/onboarding/seed) had invalid `entity_type: 'soparfi'` — changed to `active_holding` with comment explaining the Cibo-style narrative. vat-letter-extract.ts extractor prompt rewrote the entity_type mapping to cover all six valid values with an explicit anomaly path for the "pure passive SOPARFI appears VAT-registered" case.
+
+**Diego actions when back at the keyboard:**
+- 🎯 Visit `/entities/[id]` and Edit — see new SV option + per-type advisory notes
+- 🎯 Switch an entity to `passive_holding` with a VAT number → confirm amber Polysar warning fires
+- 🎯 Run classifier on a demo declaration with a mortgage-broker invoice → confirm RULE 36 + Versãofast citation in audit trail
+- 🟡 Consider: a DB CHECK constraint on entity_type now that the valid enum is stable (migration 019 — parkable)
+
+---
+
 **2026-04-20 (late afternoon)** — Stint 15 follow-up: frequency change propagation
 
 Diego's follow-up: "cuando subo una carta que modifica la periodicidad, se tiene que actualizar la periodicidad de la entidad — de manera automática o manual — y también cuando la carta NO es una VAT registration letter". Two gaps addressed:
