@@ -169,7 +169,7 @@ export async function POST(
     });
     const ccEmails = ccs.map(a => a.email!).filter(Boolean);
 
-    // Include the intermediary contact (JTC-type) as an additional CC
+    // Include the intermediary contact (the CSP that engaged us) as an additional CC
     // when present. The reviewer can remove it from the mailto before
     // sending.
     if (engagedVia?.engaged_via_contact_email

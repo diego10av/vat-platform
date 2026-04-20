@@ -171,11 +171,11 @@ export function EngagedViaCard({
       </div>
 
       <div className="space-y-3">
-        <Field label="Intermediary company" hint="e.g. JTC, Vistra, Circum">
+        <Field label="Intermediary company" hint="The CSP / fiduciary that put you on the file">
           <input
             value={draft.engaged_via_name ?? ''}
             onChange={(e) => setDraft({ ...draft, engaged_via_name: e.target.value || null })}
-            placeholder="e.g. JTC Luxembourg SA"
+            placeholder="Name of the intermediary company"
             className="w-full border border-border-strong rounded px-2 py-1.5 text-[12.5px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             autoFocus
           />
@@ -209,7 +209,7 @@ export function EngagedViaCard({
             value={draft.engaged_via_notes ?? ''}
             onChange={(e) => setDraft({ ...draft, engaged_via_notes: e.target.value || null })}
             rows={2}
-            placeholder="e.g. JTC handles all VAT queries. For invoice issues contact BlackRock HQ directly."
+            placeholder="e.g. Intermediary handles all VAT queries. For invoice issues, contact the end-client's HQ directly."
             className="w-full border border-border-strong rounded px-2 py-1.5 text-[12.5px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
           />
         </Field>

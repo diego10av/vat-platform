@@ -141,8 +141,16 @@ export default function ClientDetailPage() {
             )}
           </div>
           <div className="text-[12px] text-ink-muted mt-1 flex items-center gap-2 flex-wrap">
-            <KindBadge kind={client.kind} />
-            <span className="text-ink-faint">·</span>
+            {/* KindBadge now only surfaces for non-default kinds —
+                a vanilla end-client doesn't need a badge since that's
+                the implicit norm. CSP / Other are edge cases worth
+                calling out when they exist. */}
+            {client.kind !== 'end_client' && (
+              <>
+                <KindBadge kind={client.kind} />
+                <span className="text-ink-faint">·</span>
+              </>
+            )}
             <span>{entities.length} {entities.length === 1 ? 'entity' : 'entities'}</span>
             {client.vat_contact_country && (
               <>

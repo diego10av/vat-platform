@@ -248,32 +248,18 @@ export default function NewClientWizardPage() {
                 autoFocus
               />
             </Field>
-            <Field label="Relationship" hint="How you engage with this client">
-              <div className="grid grid-cols-3 gap-1.5">
-                <KindOption
-                  label="End client"
-                  hint="Beneficial owner you file for"
-                  active={client.kind === 'end_client'}
-                  onClick={() => setClient({ ...client, kind: 'end_client' })}
-                />
-                <KindOption
-                  label="CSP"
-                  hint="Corporate service provider"
-                  active={client.kind === 'csp'}
-                  onClick={() => setClient({ ...client, kind: 'csp' })}
-                />
-                <KindOption
-                  label="Other"
-                  hint="Law firm, accountant, internal"
-                  active={client.kind === 'other'}
-                  onClick={() => setClient({ ...client, kind: 'other' })}
-                />
-              </div>
-            </Field>
+            {/* The Relationship chip picker (End client / CSP / Other)
+                was removed here in stint 15 per Diego's feedback: with
+                the "Engaged through an intermediary" checkbox below, the
+                three-way picker was redundant and introduced a decision
+                at the point of creation that 95%+ of the time is
+                "End client". We default kind = 'end_client' silently.
+                Edge cases (your CSP is actually your direct customer,
+                or the client is an internal test record) can be
+                retyped from /clients/[id] → Edit → Advanced. */}
 
-            {/* ─── Engaged-via intermediary (shown only for end clients) ─── */}
-            {client.kind === 'end_client' && (
-              <div className="mt-5 pt-5 border-t border-divider">
+            {/* ─── Engaged-via intermediary ─── */}
+            <div className="mt-4 pt-4 border-t border-divider">
                 <label className="flex items-start gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -295,11 +281,11 @@ export default function NewClientWizardPage() {
 
                 {engagedViaOpen && (
                   <div className="mt-4 ml-6 space-y-3">
-                    <Field label="Intermediary company" hint="e.g. JTC, Vistra, Circum">
+                    <Field label="Intermediary company" hint="The CSP / fiduciary that put you on the file">
                       <input
                         value={client.engaged_via_name}
                         onChange={(e) => setClient({ ...client, engaged_via_name: e.target.value })}
-                        placeholder="e.g. JTC Luxembourg SA"
+                        placeholder="Name of the intermediary company"
                         className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                     </Field>
@@ -333,8 +319,7 @@ export default function NewClientWizardPage() {
                     </div>
                   </div>
                 )}
-              </div>
-            )}
+            </div>
           </div>
 
           {/* Primary VAT contact */}
@@ -650,24 +635,9 @@ function StepDot({
   );
 }
 
-function KindOption({
-  label, hint, active, onClick,
-}: { label: string; hint: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={[
-        'h-auto py-2 px-3 rounded border text-left transition-colors',
-        active
-          ? 'bg-brand-50 text-brand-700 border-brand-200'
-          : 'bg-surface text-ink-soft border-border hover:bg-surface-alt',
-      ].join(' ')}
-    >
-      <div className="text-[12.5px] font-semibold">{label}</div>
-      <div className="text-[10.5px] text-ink-muted mt-0.5">{hint}</div>
-    </button>
-  );
-}
+// KindOption was used for the End client / CSP / Other chip picker that
+// stint 15 removed. Kept the function out-of-file to keep the diff
+// tiny; delete it in a future cleanup pass.
 
 function VatStatusOption({
   label, hint, active, onClick,
