@@ -197,30 +197,81 @@ Draft the email per your instructions.`;
     subject = `VAT declaration — ${decl.entity_name} — ${decl.year} ${decl.period}`;
   }
 
-  // Approvers — same lookup as the share-link endpoint. Tolerant of
-  // migration 005 not applied (returns empty list).
+  // Approvers — same lookup as the share-link endpoint. Post-migration-
+  // 016 we respect approver_role (approver | cc | both) when deciding
+  // To: vs Cc:. Also pulls the engaged-via intermediary contact when
+  // present + adds them to Cc automatically.
   interface Approver {
     id: string; name: string; email: string | null;
     role: string | null; organization: string | null;
     country: string | null; approver_type: 'client' | 'csp' | 'other';
+    approver_role: 'approver' | 'cc' | 'both';
     is_primary: boolean;
   }
   let approvers: Approver[] = [];
   try {
     approvers = await query<Approver>(
       `SELECT a.id, a.name, a.email, a.role, a.organization,
-              a.country, a.approver_type, a.is_primary
+              a.country, a.approver_type, a.approver_role, a.is_primary
          FROM entity_approvers a
          JOIN declarations d ON a.entity_id = d.entity_id
         WHERE d.id = $1
         ORDER BY a.is_primary DESC, a.sort_order ASC`,
       [declaration_id],
     );
-  } catch {
-    // schema missing — approvers stays empty
+  } catch (err) {
+    // schema variants: pre-migration-016 lacks approver_role → retry.
+    const msg = (err as { message?: string } | null)?.message ?? '';
+    if (/column.*approver_role.*does not exist/i.test(msg)) {
+      try {
+        const legacy = await query<Omit<Approver, 'approver_role'>>(
+          `SELECT a.id, a.name, a.email, a.role, a.organization,
+                  a.country, a.approver_type, a.is_primary
+             FROM entity_approvers a
+             JOIN declarations d ON a.entity_id = d.entity_id
+            WHERE d.id = $1
+            ORDER BY a.is_primary DESC, a.sort_order ASC`,
+          [declaration_id],
+        );
+        approvers = legacy.map(a => ({ ...a, approver_role: 'approver' as const }));
+      } catch {
+        // fall through with empty
+      }
+    }
+    // else: relation missing — approvers stays empty.
   }
-  const primary = approvers.find(a => a.is_primary && a.email) ?? null;
-  const ccs = approvers.filter(a => !a.is_primary && a.email);
+
+  let engagedViaEmail: string | null = null;
+  try {
+    const row = await queryOne<{ engaged_via_contact_email: string | null }>(
+      `SELECT c.engaged_via_contact_email
+         FROM clients c
+         JOIN entities e ON e.client_id = c.id
+         JOIN declarations d ON d.entity_id = e.id
+        WHERE d.id = $1`,
+      [declaration_id],
+    );
+    engagedViaEmail = row?.engaged_via_contact_email ?? null;
+  } catch { /* ignore */ }
+
+  const withEmail = approvers.filter(a => !!a.email);
+  const primary = withEmail.find(a =>
+    a.is_primary && (a.approver_role === 'approver' || a.approver_role === 'both'),
+  )
+    ?? withEmail.find(a => a.is_primary)
+    ?? withEmail.find(a => a.approver_role === 'approver' || a.approver_role === 'both')
+    ?? withEmail[0]
+    ?? null;
+
+  const ccs = withEmail.filter(a => {
+    if (primary && a.id === primary.id) return false;
+    return a.approver_role === 'cc' || a.approver_role === 'both';
+  });
+  const ccEmails = ccs.map(a => a.email!).filter(Boolean);
+
+  if (engagedViaEmail && engagedViaEmail !== primary?.email && !ccEmails.includes(engagedViaEmail)) {
+    ccEmails.push(engagedViaEmail);
+  }
 
   return NextResponse.json({
     subject,
@@ -230,6 +281,6 @@ Draft the email per your instructions.`;
     observations_data: observations,
     approvers,
     primary_email: primary?.email ?? null,
-    cc_emails: ccs.map(a => a.email!).filter(Boolean),
+    cc_emails: ccEmails,
   });
 }

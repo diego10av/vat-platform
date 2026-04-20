@@ -229,12 +229,17 @@ export default function NewClientWizardPage() {
 
       {step === 1 && (
         <div className="space-y-5">
-          {/* Client name + type */}
+          {/* Identity */}
           <div className="bg-surface border border-border rounded-lg p-5">
-            <h3 className="text-[13px] font-semibold text-ink mb-4 flex items-center gap-2">
-              <Building2Icon size={15} className="text-brand-500" /> Client
-            </h3>
-            <Field label="Client name" required>
+            <div className="flex items-center gap-2 mb-1">
+              <Building2Icon size={15} className="text-brand-500" />
+              <h3 className="text-[13.5px] font-semibold text-ink">Identity</h3>
+            </div>
+            <p className="text-[11.5px] text-ink-muted mb-4 leading-relaxed">
+              Legal name as it appears on AED correspondence + the relationship
+              to your firm.
+            </p>
+            <Field label="Legal name" required>
               <input
                 value={client.name}
                 onChange={(e) => setClient({ ...client, name: e.target.value })}
@@ -243,7 +248,7 @@ export default function NewClientWizardPage() {
                 autoFocus
               />
             </Field>
-            <Field label="Type" hint="Who are they to cifra?">
+            <Field label="Relationship" hint="How you engage with this client">
               <div className="grid grid-cols-3 gap-1.5">
                 <KindOption
                   label="End client"
@@ -334,12 +339,17 @@ export default function NewClientWizardPage() {
 
           {/* Primary VAT contact */}
           <div className="bg-surface border border-border rounded-lg p-5">
-            <h3 className="text-[13px] font-semibold text-ink mb-1 flex items-center gap-2">
-              <UserIcon size={15} className="text-brand-500" /> Primary VAT contact
-            </h3>
-            <p className="text-[11.5px] text-ink-muted mb-4">
-              The person to reach for any VAT matter. Per-entity approvers
-              can be set later — this is the default for the whole client.
+            <div className="flex items-center gap-2 mb-1">
+              <UserIcon size={15} className="text-brand-500" />
+              <h3 className="text-[13.5px] font-semibold text-ink">Main point of contact</h3>
+            </div>
+            <p className="text-[11.5px] text-ink-muted mb-4 leading-relaxed">
+              Who you write to for anything VAT-related on this client. Defaults
+              to the approver on every new entity you create under this client
+              (you can add per-entity overrides later).
+              {engagedViaOpen && client.engaged_via_contact_name && (
+                <> When an intermediary is set, it&rsquo;s usually that contact rather than someone at the end client directly.</>
+              )}
             </p>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Name">

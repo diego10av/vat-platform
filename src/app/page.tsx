@@ -240,13 +240,27 @@ export default function Home() {
           })}
         </p>
 
-        {/* Quick actions — the two things a reviewer does most often when
-            creating new records. "Add client" moved to the sidebar + ⌘K
-            + onboarding banner (happens rarely, once per new client).
-            Frequency bias over aesthetic symmetry. */}
-        <div className="mt-5 flex flex-wrap items-center gap-2">
+        {/* Quick actions — Linear-style command-first hierarchy.
+            Prominent command-palette pill + two concrete CTAs in a
+            secondary row. Design intent: the "Today's focus" banner
+            below is where the reviewer's eye lands; these quick
+            actions are for the times when you KNOW what you want
+            to do next. */}
+        <div className="mt-6 flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => {
+              // Trigger the same ⌘K the SearchBar listens for.
+              window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
+            }}
+            className="group inline-flex items-center gap-2 h-9 pl-3 pr-2.5 rounded-md bg-ink text-white text-[12.5px] font-medium hover:bg-ink-soft transition-colors"
+            title="Open command palette — search + actions"
+          >
+            Search or run a command
+            <kbd className="ml-1 inline-flex items-center h-5 px-1.5 rounded bg-white/15 font-mono text-[10.5px] text-white/90 border border-white/20">⌘K</kbd>
+          </button>
+          <span className="text-ink-faint text-[11px] px-1">·</span>
           <Button
-            variant="primary"
+            variant="secondary"
             size="md"
             icon={<PlusIcon size={14} />}
             onClick={() => setNewDeclOpen(true)}
@@ -256,11 +270,6 @@ export default function Home() {
           <Link href="/aed-letters">
             <Button variant="secondary" size="md" icon={<InboxIcon size={14} />}>Upload AED letter</Button>
           </Link>
-          <span className="text-[10.5px] text-ink-muted ml-2 hidden md:inline-flex items-center gap-1.5">
-            or press
-            <kbd className="inline-flex items-center h-5 px-1.5 rounded bg-surface-alt border border-border font-mono text-[10px]">⌘K</kbd>
-            for any other action
-          </span>
         </div>
       </header>
 

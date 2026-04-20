@@ -69,6 +69,7 @@ to enterprise / compliance-SaaS standards.
 | D4 | **Scheduled purge job** — cron that enforces the retention policy; dry-run mode + notification preview | L |
 | D5 | **Delete reason / justification** — free-text field required when cascade-deleting a client with > 10 entities | S |
 | D6 | **Auto-snapshot before delete** — dumps JSON of the target + cascaded children to a cold-storage bucket for 30 days | M |
+| D7b | **Intermediary as first-class entity** — today `clients.engaged_via_*` is flat metadata per client. When a firm routes 3+ clients through the same CSP (e.g. JTC), updating JTC's contact means editing every client. Migrate to an `intermediaries` table with FK from `clients`. Data migration: extract distinct engaged_via_name rows, create intermediary records, repoint FKs. UI: "Intermediaries" section in /settings with per-intermediary contact sync across all linked clients. | L |
 
 ### 🟡 P2 — Fase 3 (before Big 4 / ALFI presentation)
 | # | Item | Effort |

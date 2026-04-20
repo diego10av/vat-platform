@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { ContactsCard } from '@/components/clients/ContactsCard';
+import { EngagedViaCard } from '@/components/clients/EngagedViaCard';
 import { describeApiError, formatUiError } from '@/lib/ui-errors';
 import { CascadeDeleteModal } from '@/components/delete/CascadeDeleteModal';
 
@@ -36,6 +37,11 @@ interface Client {
   address: string | null;
   website: string | null;
   notes: string | null;
+  engaged_via_name: string | null;
+  engaged_via_contact_name: string | null;
+  engaged_via_contact_email: string | null;
+  engaged_via_contact_role: string | null;
+  engaged_via_notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -120,8 +126,20 @@ export default function ClientDetailPage() {
 
       {/* Header */}
       <div className="mb-5 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight">{client.name}</h1>
+        <div className="min-w-0">
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <h1 className="text-[22px] font-semibold tracking-tight">{client.name}</h1>
+            {client.engaged_via_name && (
+              <a
+                href="#engaged-via"
+                className="inline-flex items-center gap-1 text-[11.5px] text-ink-soft bg-amber-50 border border-amber-200 rounded px-2 py-0.5 hover:bg-amber-100 transition-colors"
+                title="This client is engaged through an intermediary — click to see details"
+              >
+                <span className="text-ink-muted">via</span>
+                <span className="font-semibold text-ink">{client.engaged_via_name}</span>
+              </a>
+            )}
+          </div>
           <div className="text-[12px] text-ink-muted mt-1 flex items-center gap-2 flex-wrap">
             <KindBadge kind={client.kind} />
             <span className="text-ink-faint">·</span>
@@ -162,6 +180,22 @@ export default function ClientDetailPage() {
         {/* Left: profile */}
         <div className="col-span-2 space-y-4">
           <ProfileCard client={client} onUpdated={load} />
+
+          {/* Engaged-via intermediary — visible only when the kind is
+              'end_client'. Empty-state is a slim "Add intermediary"
+              affordance; populated-state is a full card with edit. */}
+          <EngagedViaCard
+            clientId={client.id}
+            clientKind={client.kind}
+            initial={{
+              engaged_via_name: client.engaged_via_name,
+              engaged_via_contact_name: client.engaged_via_contact_name,
+              engaged_via_contact_email: client.engaged_via_contact_email,
+              engaged_via_contact_role: client.engaged_via_contact_role,
+              engaged_via_notes: client.engaged_via_notes,
+            }}
+            onSaved={() => { void load(); }}
+          />
 
           {/* Multi-contact roster — stint 11 (2026-04-19). */}
           <ContactsCard clientId={client.id} />

@@ -94,6 +94,22 @@ Things worth remembering but not actionable yet:
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
 
+**2026-04-20 (mid-day extras)** — Stint 14.5: pulled on every "debatable" thread from the self-critique
+
+After the stint 14 screen-by-screen review, Diego asked me to (a) ship the intermediary display on /clients/[id], (b) close the approver_role downstream gap, (c) also execute the "debatable value" items I'd flagged rather than leave them. All done in one commit.
+
+**Shipped**:
+- ✅ **Intermediary visible + editable** on /clients/[id]: header badge *"via JTC"* + new `EngagedViaCard` between Profile and Contacts. Uses `useDraft` so edits are auto-saved.
+- ✅ **Approver_role downstream wiring**: `/api/declarations/[id]/share-link` and `/api/agents/draft-email` now distinguish `approver_role ∈ {approver,cc,both}` when building To: vs Cc:. Plus: intermediary contact (`engaged_via_contact_email`) is automatically added to Cc when present. Legacy-schema fallback in both endpoints so the system stays alive during partial migrations.
+- ✅ **Unified creation UX**: `/declarations` no longer has an inline form. Both the home CTA and the list-page "New declaration" button open the same `NewDeclarationModal`. Single source of truth for "create declaration".
+- ✅ **Home CTA rethought**: swapped from 2 symmetric buttons to Linear-style. Prominent dark pill *"Search or run a command ⌘K"* leads. Secondary row has New declaration + Upload AED letter. Signals to new users that ⌘K is first-class.
+- ✅ **New Client copy polish**: section titles upgraded ("Client" → "Identity", "Primary VAT contact" → "Main point of contact"). Each section now has a 1-sentence lead explaining what it captures. "Type" relabeled to "Relationship" with hint "How you engage with this client".
+
+**ROADMAP Fase 2 addition**:
+- D7b: Intermediary as first-class entity. Today it's flat metadata per client (`clients.engaged_via_*`). When the same CSP (e.g. JTC) routes 3+ of your clients, you end up duplicating their contact info. Migrate to an `intermediaries` table + FK when that pain materialises. Data-migration recipe included in the ROADMAP entry.
+
+---
+
 **2026-04-20 (mid-morning)** — Thirteenth stint: deletion + retention maturity (Fase 1 of the Veeva-grade roadmap)
 
 Context: after the cascade-delete shipped, Diego asked "¿así lo tienen los
