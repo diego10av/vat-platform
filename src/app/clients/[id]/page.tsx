@@ -153,6 +153,13 @@ export default function ClientDetailPage() {
             <Trash2Icon size={13} />
           </button>
           <Link
+            href={`/clients/${client.id}/bulk-import`}
+            className="h-8 px-3 rounded-md border border-border-strong text-[12px] font-medium text-ink-soft hover:bg-surface-alt hover:text-ink inline-flex items-center gap-1.5"
+            title="Paste a CSV/TSV and bulk-create entities under this client"
+          >
+            Bulk import
+          </Link>
+          <Link
             href={{ pathname: '/entities/new', query: { client_id: client.id } }}
             className="h-8 px-3 rounded-md bg-brand-500 text-white text-[12px] font-semibold hover:bg-brand-600 inline-flex items-center gap-1.5"
           >
