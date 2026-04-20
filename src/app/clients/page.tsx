@@ -4,13 +4,10 @@
 // /clients — the new top-level view. One row per client; each row
 // expands to show the entities that hang off it + their lifecycle.
 //
-// Applies the "accionable-first" principle (PROTOCOLS §11): the two
-// KPIs at the top (total clients, pending VAT registrations) are both
-// clickable and change what you do next. No regime breakdown, no
-// vanity counters.
+// Stint 12: URL-synced filters + sort dropdown + pagination.
 // ════════════════════════════════════════════════════════════════════════
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -18,6 +15,9 @@ import {
   AlertTriangleIcon, CircleIcon,
 } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { useListState, paginate } from '@/lib/use-list-state';
+import { ListFooter } from '@/components/ui/ListFooter';
 
 interface Entity {
   id: string;
@@ -47,20 +47,45 @@ interface Client {
   updated_at: string;
 }
 
+const SORT_KEYS = ['name', 'entities', 'pending', 'updated'] as const;
+type ClientSortKey = typeof SORT_KEYS[number];
+const FILTERS = ['all', 'end_client', 'csp', 'other'] as const;
+type ClientFilter = typeof FILTERS[number];
+const PAGE_SIZES = [25, 50, 100, 250] as const;
+
 export default function ClientsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ClientsContent />
+    </Suspense>
+  );
+}
+
+function ClientsContent() {
   const router = useRouter();
   const [clients, setClients] = useState<Client[] | null>(null);
   const [schemaMissing, setSchemaMissing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState('');
-  const [kindFilter, setKindFilter] = useState<'all' | Client['kind']>('all');
+
+  const list = useListState<ClientSortKey, ClientFilter>({
+    basePath: '/clients',
+    sortKeys: SORT_KEYS,
+    defaultSort: 'name',
+    defaultDir: 'asc',
+    filterValues: FILTERS,
+    defaultFilter: 'all',
+    pageSizes: PAGE_SIZES,
+    defaultPageSize: 50,
+  });
 
   const load = useCallback(async () => {
     setError(null);
     try {
+      // Server-side filters (q + kind) are still applied via the API
+      // because the backend index helps at scale.
       const sp = new URLSearchParams();
-      if (q.trim()) sp.set('q', q.trim());
-      if (kindFilter !== 'all') sp.set('kind', kindFilter);
+      if (list.q.trim()) sp.set('q', list.q.trim());
+      if (list.filter !== 'all') sp.set('kind', list.filter);
       const res = await fetch(`/api/clients${sp.toString() ? '?' + sp.toString() : ''}`);
       const data = await res.json();
       if (res.status === 501 && data?.error?.code === 'schema_missing') {
@@ -79,7 +104,7 @@ export default function ClientsPage() {
       setError(e instanceof Error ? e.message : 'Network error.');
       setClients([]);
     }
-  }, [q, kindFilter]);
+  }, [list.q, list.filter]);
 
   useEffect(() => {
     const t = setTimeout(load, 180);
@@ -90,6 +115,18 @@ export default function ClientsPage() {
 
   const totalClients = clients.length;
   const pendingVat = clients.reduce((s, c) => s + (c.pending_registration_count || 0), 0);
+
+  const sorted = [...clients].sort((a, b) => {
+    const mul = list.dir === 'asc' ? 1 : -1;
+    switch (list.sort) {
+      case 'entities': return mul * (a.entity_count - b.entity_count);
+      case 'pending':  return mul * (a.pending_registration_count - b.pending_registration_count);
+      case 'updated':  return mul * (new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+      case 'name':
+      default:         return mul * a.name.localeCompare(b.name);
+    }
+  });
+  const page = paginate(sorted, list.page, list.pageSize);
 
   return (
     <div>
@@ -155,56 +192,103 @@ export default function ClientsPage() {
         </div>
       )}
 
-      {/* Filters */}
+      {/* Filters + sort */}
       {!schemaMissing && (
         <div className="mb-3 flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 max-w-xs">
             <SearchIcon size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted" />
             <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
+              value={list.q}
+              onChange={(e) => list.setQ(e.target.value)}
               placeholder="Search clients"
               className="w-full h-8 pl-8 pr-3 text-[12.5px] border border-border-strong rounded-md bg-surface focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           </div>
-          <KindChip label="All"       active={kindFilter === 'all'}        onClick={() => setKindFilter('all')} />
-          <KindChip label="End client" active={kindFilter === 'end_client'} onClick={() => setKindFilter('end_client')} />
-          <KindChip label="CSP"       active={kindFilter === 'csp'}        onClick={() => setKindFilter('csp')} />
-          <KindChip label="Other"     active={kindFilter === 'other'}      onClick={() => setKindFilter('other')} />
+          <KindChip label="All"       active={list.filter === 'all'}        onClick={() => list.setFilter('all')} />
+          <KindChip label="End client" active={list.filter === 'end_client'} onClick={() => list.setFilter('end_client')} />
+          <KindChip label="CSP"       active={list.filter === 'csp'}        onClick={() => list.setFilter('csp')} />
+          <KindChip label="Other"     active={list.filter === 'other'}      onClick={() => list.setFilter('other')} />
+
+          {/* Sort dropdown — client page uses cards not tables, so no
+              sortable headers. Dropdown is the equivalent. */}
+          <div className="ml-auto flex items-center gap-1.5 text-[11.5px] text-ink-muted">
+            Sort
+            <select
+              value={`${list.sort}:${list.dir}`}
+              onChange={e => {
+                const [s, d] = e.target.value.split(':') as [ClientSortKey, 'asc' | 'desc'];
+                if (s !== list.sort) list.toggleSort(s);
+                if (d !== list.dir) list.toggleSort(s);
+              }}
+              className="h-8 px-2 border border-border-strong rounded text-[11.5px] text-ink bg-surface"
+            >
+              <option value="name:asc">Name A→Z</option>
+              <option value="name:desc">Name Z→A</option>
+              <option value="entities:desc">Most entities first</option>
+              <option value="entities:asc">Fewest entities first</option>
+              <option value="pending:desc">Most pending registrations</option>
+              <option value="updated:desc">Recently updated</option>
+            </select>
+          </div>
         </div>
       )}
 
       {/* List */}
-      {!schemaMissing && clients.length === 0 && (q || kindFilter !== 'all') && (
-        <div className="bg-surface border border-border rounded-lg p-8 text-center">
-          <div className="text-[13px] text-ink-muted">No clients match your filter.</div>
+      {!schemaMissing && clients.length === 0 && (list.q || list.filter !== 'all') && (
+        <div className="bg-surface border border-border rounded-lg">
+          <EmptyState
+            illustration="empty_search"
+            title="No clients match your filter"
+            description="Try a different search or clear the filter to see the full list."
+            action={
+              <button
+                onClick={() => { list.setQ(''); list.setFilter('all'); }}
+                className="h-9 px-4 rounded-md border border-border-strong text-[12.5px] font-medium text-ink-soft hover:text-ink hover:bg-surface-alt"
+              >
+                Clear filters
+              </button>
+            }
+          />
         </div>
       )}
 
-      {!schemaMissing && clients.length === 0 && !q && kindFilter === 'all' && (
-        <div className="bg-surface border border-border rounded-lg p-10 text-center">
-          <div className="w-12 h-12 mx-auto rounded-lg bg-brand-50 text-brand-700 inline-flex items-center justify-center mb-3">
-            <Building2Icon size={18} />
-          </div>
-          <div className="text-[14px] font-semibold text-ink">No clients yet</div>
-          <div className="text-[12px] text-ink-muted mt-1.5 max-w-sm mx-auto leading-relaxed">
-            Start by creating your first client. After that, you can add the
-            Luxembourg entities that belong to them.
-          </div>
-          <button
-            onClick={() => router.push('/clients/new')}
-            className="mt-5 h-9 px-4 rounded-md bg-brand-500 text-white text-[12.5px] font-semibold hover:bg-brand-600 inline-flex items-center gap-1.5"
-          >
-            <PlusIcon size={14} /> Create first client
-          </button>
+      {!schemaMissing && clients.length === 0 && !list.q && list.filter === 'all' && (
+        <div className="bg-surface border border-border rounded-lg">
+          <EmptyState
+            illustration="empty_clients"
+            title="No clients yet"
+            description="Start by creating your first client. After that, you can add the Luxembourg entities that belong to them."
+            action={
+              <button
+                onClick={() => router.push('/clients/new')}
+                className="h-9 px-4 rounded-md bg-brand-500 text-white text-[12.5px] font-semibold hover:bg-brand-600 inline-flex items-center gap-1.5"
+              >
+                <PlusIcon size={14} /> Create first client
+              </button>
+            }
+          />
         </div>
       )}
 
       {!schemaMissing && clients.length > 0 && (
-        <div className="space-y-2">
-          {clients.map((c) => (
-            <ClientCard key={c.id} client={c} />
-          ))}
+        <div className="bg-surface border border-border rounded-lg overflow-hidden">
+          <div className="p-2 space-y-2">
+            {page.visible.map((c) => (
+              <ClientCard key={c.id} client={c} />
+            ))}
+          </div>
+          <ListFooter
+            start={page.start}
+            end={page.end}
+            total={page.total}
+            allTotal={clients.length}
+            page={page.page}
+            totalPages={page.totalPages}
+            pageSize={list.pageSize}
+            pageSizes={PAGE_SIZES}
+            onPage={list.setPage}
+            onPageSize={list.setPageSize}
+          />
         </div>
       )}
     </div>
