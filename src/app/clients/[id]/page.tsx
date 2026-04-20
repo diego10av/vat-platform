@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { ContactsCard } from '@/components/clients/ContactsCard';
+import { describeApiError, formatUiError } from '@/lib/ui-errors';
 
 interface Client {
   id: string;
@@ -67,11 +68,12 @@ export default function ClientDetailPage() {
   const load = useCallback(async () => {
     try {
       const res = await fetch(`/api/clients/${id}`);
-      const body = await res.json();
       if (!res.ok) {
-        setError(body?.error?.message ?? 'Failed to load client.');
+        const e = await describeApiError(res, 'Could not load this client.');
+        setError(formatUiError(e));
         return;
       }
+      const body = await res.json();
       setData(body as ClientData);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error.');
@@ -85,9 +87,9 @@ export default function ClientDetailPage() {
     if (!confirm(`Archive ${data.client.name}? This client can't have active entities — move or archive them first if needed.`)) return;
     try {
       const res = await fetch(`/api/clients/${id}`, { method: 'DELETE' });
-      const body = await res.json();
       if (!res.ok) {
-        setError(body?.error?.message ?? 'Could not archive.');
+        const e = await describeApiError(res, `Could not archive ${data.client.name}.`);
+        setError(formatUiError(e));
         return;
       }
       router.push('/clients');

@@ -15,6 +15,7 @@ import {
   PlusIcon, PencilIcon, Trash2Icon, StarIcon, CheckIcon, XIcon,
   MailIcon, PhoneIcon,
 } from 'lucide-react';
+import { describeApiError, formatUiError } from '@/lib/ui-errors';
 
 export interface ClientContact {
   id: string;
@@ -40,11 +41,12 @@ export function ContactsCard({ clientId }: { clientId: string }) {
     try {
       setLoading(true);
       const res = await fetch(`/api/clients/${clientId}/contacts`);
-      const body = await res.json();
       if (!res.ok) {
-        setError(body?.error?.message ?? 'Failed to load contacts.');
+        const e = await describeApiError(res, 'Could not load the contacts for this client.');
+        setError(formatUiError(e));
         return;
       }
+      const body = await res.json();
       setContacts(body.contacts ?? []);
       setError(null);
     } catch (e) {
@@ -284,9 +286,9 @@ function ContactForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(draft),
       });
-      const body = await res.json();
       if (!res.ok) {
-        setErr(body?.error?.message ?? 'Could not save.');
+        const e = await describeApiError(res, editing ? 'Could not update this contact.' : 'Could not add this contact.');
+        setErr(formatUiError(e));
         return;
       }
       onSaved();

@@ -360,8 +360,8 @@ export default function DeclarationDetailPage() {
       body: JSON.stringify({ status: newStatus, ...(extra || {}) }),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      alert(`Could not change status: ${err.error || 'unknown error'}`);
+      const e = await describeApiError(res, 'Could not change status.');
+      toast.error(e.message, e.hint);
       return;
     }
     const result = await res.json();
@@ -659,9 +659,8 @@ export default function DeclarationDetailPage() {
                     try {
                       const res = await fetch(`/api/declarations/${id}`, { method: 'DELETE' });
                       if (!res.ok) {
-                        const body = await res.json().catch(() => ({}));
-                        const msg: string = (body?.message || body?.error || 'Could not delete.') as string;
-                        toast.error(msg);
+                        const e = await describeApiError(res, 'Could not delete the declaration.');
+                        toast.error(e.message, e.hint);
                         return;
                       }
                       toast.success('Declaration deleted.');
