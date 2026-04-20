@@ -187,6 +187,25 @@ clients → entities → declarations → invoices → invoice_lines
 - ✅ 10 migrations applied, RLS on every public table.
 - ✅ Governance: PROTOCOLS §13 living-docs custody (with deeply-held-position checkpoint).
 
+### Shipped in stint 12 (2026-04-20 pre-dawn)
+Executed the Gassner-audit punch list (`docs/gassner-audit-2026-04-19.md`) to zero:
+- ✅ Reopen + Un-file confirmations (approved / filed / paid → review
+  with full AED-rectification copy, lifecycle extended, PATCH clears
+  forward-state artefacts).
+- ✅ Entity edit form (was API-only, now has inline edit UI on
+  /entities/[id]).
+- ✅ Human error messages — ERROR_MAP humaniser + describeApiError
+  parses 3 envelope shapes + formatUiError auto-humanises. 40+ codes
+  translated.
+- ✅ Legal tooltips inline — migration 014 persists
+  classification_reason. TreatmentBadge rich hover popover
+  highlights CJEU / LTVA / Directive / Circulaire references.
+- ✅ ⌘K command palette — 13 action verbs alongside search.
+- ✅ Home v2 "Today's focus" banner + role-aware greeting.
+- ✅ Bulk entity import via CSV/TSV paste.
+- ✅ Declarations list URL-persistent filters + column sort +
+  pagination (25/50/100/250).
+
 ### Shipped in stint 11 (2026-04-19 overnight)
 - ✅ Classification: independent directors (natural = OUT_SCOPE per
   C-288/22 TP, legal = taxable + CONTESTED flag per AED Circ. 781-2),
