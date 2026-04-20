@@ -52,6 +52,8 @@ interface AedLetter {
   summary: string | null;
 }
 
+type Role = 'admin' | 'reviewer' | 'junior' | 'client';
+
 export default function Home() {
   const router = useRouter();
   const [entities, setEntities] = useState<Entity[] | null>(null);
@@ -61,12 +63,16 @@ export default function Home() {
   const [onboardingDismissed, setOnboardingDismissed] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
+  const [role, setRole] = useState<Role>('admin');
 
   // Read the dismiss flag once on mount. SSR-safe (client-only component).
   useEffect(() => {
     try {
       setOnboardingDismissed(localStorage.getItem(ONBOARDING_DISMISS_KEY) === '1');
     } catch { /* noop */ }
+    fetch('/api/auth/me').then(r => r.ok ? r.json() : null).then(data => {
+      if (data?.role) setRole(data.role as Role);
+    }).catch(() => { /* ok */ });
   }, []);
 
   useEffect(() => {
@@ -107,8 +113,20 @@ export default function Home() {
 
   const entityById = new Map(entities.map(e => [e.id, e]));
 
-  const greeting = getGreeting(now);
+  const greeting = getGreeting(now, role);
   const isFirstTime = entities.length === 0 && !onboardingDismissed;
+
+  // Today's focus: compute the single highest-leverage action the
+  // reviewer should take right now. The logic is pessimistic — we
+  // show the most urgent thing. Cascades priorities:
+  //   1. Overdue deadlines
+  //   2. AED urgent letters
+  //   3. Declarations in review (most loaded-up first)
+  //   4. Next upcoming deadline (< 7 days)
+  //   5. Empty-state suggestion
+  const focus = computeTodaysFocus({
+    overdue, aedUrgent, inReview, dueIn7, entitiesCount: entities.length,
+  });
 
   async function handleSeedDemo() {
     setSeedError(null);
@@ -194,7 +212,7 @@ export default function Home() {
       )}
 
       {/* ── Hero greeting + quick actions ───────────────────────────── */}
-      <header className="mb-8">
+      <header className="mb-6">
         <h1 className="text-[28px] font-bold text-ink tracking-tight leading-none" style={{ letterSpacing: '-0.02em' }}>
           {greeting}
         </h1>
@@ -218,6 +236,9 @@ export default function Home() {
           </Link>
         </div>
       </header>
+
+      {/* ── Today's focus banner — the single most-leveraged action ── */}
+      {!isFirstTime && <TodaysFocusBanner focus={focus} />}
 
       {/* ── Priority cards (attention + AED + overdue) ─────────────── */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
@@ -567,14 +588,136 @@ function buildPortfolioRows(entities: Entity[], declarations: Declaration[], dea
     .sort((a, b) => (a.deadline?.days_until ?? 9999) - (b.deadline?.days_until ?? 9999));
 }
 
-function getGreeting(now: Date): string {
-  // Reviewer-specific: defaults to "Diego" until we wire user profile
-  const name = 'Diego';
+function getGreeting(now: Date, role: Role): string {
+  const name =
+    role === 'junior' ? 'Associate' :
+    role === 'reviewer' ? 'Reviewer' :
+    'Diego';
   const h = now.getHours();
   if (h < 6)  return `Late night, ${name}`;
   if (h < 12) return `Good morning, ${name}`;
   if (h < 18) return `Good afternoon, ${name}`;
   return `Good evening, ${name}`;
+}
+
+// ─────────────────── Today's focus ───────────────────
+// Computes the single highest-leverage next action.
+
+type Focus =
+  | { tone: 'critical'; title: string; detail: string; href: string; cta: string }
+  | { tone: 'warning'; title: string; detail: string; href: string; cta: string }
+  | { tone: 'info'; title: string; detail: string; href: string; cta: string }
+  | { tone: 'empty'; title: string; detail: string; href: string; cta: string };
+
+function computeTodaysFocus({
+  overdue, aedUrgent, inReview, dueIn7, entitiesCount,
+}: {
+  overdue: DeadlineRow[];
+  aedUrgent: AedLetter[];
+  inReview: Declaration[];
+  dueIn7: DeadlineRow[];
+  entitiesCount: number;
+}): Focus {
+  if (overdue.length > 0) {
+    const d = overdue[0];
+    return {
+      tone: 'critical',
+      title: `Overdue: ${d.entity_name ?? 'entity'} · ${formatDate(d.due_date)}`,
+      detail: overdue.length > 1
+        ? `${overdue.length - 1} more filing${overdue.length === 2 ? '' : 's'} overdue. Start with the oldest.`
+        : 'This filing is past its AED deadline. Interest / penalties may accrue until filed.',
+      href: d.declaration_id ? `/declarations/${d.declaration_id}` : '/deadlines',
+      cta: d.declaration_status === 'approved' ? 'Complete filing' : 'Open declaration',
+    };
+  }
+  if (aedUrgent.length > 0) {
+    const a = aedUrgent[0];
+    return {
+      tone: 'critical',
+      title: `AED letter needs a response${a.deadline_date ? ` by ${formatDate(a.deadline_date)}` : ''}`,
+      detail: a.summary?.slice(0, 140) ?? 'Missing response deadline information — open the letter to read the full context.',
+      href: '/aed-letters',
+      cta: 'Open AED inbox',
+    };
+  }
+  if (inReview.length > 0) {
+    // Pick the one with the most work: highest vat_due.
+    const top = [...inReview].sort((a, b) => Number(b.vat_due || 0) - Number(a.vat_due || 0))[0];
+    return {
+      tone: 'warning',
+      title: `Review ${top.entity_name} · ${top.year} ${top.period}`,
+      detail: inReview.length > 1
+        ? `${inReview.length} declarations in review. Start here — approve to move them forward.`
+        : 'One declaration is waiting on your approval. Approve to transition it toward filing.',
+      href: `/declarations/${top.id}`,
+      cta: 'Open for review',
+    };
+  }
+  if (dueIn7.length > 0) {
+    const d = dueIn7[0];
+    return {
+      tone: 'info',
+      title: `Upcoming: ${d.entity_name ?? 'entity'} · ${formatDate(d.due_date)}`,
+      detail: `Filing due in ${d.days_until} day${d.days_until === 1 ? '' : 's'}. Start the declaration now to avoid end-of-period crunch.`,
+      href: d.declaration_id ? `/declarations/${d.declaration_id}` : '/declarations',
+      cta: d.declaration_id ? 'Open declaration' : 'Start declaration',
+    };
+  }
+  if (entitiesCount === 0) {
+    return {
+      tone: 'empty',
+      title: 'Your workspace is empty',
+      detail: 'Create your first client + entity to start preparing returns. The demo dataset is a good warm-up.',
+      href: '/clients/new',
+      cta: 'Create first client',
+    };
+  }
+  return {
+    tone: 'info',
+    title: 'Inbox is clear',
+    detail: 'No overdue, no AED, no declarations in review, no deadlines in the next 7 days. Use this window to start the next period\'s filings or review the classifier health.',
+    href: '/declarations',
+    cta: 'Open declarations',
+  };
+}
+
+function TodaysFocusBanner({ focus }: { focus: Focus }) {
+  const style = {
+    critical: 'border-danger-200 bg-gradient-to-br from-danger-50 via-surface to-surface',
+    warning: 'border-amber-200 bg-gradient-to-br from-amber-50 via-surface to-surface',
+    info: 'border-brand-100 bg-gradient-to-br from-brand-50/50 via-surface to-surface',
+    empty: 'border-border bg-surface',
+  }[focus.tone];
+  const badge = {
+    critical: 'bg-danger-500 text-white',
+    warning: 'bg-amber-500 text-white',
+    info: 'bg-brand-500 text-white',
+    empty: 'bg-ink-muted text-white',
+  }[focus.tone];
+  return (
+    <div className={`mb-6 rounded-xl border p-4 md:p-5 ${style}`}>
+      <div className="flex items-start gap-4">
+        <div className={`shrink-0 inline-flex items-center justify-center h-8 px-2.5 rounded-md text-[10.5px] font-semibold tracking-wide uppercase ${badge}`}>
+          Today's focus
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-[14.5px] font-semibold text-ink leading-tight">
+            {focus.title}
+          </h3>
+          <p className="text-[12.5px] text-ink-soft mt-1 leading-relaxed">
+            {focus.detail}
+          </p>
+        </div>
+        <Link
+          href={focus.href}
+          className="shrink-0 h-8 px-3.5 rounded-md bg-ink text-white text-[12px] font-semibold hover:bg-ink-soft inline-flex items-center gap-1.5"
+        >
+          {focus.cta}
+          <ArrowRightIcon size={12} />
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 function summarySentence({
