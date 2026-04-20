@@ -94,6 +94,27 @@ Things worth remembering but not actionable yet:
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
 
+**2026-04-20 (afternoon)** — Stint 15: VAT letter archive + client billing panel
+
+After the stint 14.5 self-critique cleanup, Diego asked for two new surfaces that both flow from "I want to remember what we agreed with this client, not just parse it once":
+
+1. **VAT registration letter storage + versioning.** Uploading during /entities/new or /clients/new now *keeps* the file in Supabase Storage (`entity-docs/<id>/…`) — it used to be parsed-and-discarded. On `/entities/[id]` an **OfficialDocumentsCard** lists the current letter + prior versions (superseded chain), opens each via short-lived signed URLs, and replaces via a single click. Re-uploading a newer letter runs the extractor again, computes a field-by-field diff vs. the live entity (name / VAT / matricule / RCS / address / type / regime / frequency), and opens a modal — **per-field opt-in**, reviewer authority preserved (Gassner). Other document kinds (articles, engagement letter, other) share the same storage surface but skip the diff flow.
+
+2. **Client billing panel.** Per-client fee schedule: monthly / quarterly / annual / annual-summary / VAT-registration (one-off) / ad-hoc-hourly rate + disbursement % (bps) + VAT-on-disbursement flag + currency + free-form notes. **Engagement letter upload** on top (stored at `client-billing/<id>/…`; replaceable; deletable; not versioned because last signed copy binds). **BillingCard** on `/clients/[id]` renders slim empty-state CTA / compact summary / full edit form.
+
+**Migrations applied**: 017 (`entity_official_documents` with self-FK `superseded_by`) and 018 (`client_billing` 1:1 with `clients`, cents-in-bigint, bps-in-integer, strict CHECK constraints).
+
+**New API surface**:
+- `POST/GET /api/entities/[id]/official-documents` (upload + list, optional `?history=true`)
+- `GET/DELETE /api/entities/[id]/official-documents/[docId]` (signed URL / delete)
+- `POST /api/entities/[id]/apply-vat-letter-diff` (whitelisted field patcher, per-column audit)
+- `GET/PUT /api/clients/[id]/billing`
+- `POST/GET/DELETE /api/clients/[id]/billing/engagement-letter`
+
+**Refactor**: extractor logic moved from `/api/entities/extract-vat-letter/route.ts` into shared `src/lib/vat-letter-extract.ts` so the persist endpoint and the preview endpoint use the same parser.
+
+---
+
 **2026-04-20 (mid-day extras)** — Stint 14.5: pulled on every "debatable" thread from the self-critique
 
 After the stint 14 screen-by-screen review, Diego asked me to (a) ship the intermediary display on /clients/[id], (b) close the approver_role downstream gap, (c) also execute the "debatable value" items I'd flagged rather than leave them. All done in one commit.

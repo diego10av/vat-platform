@@ -24,7 +24,7 @@ import {
   CheckIcon, ChevronLeftIcon, ChevronRightIcon, Loader2Icon,
   AlertTriangleIcon, Building2Icon, UserIcon,
 } from 'lucide-react';
-import { VatLetterUpload } from '@/components/entity/VatLetterUpload';
+import { VatLetterUpload, type ExtractedVatLetter } from '@/components/entity/VatLetterUpload';
 
 type Kind = 'end_client' | 'csp' | 'other';
 
@@ -97,6 +97,13 @@ export default function NewClientWizardPage() {
   const [savingClient, setSavingClient] = useState(false);
   const [savingEntity, setSavingEntity] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Stint 15: stash the VAT letter + its extracted fields so we can
+  // persist them via /api/entities/:id/official-documents once the
+  // entity has been created. Users wanted the letter stored, not
+  // just parsed-and-discarded.
+  const [vatLetterFile, setVatLetterFile] = useState<File | null>(null);
+  const [vatLetterFields, setVatLetterFields] = useState<ExtractedVatLetter | null>(null);
 
   async function saveClient(): Promise<string | null> {
     setSavingClient(true);
@@ -188,6 +195,29 @@ export default function NewClientWizardPage() {
         setError(data?.error?.message ?? data?.error ?? 'Failed to create entity.');
         return;
       }
+
+      // If the user uploaded a VAT letter to auto-fill the form, persist
+      // the file so it shows up on the entity detail page. We pass the
+      // already-extracted fields so we don't pay the extractor twice.
+      if (vatLetterFile && data.id) {
+        try {
+          const fd = new FormData();
+          fd.append('file', vatLetterFile);
+          fd.append('kind', 'vat_registration');
+          fd.append('skip_extract', 'true');
+          if (vatLetterFields) {
+            fd.append('extracted_fields', JSON.stringify(vatLetterFields));
+          }
+          await fetch(`/api/entities/${data.id}/official-documents`, {
+            method: 'POST',
+            body: fd,
+          });
+        } catch {
+          // Non-blocking — the entity is saved; the user can re-upload
+          // the letter from /entities/[id] if this failed.
+        }
+      }
+
       router.push(`/entities/${data.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error.');
@@ -425,7 +455,7 @@ export default function NewClientWizardPage() {
               </h3>
               <VatLetterUpload
                 compact
-                onExtracted={(f) => {
+                onExtracted={(f, file) => {
                   setEntity((prev) => ({
                     ...prev,
                     name: f.name ?? prev.name,
@@ -437,6 +467,8 @@ export default function NewClientWizardPage() {
                     frequency: f.frequency === 'yearly' ? 'annual'
                                : f.frequency ?? prev.frequency,
                   }));
+                  setVatLetterFile(file);
+                  setVatLetterFields(f);
                 }}
               />
             </div>

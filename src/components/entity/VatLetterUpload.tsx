@@ -5,9 +5,14 @@
 // Haiku, return the structured fields for the caller to apply to its
 // form state.
 //
-// Stint 14 (2026-04-20). Per Diego: "yo te subo la VAT Registration
-// Letter y tú ya absorbes de ahí toda la información posible, y lo que
-// quede manual ya lo meto yo".
+// Stint 14 (2026-04-20) — first version, extraction only.
+// Stint 15 (2026-04-20) — caller can now receive the raw File so it
+// can persist the letter via POST /api/entities/:id/official-documents
+// after the entity is created (for /entities/new) or immediately
+// (for re-uploads on /entities/:id).
+//
+// Per Diego: "esa carta se guardara, porque está bien tenerla a mano
+// para poder verificar…"
 // ════════════════════════════════════════════════════════════════════════
 
 import { useRef, useState } from 'react';
@@ -30,10 +35,20 @@ export interface ExtractedVatLetter {
 export function VatLetterUpload({
   onExtracted,
   compact,
+  label,
 }: {
-  onExtracted: (fields: ExtractedVatLetter) => void;
+  /**
+   * Called with the extracted fields AND the raw File the user picked.
+   * The caller can stash the File and upload it to the official-documents
+   * endpoint once an entity id exists (the /entities/new flow), or upload
+   * immediately on an existing entity.
+   */
+  onExtracted: (fields: ExtractedVatLetter, file: File) => void;
   /** When true, render as a slim inline button (for use inside a form header). */
   compact?: boolean;
+  /** Override the button label; useful on the entity detail page where
+   *  the wording is "Replace letter" rather than "Auto-fill". */
+  label?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -60,13 +75,17 @@ export function VatLetterUpload({
       const fields = body.fields as ExtractedVatLetter;
       setPreview(fields);
       setWarnings(fields.warnings ?? []);
-      onExtracted(fields);
+      onExtracted(fields, file);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error.');
     } finally {
       setBusy(false);
     }
   }
+
+  const idleLabel =
+    label ??
+    (compact ? 'Auto-fill from VAT letter' : 'Upload VAT registration letter → auto-fill');
 
   return (
     <div className={compact ? 'inline-block' : ''}>
@@ -96,11 +115,7 @@ export function VatLetterUpload({
         {busy
           ? <Loader2Icon size={14} className="animate-spin" />
           : <SparklesIcon size={14} />}
-        {busy
-          ? 'Reading letter…'
-          : compact
-            ? 'Auto-fill from VAT letter'
-            : 'Upload VAT registration letter → auto-fill'}
+        {busy ? 'Reading letter…' : idleLabel}
         {!compact && !busy && <UploadCloudIcon size={12} className="opacity-60" />}
       </button>
 

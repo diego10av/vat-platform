@@ -192,6 +192,9 @@ Recent milestones landed on `main` — see `docs/TODO.md` "Done this week" secti
 
 | Date | Commit | What |
 |------|--------|------|
+| 2026-04-20 | stint 15 | **VAT letter storage + versioning** (migration 017, `entity_official_documents`). Upload persists the letter via `/api/entities/:id/official-documents`; OfficialDocumentsCard on `/entities/[id]` lists the current letter + prior versions (`superseded_by` chain). Re-upload runs extractor again, computes a field-by-field diff vs. the live entity, and opens a modal so the reviewer can opt IN per field — nothing auto-applies. Non-VAT docs (articles, engagement letter, other) share the same storage + list surface but skip the diff flow. |
+| 2026-04-20 | stint 15 | **Client billing panel** (migration 018, `client_billing`). Per-client fee schedule (monthly/quarterly/annual/annual-summary/VAT-registration/ad-hoc-hourly fees + disbursement % in bps + VAT-on-disbursement flag). Engagement letter upload on top — stored in Supabase Storage at `client-billing/<client_id>/…`, replaceable, deletable. BillingCard on `/clients/[id]` renders a slim empty-state CTA when nothing's captured, a compact summary when populated, and a full edit form. |
+| 2026-04-20 | stint 14.5 | Intermediary display + approver-role downstream wiring (share-link, draft-email). Unified new-declaration modal on Home and /declarations. Copy polish on /clients/new. Removed Relationship chips (redundant with intermediary checkbox). |
 | 2026-04-19 | a64cf35 | Sentry custom envelope (bypasses SDK bug) — observability live |
 | 2026-04-19 | 0c05ee4 | Playwright E2E scaffold + 5 read-only specs |
 | 2026-04-19 | cd0f93f | Onboarding banner + one-click demo seed |

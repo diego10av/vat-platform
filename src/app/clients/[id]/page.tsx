@@ -22,6 +22,7 @@ import {
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { ContactsCard } from '@/components/clients/ContactsCard';
 import { EngagedViaCard } from '@/components/clients/EngagedViaCard';
+import { BillingCard } from '@/components/clients/BillingCard';
 import { describeApiError, formatUiError } from '@/lib/ui-errors';
 import { CascadeDeleteModal } from '@/components/delete/CascadeDeleteModal';
 
@@ -207,6 +208,11 @@ export default function ClientDetailPage() {
 
           {/* Multi-contact roster — stint 11 (2026-04-19). */}
           <ContactsCard clientId={client.id} />
+
+          {/* Billing / fee schedule — stint 15 (2026-04-20). Per Diego:
+              he wants to remember the fees agreed with each client and
+              have the engagement letter one click away. */}
+          <BillingCard clientId={client.id} />
 
           {/* Entities list */}
           <div className="bg-surface border border-border rounded-lg">

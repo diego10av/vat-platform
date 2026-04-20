@@ -59,6 +59,11 @@ function NewEntityPageInner() {
   });
   const [saving, setSaving] = useState(false);
 
+  // Stint 15: stash the VAT letter so we can persist it via
+  // /api/entities/:id/official-documents once the entity row exists.
+  const [vatLetterFile, setVatLetterFile] = useState<File | null>(null);
+  const [vatLetterFields, setVatLetterFields] = useState<ExtractedVatLetter | null>(null);
+
   // Load the preset client if provided, otherwise load the client list
   // so the user can pick.
   useEffect(() => {
@@ -133,6 +138,28 @@ function NewEntityPageInner() {
         setError(data?.error?.message ?? data?.error ?? 'Failed to create entity.');
         return;
       }
+
+      // Persist the VAT letter (if uploaded) so it shows up on the
+      // entity detail page. Best-effort — entity creation already
+      // succeeded; we don't block navigation on the upload.
+      if (vatLetterFile && data.id) {
+        try {
+          const fd = new FormData();
+          fd.append('file', vatLetterFile);
+          fd.append('kind', 'vat_registration');
+          fd.append('skip_extract', 'true');
+          if (vatLetterFields) {
+            fd.append('extracted_fields', JSON.stringify(vatLetterFields));
+          }
+          await fetch(`/api/entities/${data.id}/official-documents`, {
+            method: 'POST',
+            body: fd,
+          });
+        } catch {
+          // Non-blocking — user can re-upload from /entities/[id] later.
+        }
+      }
+
       router.push(`/entities/${data.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Network error.');
@@ -272,7 +299,7 @@ function NewEntityPageInner() {
           </div>
           <VatLetterUpload
             compact
-            onExtracted={(f: ExtractedVatLetter) => {
+            onExtracted={(f: ExtractedVatLetter, file: File) => {
               setForm((prev) => ({
                 ...prev,
                 name: f.name ?? prev.name,
@@ -286,6 +313,8 @@ function NewEntityPageInner() {
                 frequency: f.frequency === 'yearly' ? 'annual'
                            : f.frequency ?? prev.frequency,
               }));
+              setVatLetterFile(file);
+              setVatLetterFields(f);
             }}
           />
         </div>

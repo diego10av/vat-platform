@@ -7,6 +7,7 @@ import { Trash2Icon } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { ApproversCard } from '@/components/entity/ApproversCard';
 import { EntityEditCard } from '@/components/entity/EntityEditCard';
+import { OfficialDocumentsCard } from '@/components/entity/OfficialDocumentsCard';
 import { CascadeDeleteModal } from '@/components/delete/CascadeDeleteModal';
 
 interface TimelineData {
@@ -112,6 +113,15 @@ export default function EntityDetailPage() {
           has_recharges: e.has_recharges,
         }}
         onSaved={(next) => setData(d => d ? { ...d, entity: { ...d.entity, ...next } } : d)}
+      />
+
+      <OfficialDocumentsCard
+        entityId={id}
+        onEntityPatched={() => {
+          // Re-fetch the timeline so the entity card reflects any
+          // fields the user just propagated from the new VAT letter.
+          fetch(`/api/entities/${id}/timeline`).then(r => r.json()).then(setData);
+        }}
       />
 
       <ApproversCard entityId={id} />
