@@ -26,11 +26,12 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   FileTextIcon, UploadCloudIcon, Loader2Icon, ExternalLinkIcon,
-  HistoryIcon, ClockIcon, AlertTriangleIcon,
+  HistoryIcon, ClockIcon, AlertTriangleIcon, CalendarClockIcon,
   CheckIcon, Trash2Icon, FileIcon,
 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/Toaster';
+import { FrequencyChangeModal } from '@/components/entity/FrequencyChangeModal';
 
 type Kind = 'vat_registration' | 'articles_of_association' | 'engagement_letter' | 'other';
 
@@ -79,13 +80,19 @@ const KIND_LABELS: Record<Kind, string> = {
 
 export function OfficialDocumentsCard({
   entityId,
+  entityName,
+  currentFrequency,
+  currentRegime,
   onEntityPatched,
 }: {
   entityId: string;
+  entityName: string;
+  currentFrequency: string;
+  currentRegime: string;
   /**
-   * Called after the user applies a VAT-letter diff. The parent refetches
-   * the entity so read-mode values reflect the apply (frequency changed
-   * from quarterly → monthly, etc.).
+   * Called after the user applies a VAT-letter diff or a manual
+   * frequency change. Parent refetches the entity so read-mode values
+   * reflect the apply (frequency changed from quarterly → monthly, etc.).
    */
   onEntityPatched?: () => void;
 }) {
@@ -96,6 +103,17 @@ export function OfficialDocumentsCard({
   const [migrationMissing, setMigrationMissing] = useState(false);
   const [diffModal, setDiffModal] = useState<{
     docId: string; diff: DiffRow[]; fields: ExtractedFields | null;
+  } | null>(null);
+  // Manual frequency-change flow — for letters whose `kind` is NOT
+  // vat_registration (engagement letter, articles, other, AED
+  // "changement de régime", etc.). `initialDocId` pre-links the modal
+  // to a just-uploaded document so the paper trail is captured.
+  const [freqModal, setFreqModal] = useState<{ initialDocId: string | null } | null>(null);
+  // When a non-VAT-letter upload just landed, we nudge the user: "did
+  // this letter change the filing frequency?". Dismissable — the nudge
+  // never hijacks the main page.
+  const [postUploadNudge, setPostUploadNudge] = useState<{
+    docId: string; filename: string; kind: Kind;
   } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -166,6 +184,16 @@ export function OfficialDocumentsCard({
           diff: body.diff,
           fields: body.extracted_fields ?? null,
         });
+      } else if (kind !== 'vat_registration' && body.document_id) {
+        // Non-VAT kinds don't trigger the extractor-driven diff flow.
+        // But the user may have just uploaded an AED "changement de
+        // régime" letter or a revised engagement letter that DOES
+        // change the filing cadence. Nudge them.
+        setPostUploadNudge({
+          docId: body.document_id,
+          filename: file.name,
+          kind,
+        });
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Network error.');
@@ -222,50 +250,79 @@ export function OfficialDocumentsCard({
   // Slim 1-line affordance when nothing has been uploaded yet, so users
   // who don't have / don't want to upload an AED letter aren't nagged.
   // Matches the EngagedViaCard + BillingCard empty-state pattern.
+  // Still exposes "Change frequency" + the FrequencyChangeModal so a
+  // user who's been told orally about a periodicity change can record
+  // it without a document in hand.
   if (docs.length === 0) {
     return (
-      <div className="mb-5 bg-surface border border-dashed border-border rounded-lg px-4 py-3 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[12px] text-ink-muted min-w-0">
-          <FileTextIcon size={13} className="text-ink-faint shrink-0" />
-          <span className="truncate">
-            <strong className="text-ink-soft">No official documents attached.</strong>{' '}
-            Optional — upload the VAT registration letter, articles, or engagement
-            letter to keep them one click away.
-          </span>
+      <>
+        <div className="mb-5 bg-surface border border-dashed border-border rounded-lg px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2 text-[12px] text-ink-muted min-w-0">
+            <FileTextIcon size={13} className="text-ink-faint shrink-0" />
+            <span className="truncate">
+              <strong className="text-ink-soft">No official documents attached.</strong>{' '}
+              Optional — upload the VAT registration letter, articles, or engagement
+              letter to keep them one click away.
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => setFreqModal({ initialDocId: null })}
+              className="h-7 px-2 rounded border border-amber-300 bg-amber-50 text-[11px] font-medium text-amber-900 hover:bg-amber-100 inline-flex items-center gap-1"
+              title="Record a filing-frequency change without attaching a document"
+            >
+              <CalendarClockIcon size={11} /> Change frequency
+            </button>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="application/pdf,image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleUpload(f, 'vat_registration');
+                e.target.value = '';
+              }}
+            />
+            <button
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+              className="h-7 px-2.5 rounded-md border border-border-strong text-[11.5px] font-medium text-ink-soft hover:text-ink hover:bg-surface-alt disabled:opacity-50 inline-flex items-center gap-1"
+            >
+              {uploading
+                ? <Loader2Icon size={11} className="animate-spin" />
+                : <UploadCloudIcon size={11} />}
+              Upload VAT letter
+            </button>
+          </div>
         </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf,image/*"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) handleUpload(f, 'vat_registration');
-            e.target.value = '';
+
+        <FrequencyChangeModal
+          open={!!freqModal}
+          onClose={() => setFreqModal(null)}
+          entityId={entityId}
+          entityName={entityName}
+          currentFrequency={currentFrequency}
+          currentRegime={currentRegime}
+          availableDocs={[]}
+          initialDocId={null}
+          onApplied={() => {
+            setFreqModal(null);
+            onEntityPatched?.();
           }}
         />
-        <button
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="shrink-0 h-7 px-2.5 rounded-md border border-border-strong text-[11.5px] font-medium text-ink-soft hover:text-ink hover:bg-surface-alt disabled:opacity-50 inline-flex items-center gap-1"
-        >
-          {uploading
-            ? <Loader2Icon size={11} className="animate-spin" />
-            : <UploadCloudIcon size={11} />}
-          Upload VAT letter
-        </button>
-      </div>
+      </>
     );
   }
 
   return (
     <div className="mb-5 bg-surface border border-border rounded-lg">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-divider">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-divider gap-2 flex-wrap">
         <h3 className="text-[13px] font-semibold text-ink inline-flex items-center gap-2">
           <FileTextIcon size={14} className="text-brand-500" />
           Official documents
         </h3>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           {history.length > 0 && (
             <button
               onClick={() => setShowHistory(v => !v)}
@@ -274,6 +331,13 @@ export function OfficialDocumentsCard({
               <HistoryIcon size={10} /> {showHistory ? 'Hide' : 'Show'} history ({history.length})
             </button>
           )}
+          <button
+            onClick={() => setFreqModal({ initialDocId: null })}
+            className="h-7 px-2 rounded border border-amber-300 bg-amber-50 text-[11px] font-medium text-amber-900 hover:bg-amber-100 inline-flex items-center gap-1"
+            title="Record a filing-frequency change (typically driven by an AED letter or turnover threshold)"
+          >
+            <CalendarClockIcon size={11} /> Change frequency
+          </button>
           <input
             ref={inputRef}
             type="file"
@@ -297,6 +361,38 @@ export function OfficialDocumentsCard({
           </button>
         </div>
       </div>
+
+      {postUploadNudge && (
+        <div className="border-b border-amber-200 bg-amber-50/60 px-4 py-2.5 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2 min-w-0">
+            <CalendarClockIcon size={13} className="text-amber-700 mt-0.5 shrink-0" />
+            <div className="text-[12px] text-amber-900 min-w-0">
+              <span className="font-semibold">Does this letter change the filing frequency?</span>{' '}
+              <span className="text-amber-800">
+                &ldquo;{postUploadNudge.filename}&rdquo; is stored as {KIND_LABELS[postUploadNudge.kind].toLowerCase()}. If it
+                revises your monthly / quarterly / annual schedule, record the change so future declarations use the right cadence.
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => {
+                setFreqModal({ initialDocId: postUploadNudge.docId });
+                setPostUploadNudge(null);
+              }}
+              className="h-7 px-2.5 rounded border border-amber-400 bg-amber-100 text-[11.5px] font-semibold text-amber-900 hover:bg-amber-200 inline-flex items-center gap-1"
+            >
+              Update frequency →
+            </button>
+            <button
+              onClick={() => setPostUploadNudge(null)}
+              className="h-7 px-2 rounded text-[11px] text-amber-800 hover:bg-amber-100"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="p-4 space-y-3">
         {/* Current VAT letter (special-case because we care about it most) */}
@@ -366,6 +462,26 @@ export function OfficialDocumentsCard({
         diff={diffModal?.diff ?? []}
         onApplied={() => {
           setDiffModal(null);
+          onEntityPatched?.();
+        }}
+      />
+
+      <FrequencyChangeModal
+        open={!!freqModal}
+        onClose={() => setFreqModal(null)}
+        entityId={entityId}
+        entityName={entityName}
+        currentFrequency={currentFrequency}
+        currentRegime={currentRegime}
+        availableDocs={(docs ?? []).map((d) => ({
+          id: d.id,
+          kind: d.kind,
+          filename: d.filename,
+          uploaded_at: d.uploaded_at,
+        }))}
+        initialDocId={freqModal?.initialDocId ?? null}
+        onApplied={() => {
+          setFreqModal(null);
           onEntityPatched?.();
         }}
       />
@@ -532,11 +648,24 @@ function DiffModal({
     }
   }
 
+  // Surface frequency / regime changes specifically — these are the
+  // ones that actually reshape the filing calendar. Sort them to the
+  // top and render a banner at the top of the modal so the reviewer
+  // can't miss them.
+  const criticalFields = new Set(['frequency', 'regime']);
+  const sortedDiff = [...diff].sort((a, b) => {
+    const aCritical = criticalFields.has(a.field) ? 0 : 1;
+    const bCritical = criticalFields.has(b.field) ? 0 : 1;
+    return aCritical - bCritical;
+  });
+  const frequencyDiff = diff.find(d => d.field === 'frequency');
+  const regimeDiff = diff.find(d => d.field === 'regime');
+
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="The new VAT letter changes these fields"
+      title="The new letter changes these fields"
       subtitle="Pick the ones you want to propagate to the entity. Nothing auto-applies."
       size="lg"
       footer={
@@ -564,49 +693,93 @@ function DiffModal({
         </div>
       }
     >
+      {/* Critical-change banner — frequency / regime reshape the filing
+          calendar. Calling these out explicitly beats having the user
+          scan a list of 8 checkboxes. Per Diego: "si cambia la
+          periodicidad, se debería actualizar de manera automática o
+          manual". Manual + prominent is the safe default. */}
+      {(frequencyDiff || regimeDiff) && (
+        <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5">
+          <div className="flex items-start gap-2">
+            <AlertTriangleIcon size={14} className="text-amber-700 mt-0.5 shrink-0" />
+            <div className="flex-1 text-[12px] text-amber-900">
+              <div className="font-semibold">
+                This letter changes how you file going forward.
+              </div>
+              {frequencyDiff && (
+                <div className="mt-0.5">
+                  Filing frequency: <strong>{frequencyDiff.before ?? 'unset'}</strong>{' '}
+                  → <strong>{frequencyDiff.after ?? 'unset'}</strong>.
+                  {' '}Future declarations will follow the new frequency from now on.
+                </div>
+              )}
+              {regimeDiff && (
+                <div className="mt-0.5">
+                  Regime: <strong>{regimeDiff.before ?? 'unset'}</strong>{' '}
+                  → <strong>{regimeDiff.after ?? 'unset'}</strong>.
+                </div>
+              )}
+              <div className="mt-0.5 text-[11px] text-amber-800">
+                Already-filed declarations keep their historical period type — only new ones change.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-1.5">
-        {diff.length === 0 ? (
+        {sortedDiff.length === 0 ? (
           <div className="text-[12px] text-ink-muted text-center py-4">
             The new letter matches the entity exactly. Nothing to apply.
           </div>
         ) : (
-          diff.map((d) => (
-            <label
-              key={d.field}
-              className={[
-                'flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer transition-colors',
-                selected[d.field]
-                  ? 'border-brand-300 bg-brand-50/40'
-                  : 'border-border bg-surface hover:bg-surface-alt/50',
-              ].join(' ')}
-            >
-              <input
-                type="checkbox"
-                className="mt-0.5"
-                checked={!!selected[d.field]}
-                onChange={(e) => setSelected({ ...selected, [d.field]: e.target.checked })}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-[10.5px] uppercase tracking-wide font-semibold text-ink-muted">
-                  {fieldLabel(d.field)}
-                </div>
-                <div className="mt-0.5 grid grid-cols-2 gap-3 text-[12px]">
-                  <div className="min-w-0">
-                    <div className="text-[9.5px] text-ink-faint uppercase">Current</div>
-                    <div className="text-ink-soft truncate" title={d.before ?? ''}>
-                      {d.before ?? <span className="italic text-ink-faint">empty</span>}
+          sortedDiff.map((d) => {
+            const isCritical = criticalFields.has(d.field);
+            return (
+              <label
+                key={d.field}
+                className={[
+                  'flex items-start gap-3 rounded-md border px-3 py-2.5 cursor-pointer transition-colors',
+                  selected[d.field]
+                    ? (isCritical ? 'border-amber-400 bg-amber-50/70' : 'border-brand-300 bg-brand-50/40')
+                    : 'border-border bg-surface hover:bg-surface-alt/50',
+                ].join(' ')}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={!!selected[d.field]}
+                  onChange={(e) => setSelected({ ...selected, [d.field]: e.target.checked })}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10.5px] uppercase tracking-wide font-semibold flex items-center gap-1.5">
+                    <span className={isCritical ? 'text-amber-900' : 'text-ink-muted'}>
+                      {fieldLabel(d.field)}
+                    </span>
+                    {isCritical && (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] bg-amber-200 text-amber-900 px-1 py-0.5 rounded font-bold">
+                        RESHAPES FILING
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-0.5 grid grid-cols-2 gap-3 text-[12px]">
+                    <div className="min-w-0">
+                      <div className="text-[9.5px] text-ink-faint uppercase">Current</div>
+                      <div className="text-ink-soft truncate" title={d.before ?? ''}>
+                        {d.before ?? <span className="italic text-ink-faint">empty</span>}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[9.5px] text-ink-faint uppercase">From letter</div>
+                      <div className="font-semibold text-ink truncate" title={d.after ?? ''}>
+                        {d.after ?? <span className="italic text-ink-faint">empty</span>}
+                      </div>
                     </div>
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[9.5px] text-ink-faint uppercase">From letter</div>
-                    <div className="font-semibold text-ink truncate" title={d.after ?? ''}>
-                      {d.after ?? <span className="italic text-ink-faint">empty</span>}
-                    </div>
-                  </div>
                 </div>
-              </div>
-            </label>
-          ))
+              </label>
+            );
+          })
         )}
       </div>
     </Modal>

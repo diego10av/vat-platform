@@ -94,6 +94,20 @@ Things worth remembering but not actionable yet:
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
 
+**2026-04-20 (late afternoon)** — Stint 15 follow-up: frequency change propagation
+
+Diego's follow-up: "cuando subo una carta que modifica la periodicidad, se tiene que actualizar la periodicidad de la entidad — de manera automática o manual — y también cuando la carta NO es una VAT registration letter". Two gaps addressed:
+
+1. **Diff modal now shouts frequency / regime changes.** When a replacement VAT letter is uploaded and the extractor detects a frequency or regime change, the diff modal opens with an amber banner ("⚠️ This letter changes how you file going forward — filing frequency: quarterly → monthly") and those fields are sorted to the top with a "RESHAPES FILING" badge. Hard to miss.
+
+2. **Manual path for non-VAT letters.** New `FrequencyChangeModal` + `POST /api/entities/[id]/frequency-change` endpoint. Accepts new frequency (required), optional regime change, effective date, linked document (dropdown of existing official documents), and notes. Audit log records per-column changes plus a dedicated `frequency_change` entry with the full context (source_document_id, effective_from, notes). Two entry points:
+   - **"Change frequency" button** in the OfficialDocumentsCard header (and in the slim empty state — so users who've been told orally about a change can record it without attaching a document).
+   - **Post-upload nudge**: when a user uploads a kind ≠ `vat_registration` (engagement letter, articles, other), an amber inline banner appears: "Does this letter change the filing frequency? [Update frequency →] [Dismiss]". Pre-links the modal to the just-uploaded document.
+
+No auto-apply — the modal always requires confirmation (Gassner principle). Past filed declarations keep their original period type; only future declarations follow the new cadence.
+
+---
+
 **2026-04-20 (afternoon)** — Stint 15: VAT letter archive + client billing panel
 
 After the stint 14.5 self-critique cleanup, Diego asked for two new surfaces that both flow from "I want to remember what we agreed with this client, not just parse it once":

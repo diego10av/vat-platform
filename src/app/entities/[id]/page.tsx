@@ -117,9 +117,13 @@ export default function EntityDetailPage() {
 
       <OfficialDocumentsCard
         entityId={id}
+        entityName={e.name}
+        currentFrequency={e.frequency}
+        currentRegime={e.regime}
         onEntityPatched={() => {
           // Re-fetch the timeline so the entity card reflects any
-          // fields the user just propagated from the new VAT letter.
+          // fields the user just propagated from the new VAT letter
+          // or the manual frequency-change modal.
           fetch(`/api/entities/${id}/timeline`).then(r => r.json()).then(setData);
         }}
       />
