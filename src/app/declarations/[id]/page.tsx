@@ -727,12 +727,19 @@ export default function DeclarationDetailPage() {
             </div>
           )}
 
-          {/* Upload zones — only in Documents tab */}
+          {/* Upload zones — only in Documents tab.
+              Restructured 2026-04-22 per PROTOCOLS §11: the primary
+              "Invoices" drop zone now takes the full row width
+              because it's what 90%+ of uploads use. The two
+              secondary zones (Client Excel = 10-30% of flows,
+              Prior-year appendix = ~5%) live behind a collapsed
+              "More upload options" disclosure so a first-time user
+              doesn't face three parallel dropzones. */}
           {activeTab === 'documents' && ['created', 'uploading', 'review'].includes(data.status) && (
-            <div className="grid grid-cols-3 gap-3 mb-4">
-              {/* Invoice upload */}
+            <div className="mb-4">
+              {/* Invoice upload — primary, full width */}
               <div
-                className={`border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-150 ${
+                className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-all duration-150 ${
                   dragOver ? 'border-[#1a1a2e] bg-blue-50' : 'border-border-strong bg-surface hover:border-gray-400 hover:bg-surface-alt'
                 }`}
                 onClick={() => fileInput.current?.click()}
@@ -743,37 +750,50 @@ export default function DeclarationDetailPage() {
                 <input ref={fileInput} type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.doc"
                   className="hidden" onChange={e => e.target.files && handleUpload(e.target.files)} />
                 <div className="text-[11px] text-ink-faint uppercase tracking-wide font-semibold mb-1">Invoices</div>
-                <div className="text-[12px] text-ink-soft">
+                <div className="text-[13px] text-ink-soft">
                   {uploading ? 'Uploading…' : 'Drop PDFs here or click to browse'}
                 </div>
-              </div>
-
-              {/* Client Excel import — invoices delivered as a spreadsheet. */}
-              <div
-                className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-150 border-border-strong bg-surface hover:border-brand-400 hover:bg-surface-alt"
-                onClick={() => setExcelImportOpen(true)}
-              >
-                <div className="text-[11px] text-ink-faint uppercase tracking-wide font-semibold mb-1">Client Excel</div>
-                <div className="text-[12px] text-ink-soft">
-                  Client sent a spreadsheet instead of PDFs? Import it with AI mapping.
+                <div className="mt-1 text-[10.5px] text-ink-muted">
+                  PDF · PNG · JPG · DOCX — cifra extracts the fields and classifies each line.
                 </div>
               </div>
 
-              {/* Precedents upload */}
-              <div
-                className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-150 border-border-strong bg-surface hover:border-gray-400 hover:bg-surface-alt"
-                onClick={() => precedentInput.current?.click()}
-              >
-                <input ref={precedentInput} type="file" accept=".xlsx,.xls"
-                  className="hidden" onChange={e => e.target.files && handlePrecedentUpload(e.target.files)} />
-                <div className="text-[11px] text-ink-faint uppercase tracking-wide font-semibold mb-1">Prior-year appendix</div>
-                <div className="text-[12px] text-ink-soft">
-                  {uploadingPrecedents ? 'Parsing Excel…' : 'Upload .xlsx to seed precedents'}
+              {/* More upload options — collapsed by default to keep the
+                  primary invoice zone prominent. */}
+              <details className="mt-3 group">
+                <summary className="cursor-pointer inline-flex items-center gap-1.5 text-[11.5px] text-ink-muted hover:text-ink select-none">
+                  <span className="inline-block transition-transform group-open:rotate-90">▸</span>
+                  More upload options — Excel, prior-year precedents
+                </summary>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  {/* Client Excel import — invoices delivered as a spreadsheet. */}
+                  <div
+                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-150 border-border-strong bg-surface hover:border-brand-400 hover:bg-surface-alt"
+                    onClick={() => setExcelImportOpen(true)}
+                  >
+                    <div className="text-[11px] text-ink-faint uppercase tracking-wide font-semibold mb-1">Client Excel</div>
+                    <div className="text-[12px] text-ink-soft">
+                      Client sent a spreadsheet instead of PDFs? Import it with AI mapping.
+                    </div>
+                  </div>
+
+                  {/* Precedents upload */}
+                  <div
+                    className="border-2 border-dashed rounded-lg p-4 text-center cursor-pointer transition-all duration-150 border-border-strong bg-surface hover:border-gray-400 hover:bg-surface-alt"
+                    onClick={() => precedentInput.current?.click()}
+                  >
+                    <input ref={precedentInput} type="file" accept=".xlsx,.xls"
+                      className="hidden" onChange={e => e.target.files && handlePrecedentUpload(e.target.files)} />
+                    <div className="text-[11px] text-ink-faint uppercase tracking-wide font-semibold mb-1">Prior-year appendix</div>
+                    <div className="text-[12px] text-ink-soft">
+                      {uploadingPrecedents ? 'Parsing Excel…' : 'Upload .xlsx to seed precedents'}
+                    </div>
+                    {precedentToast && (
+                      <div className="mt-2 text-[11px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1">{precedentToast}</div>
+                    )}
+                  </div>
                 </div>
-                {precedentToast && (
-                  <div className="mt-2 text-[11px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1">{precedentToast}</div>
-                )}
-              </div>
+              </details>
             </div>
           )}
 
@@ -838,7 +858,15 @@ export default function DeclarationDetailPage() {
             />
           )}
 
-          {/* Services Rendered */}
+          {/* Services Rendered — hidden entirely when the entity doesn't
+              issue outgoing invoices AND has no legacy lines to show.
+              PROTOCOLS §11 actionable-first: an empty "Add outgoing
+              invoice" button on an entity that never invoices out is
+              vanity. The entity edit page is where has_outgoing flips;
+              if the reviewer lands here and realises outgoing is
+              needed, the edit page is 1 click away. */}
+          {(data.has_outgoing || outgoingLines.length > 0) && (
+          <>
           <div className="flex items-center justify-between mt-6 mb-2">
             <SectionHeader title="Services Rendered — Overall Turnover" count={outgoingLines.length} inline />
             {!locked && (
@@ -869,6 +897,8 @@ export default function DeclarationDetailPage() {
               selectedIds={selectedLineIds}
               onSelectionChange={setSelectedLineIds}
             />
+          )}
+          </>
           )}
 
           {/* Excluded */}

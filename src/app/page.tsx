@@ -272,9 +272,13 @@ export default function Home() {
           >
             New declaration
           </Button>
-          <Link href="/aed-letters">
-            <Button variant="secondary" size="md" icon={<InboxIcon size={14} />}>Upload AED letter</Button>
-          </Link>
+          {/* "Upload AED letter" removed from the top-level header
+              2026-04-22 per PROTOCOLS §11 (actionable-first). An AED
+              letter arrives ~1x/quarter per entity — the button lived
+              there permanently for an action taken less than 5% of
+              visits. AED upload is still reachable via ⌘K ("upload
+              aed"), from the entity detail page AED tab, and from
+              any urgent-AED item in the Inbox. */}
         </div>
       </header>
 
