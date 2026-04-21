@@ -46,13 +46,18 @@ function CifraWordmark() {
 // ─────────────────── Top nav ───────────────────
 
 function TopNav() {
+  // Login routing: on the root domain (cifracompliance.com), the
+  // middleware automatically redirects /login to app.cifracompliance.com/login.
+  // On the app subdomain / local dev, /login is served directly. So a
+  // single href="/login" works everywhere. Using <a> instead of Next's
+  // <Link> because a subdomain jump bypasses client-side routing anyway.
   return (
-    <header className="sticky top-0 z-30 bg-[#FBFAF7]/80 backdrop-blur-sm border-b border-[#EFEAE2]">
+    <header className="sticky top-0 z-30 bg-[#FBFAF7]/75 backdrop-blur-md border-b border-[#EFEAE2]">
       <Container className="flex items-center justify-between h-14">
-        <Link href="/marketing" className="flex items-center">
+        <Link href="/marketing" className="flex items-center" aria-label="cifra home">
           <CifraWordmark />
         </Link>
-        <nav className="flex items-center gap-7">
+        <nav className="flex items-center gap-6 md:gap-7">
           <a
             href="#product"
             className="hidden md:inline-block text-[13px] text-ink-soft hover:text-ink transition-colors"
@@ -70,6 +75,20 @@ function TopNav() {
             className="hidden md:inline-block text-[13px] text-ink-soft hover:text-ink transition-colors"
           >
             Roadmap
+          </a>
+          {/* Divider hidden on mobile so nav items don't collide with the CTA cluster. */}
+          <span aria-hidden className="hidden md:inline-block h-5 w-px bg-[#EFEAE2]" />
+          <a
+            href="/login"
+            className="inline-flex items-center text-[13px] font-medium text-ink-soft hover:text-ink transition-colors group"
+          >
+            Sign in
+            <span
+              aria-hidden
+              className="ml-1 inline-block transition-transform group-hover:translate-x-0.5"
+            >
+              →
+            </span>
           </a>
           <a
             href="mailto:contact@cifracompliance.com"
@@ -317,7 +336,7 @@ function Depth() {
               <CaseLi
                 c="GC T-657/24 Versãofast"
                 date="2025-11-26"
-                summary="Referral fees to a non-LU intermediary — exempt under 44§1 d."
+                summary="Credit intermediation — mortgage brokers who actively recruit customers qualify for Art. 44§1 (a)."
               />
               <CaseLi
                 c="CJEU C-77/19 Kaplan"
