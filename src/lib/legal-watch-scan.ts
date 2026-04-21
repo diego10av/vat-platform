@@ -18,6 +18,7 @@
 
 import { execute, query } from '@/lib/db';
 import { matchKeywords } from '@/config/legal-watch-keywords';
+import { triageQueueItem } from '@/lib/legal-watch-triage';
 
 export interface FeedItem {
   source: string;        // 'vatupdate' | 'curia' | 'legilux' | 'aed' | 'sample'
@@ -139,6 +140,11 @@ export function sampleFeedItems(): FeedItem[] {
 export interface ScanOptions {
   sources?: Array<'vatupdate' | 'sample'>;
   useFallback?: boolean;   // on live fetch failure, fall back to sample
+  /** When true (default), genuinely-new items run through the Opus 4.7
+   *  auto-triage agent and their severity / affected rules / summary
+   *  are persisted on the row. When false, items are inserted raw and
+   *  the reviewer triages manually (cheaper, useful for tests). */
+  autoTriage?: boolean;
 }
 
 export async function runLegalWatchScan(opts: ScanOptions = {}): Promise<ScanReport[]> {
@@ -175,6 +181,8 @@ export async function runLegalWatchScan(opts: ScanOptions = {}): Promise<ScanRep
       .filter(({ hits }) => hits.length > 0);
     report.filtered = filtered.length;
 
+    const autoTriage = opts.autoTriage !== false; // default true
+
     for (const { item, hits } of filtered) {
       try {
         const before = await query<{ count: string }>(
@@ -199,8 +207,51 @@ export async function runLegalWatchScan(opts: ScanOptions = {}): Promise<ScanRep
             hits,
           ],
         );
-        if (existed) report.skipped_duplicate += 1;
-        else report.inserted += 1;
+        if (existed) {
+          report.skipped_duplicate += 1;
+        } else {
+          report.inserted += 1;
+
+          // Genuinely-new item → auto-triage with Opus 4.7 so the
+          // reviewer opens the queue card to "high · affects RULE 36"
+          // instead of "untriaged, read it yourself". Non-fatal: if
+          // triage fails (network, parse, budget), the item stays in
+          // the queue with ai_triage_at=NULL and the reviewer triages
+          // manually — same as before.
+          if (autoTriage) {
+            const triaged = await triageQueueItem({
+              title: item.title,
+              summary: item.summary,
+              url: item.url,
+              matched_keywords: hits,
+              published_at: item.published_at,
+            });
+            if (triaged) {
+              await execute(
+                `UPDATE legal_watch_queue
+                    SET ai_triage_severity = $1,
+                        ai_triage_affected_rules = $2,
+                        ai_triage_summary = $3,
+                        ai_triage_proposed_action = $4,
+                        ai_triage_confidence = $5,
+                        ai_triage_model = $6,
+                        ai_triage_at = NOW(),
+                        updated_at = NOW()
+                  WHERE source = $7 AND external_id = $8`,
+                [
+                  triaged.severity,
+                  triaged.affected_rules,
+                  triaged.summary,
+                  triaged.proposed_action,
+                  triaged.confidence,
+                  triaged.model,
+                  item.source,
+                  item.external_id,
+                ],
+              );
+            }
+          }
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         report.errors.push(`insert "${item.title}": ${msg}`);

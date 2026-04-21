@@ -22,10 +22,20 @@ export async function GET(request: NextRequest) {
   const rows = await query(
     `SELECT id, source, external_id, title, url, summary, published_at,
             matched_keywords, status, triaged_at, triaged_by, triage_note,
+            ai_triage_severity, ai_triage_affected_rules,
+            ai_triage_summary, ai_triage_proposed_action,
+            ai_triage_confidence, ai_triage_model, ai_triage_at,
             created_at
        FROM legal_watch_queue
       WHERE status = ANY($1::text[])
-      ORDER BY (status = 'new') DESC,
+      ORDER BY CASE ai_triage_severity
+                 WHEN 'critical' THEN 0
+                 WHEN 'high'     THEN 1
+                 WHEN 'medium'   THEN 2
+                 WHEN 'low'      THEN 3
+                 ELSE 4
+               END,
+               (status = 'new') DESC,
                published_at DESC NULLS LAST,
                created_at DESC
       LIMIT $2`,
