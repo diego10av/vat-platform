@@ -104,7 +104,15 @@ export async function extractVatLetterFields(params: {
   try {
     resp = await anthropicCreate(
       {
-        model: 'claude-haiku-4-5',
+        // Upgraded 2026-04-22 Haiku → Opus 4.7 per Diego 2026-04-21:
+        // the VAT registration letter extractor was "almost completely
+        // wrong" on his first try. This is a once-per-entity call
+        // (creating the full VAT profile: name, VAT no., matricule,
+        // RCS, regime, frequency, entity_type, effective date) — high
+        // stakes, low volume. Opus 4.7's OCR + reasoning accuracy on
+        // LU legal documents justifies the cost for this specific path;
+        // routine invoice extraction stays on Haiku.
+        model: 'claude-opus-4-7',
         max_tokens: 1000,
         system: SYSTEM_PROMPT,
         messages: [

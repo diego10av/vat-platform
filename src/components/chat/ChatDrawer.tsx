@@ -229,7 +229,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
           // accumulated text as the reply.
           return {
             reply: accumulated,
-            model: useOpus ? 'claude-opus-4-5' : 'claude-haiku-4-5',
+            model: useOpus ? 'claude-opus-4-7' : 'claude-haiku-4-5',
             cost_eur: 0,
             thread_id: threadId,
           };

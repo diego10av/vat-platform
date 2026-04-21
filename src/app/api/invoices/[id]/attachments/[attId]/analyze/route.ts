@@ -41,7 +41,10 @@ const log = logger.bind('attachments/analyze');
 // a ?model=opus query param if we decide enterprise customers want
 // deeper analyses.
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
-const OPUS_MODEL = 'claude-opus-4-5-20250929';
+// Opus 4.7 for the deep path (contracts, engagement letters, advisor
+// emails with legal reasoning). The Haiku fallback is still used when
+// ai_mode='classifier_only' or the per-user budget is exhausted.
+const OPUS_MODEL = 'claude-opus-4-7';
 
 export const maxDuration = 120;
 

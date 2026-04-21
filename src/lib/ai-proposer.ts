@@ -40,7 +40,16 @@ import { logger } from '@/lib/logger';
 
 const log = logger.bind('ai-proposer');
 
-const TIER_4_MODEL = 'claude-haiku-4-5-20251001';
+// Upgraded 2026-04-22 — Haiku → Opus 4.7. Rationale:
+// Tier 4 fires only when Tiers 1-3 (32+ deterministic rules + precedents
+// + inference) all returned NO_MATCH — by definition these are the
+// most legally ambiguous invoices in the declaration. Haiku would give
+// a reasonable guess at the easy end of NO_MATCH; Opus 4.7 gives a
+// defensible proposal at the hard end (novel cross-border structures,
+// contested post-Versãofast intermediation patterns, substance-over-form
+// carry interest cases). At ~5-15% of lines, cost impact is ~€4-6/mo
+// for 10 clients — trivial given the quality lift for the reviewer.
+const TIER_4_MODEL = 'claude-opus-4-7';
 
 const SYSTEM_PROMPT = `You are cifra's Tier 4 classification AI proposer for Luxembourg VAT returns.
 

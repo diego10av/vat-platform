@@ -21,10 +21,19 @@ const USD_TO_EUR = 0.92;
 const PRICING_USD: Record<string, { input: number; output: number; cache_read?: number; cache_write?: number }> = {
   // Haiku — cheap mechanical tasks
   'claude-haiku-4-5-20251001':        { input: 1.0, output: 5.0, cache_read: 0.1, cache_write: 1.25 },
+  'claude-haiku-4-5':                 { input: 1.0, output: 5.0, cache_read: 0.1, cache_write: 1.25 },
   // Sonnet
   'claude-sonnet-4-5-20250929':       { input: 3.0, output: 15.0, cache_read: 0.3, cache_write: 3.75 },
   // Opus (when available for this key)
   'claude-opus-4-5-20250929':         { input: 15.0, output: 75.0, cache_read: 1.5, cache_write: 18.75 },
+  'claude-opus-4-5':                  { input: 15.0, output: 75.0, cache_read: 1.5, cache_write: 18.75 },
+  // Opus 4.7 — current top tier. Placeholder pricing pegged to 4.5
+  // while Anthropic public pricing for 4.7 is confirmed (verify on
+  // the next tax-alert refresh). If 4.7 is priced higher, the only
+  // effect is slightly under-reported cost in api_calls.cost_eur
+  // until the table updates — budget caps stay correct because we
+  // log tokens authoritatively.
+  'claude-opus-4-7':                  { input: 15.0, output: 75.0, cache_read: 1.5, cache_write: 18.75 },
 };
 
 export function priceCall(model: string, usage: {

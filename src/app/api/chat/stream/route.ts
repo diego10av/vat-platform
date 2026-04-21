@@ -40,7 +40,8 @@ import { logger } from '@/lib/logger';
 const log = logger.bind('chat/stream');
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
-const OPUS_MODEL = 'claude-opus-4-5-20250929';
+// "Ask Opus" on the streaming path — upgraded to 4.7 alongside /api/chat.
+const OPUS_MODEL = 'claude-opus-4-7';
 const MOCK_USER_ID = 'founder';
 
 export const maxDuration = 120;

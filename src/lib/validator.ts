@@ -20,7 +20,12 @@ import path from 'path';
 import { ALL_LEGAL_SOURCES } from '@/config/legal-sources';
 import { TREATMENT_CODES } from '@/config/treatment-codes';
 
-const VALIDATOR_MODEL = 'claude-opus-4-5-20250929';
+// Upgraded 2026-04-22 to Opus 4.7. Validator is the pitch-killer
+// agent — when it spots a contradictory classification or a missing
+// exemption argument, that quality is what distinguishes cifra from
+// a ChatGPT wrapper. 4.7 is strictly better at multi-hop LU-VAT
+// reasoning on a prepared declaration.
+const VALIDATOR_MODEL = 'claude-opus-4-7';
 const LINES_PER_BATCH = 30;
 const MAX_OUTPUT_TOKENS = 4000;
 

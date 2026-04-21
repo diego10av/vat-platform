@@ -52,8 +52,9 @@ import { logger } from '@/lib/logger';
 const log = logger.bind('chat');
 
 // Per docs/MODELS.md §4 — Haiku default, Opus on explicit escalation only.
+// "Ask Opus" upgraded to Opus 4.7 2026-04-22.
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
-const OPUS_MODEL  = 'claude-opus-4-5-20250929';
+const OPUS_MODEL  = 'claude-opus-4-7';
 
 // Who the chat is attributed to in api_calls. Replace with real auth
 // when multi-user lands.
