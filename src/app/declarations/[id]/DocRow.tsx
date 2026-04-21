@@ -112,6 +112,27 @@ export function DocStatusTag({ status }: { status: string }) {
   );
 }
 
+// Human labels for the triage classifier output. The raw snake_case
+// codes ('wrong_entity', 'credit_note', …) were leaking into the
+// reviewer UI — Diego flagged this on 2026-04-21 as "copy that would
+// embarrass us in a demo". Mapping table keeps the codes stable on the
+// backend while the reviewer sees sentence-case labels.
+const TRIAGE_LABEL: Record<string, string> = {
+  invoice: 'Invoice',
+  credit_note: 'Credit note',
+  wrong_entity: 'Wrong entity',
+  receipt: 'Receipt',
+  aed_letter: 'AED letter',
+  expense_claim: 'Expense claim',
+  duplicate: 'Duplicate',
+  proforma_invoice: 'Pro-forma invoice',
+  purchase_order: 'Purchase order',
+  aed_attestation: 'AED attestation',
+  power_of_attorney: 'Power of attorney',
+  kyc_document: 'KYC document',
+  other: 'Other',
+};
+
 export function TriageTag({ triage }: { triage: string | null }) {
   if (!triage) return <span className="text-[10px] text-ink-faint">—</span>;
   const colors: Record<string, string> = {
@@ -122,11 +143,16 @@ export function TriageTag({ triage }: { triage: string | null }) {
     aed_letter: 'bg-red-100 text-red-700',
     expense_claim: 'bg-pink-100 text-pink-700',
     duplicate: 'bg-surface-alt text-ink-soft',
+    proforma_invoice: 'bg-amber-100 text-amber-700',
+    purchase_order: 'bg-amber-100 text-amber-700',
+    aed_attestation: 'bg-red-100 text-red-700',
+    power_of_attorney: 'bg-surface-alt text-ink-soft',
+    kyc_document: 'bg-surface-alt text-ink-soft',
     other: 'bg-surface-alt text-ink-soft',
   };
   return (
     <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${colors[triage] || 'bg-surface-alt'}`}>
-      {triage}
+      {TRIAGE_LABEL[triage] ?? triage}
     </span>
   );
 }

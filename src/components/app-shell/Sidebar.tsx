@@ -13,7 +13,6 @@ import {
   HomeIcon, Building2Icon, FileTextIcon, CalendarIcon,
   BookOpenIcon,
   BarChart3Icon, ShieldCheckIcon, SettingsIcon,
-  CheckSquareIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
@@ -52,7 +51,12 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
         { href: '/clients',      label: 'Clients',      icon: Building2Icon },
         { href: '/declarations', label: 'Declarations', icon: FileTextIcon,
           badge: badges.declarationsInReview },
-        { href: '/closing',      label: 'Closing',      icon: CheckSquareIcon },
+        // 2026-04-21 (Diego first-use review): Closing dashboard removed
+        // from top-level nav. It's a multi-entity quarter-at-a-glance
+        // view that only earns its place when there are 10+ entities
+        // under management. For 1-5 entities it's pure noise. Route
+        // `/closing` stays live and reachable via ⌘K ("closing") for
+        // the day the book grows.
         // 2026-04-18: AED removed from top-level. It lives inside each
         // entity now (/entities/[id] → AED tab) because a flat "AED
         // inbox across all entities" view was a dashboard-only concept

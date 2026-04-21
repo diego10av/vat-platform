@@ -1,32 +1,60 @@
-// Horizontal declaration lifecycle stepper. Renders the 8 states from
-// src/lib/lifecycle.ts in order, highlighting the current one in brand
-// pink and collapsing completed ones to a check-mark. On narrow screens
-// it compresses to "step N of 8 — <current label>" + a thin progress bar.
+// Horizontal declaration lifecycle stepper.
+//
+// The engine (src/lib/lifecycle.ts) tracks 8 DB states:
+//   created → uploading → extracting → classifying → review → approved → filed → paid
+//
+// The reviewer does not need to see `extracting` and `classifying` as
+// two separate user-facing steps — architecturally they are (Extract is
+// the Haiku OCR+parse call, Classify is the deterministic rules engine)
+// but for the VAT practitioner they feel like one phase ("the system
+// is processing the uploads"). This stepper collapses them to a single
+// visible "Processing" step while the underlying status field keeps
+// its 8-value granularity for audit / telemetry / retry logic.
+//
+// Diego's call 2026-04-21: "No entiendo por qué hay fase de upload y
+// luego extract y luego classify. ¿Cuál es la finalidad de extract?"
+// → correct. Implementation leaked into the UI. Fixed below.
 
 import { CheckIcon } from 'lucide-react';
 
-const STEPS: Array<{ id: string; label: string; short: string }> = [
-  { id: 'created',     label: 'Created',     short: 'Created' },
-  { id: 'uploading',   label: 'Uploading',   short: 'Upload' },
-  { id: 'extracting',  label: 'Extracting',  short: 'Extract' },
-  { id: 'classifying', label: 'Classifying', short: 'Classify' },
-  { id: 'review',      label: 'Review',      short: 'Review' },
-  { id: 'approved',    label: 'Approved',    short: 'Approved' },
-  { id: 'filed',       label: 'Filed',       short: 'Filed' },
-  { id: 'paid',        label: 'Paid',        short: 'Paid' },
+interface VisibleStep {
+  id: string;
+  label: string;
+  short: string;
+  /** DB statuses that count as "on this visible step". First entry is
+   *  the canonical status when we render the step as current. */
+  dbStatuses: string[];
+}
+
+const VISIBLE_STEPS: VisibleStep[] = [
+  { id: 'created',    label: 'Created',    short: 'Created',    dbStatuses: ['created'] },
+  { id: 'upload',     label: 'Upload',     short: 'Upload',     dbStatuses: ['uploading'] },
+  // `processing` folds extracting + classifying: the Haiku extractor
+  // run followed by the deterministic rules pass. The reviewer sees
+  // them as one phase.
+  { id: 'processing', label: 'Processing', short: 'Processing', dbStatuses: ['extracting', 'classifying'] },
+  { id: 'review',     label: 'Review',     short: 'Review',     dbStatuses: ['review'] },
+  { id: 'approved',   label: 'Approved',   short: 'Approved',   dbStatuses: ['approved'] },
+  { id: 'filed',      label: 'Filed',      short: 'Filed',      dbStatuses: ['filed'] },
+  { id: 'paid',       label: 'Paid',       short: 'Paid',       dbStatuses: ['paid'] },
 ];
 
+function findStepIndex(status: string): number {
+  const idx = VISIBLE_STEPS.findIndex(s => s.dbStatuses.includes(status));
+  return idx === -1 ? 0 : idx;
+}
+
 export function LifecycleStepper({ status }: { status: string }) {
-  const activeIdx = Math.max(0, STEPS.findIndex(s => s.id === status));
-  const currentLabel = STEPS[activeIdx]?.label ?? 'Unknown';
-  const progressPct = ((activeIdx) / (STEPS.length - 1)) * 100;
+  const activeIdx = findStepIndex(status);
+  const currentLabel = VISIBLE_STEPS[activeIdx]?.label ?? 'Unknown';
+  const progressPct = (activeIdx / (VISIBLE_STEPS.length - 1)) * 100;
 
   return (
     <div className="w-full">
-      {/* Mobile compact: just step N of 8 + progress bar */}
+      {/* Mobile compact: just step N of 7 + progress bar */}
       <div className="md:hidden">
         <div className="flex items-center justify-between text-[11.5px] mb-2">
-          <span className="text-ink-muted">Step {activeIdx + 1} of {STEPS.length}</span>
+          <span className="text-ink-muted">Step {activeIdx + 1} of {VISIBLE_STEPS.length}</span>
           <span className="font-semibold text-brand-600">{currentLabel}</span>
         </div>
         <div className="h-1.5 w-full bg-surface-alt rounded-full overflow-hidden">
@@ -39,7 +67,7 @@ export function LifecycleStepper({ status }: { status: string }) {
 
       {/* Desktop: full horizontal stepper */}
       <ol className="hidden md:flex items-center gap-0 w-full">
-        {STEPS.map((step, i) => {
+        {VISIBLE_STEPS.map((step, i) => {
           const isDone = i < activeIdx;
           const isCurrent = i === activeIdx;
 
@@ -64,6 +92,11 @@ export function LifecycleStepper({ status }: { status: string }) {
               key={step.id}
               className="relative flex-1 flex flex-col items-center"
               aria-current={isCurrent ? 'step' : undefined}
+              title={
+                step.id === 'processing'
+                  ? 'Processing combines two internal steps: extraction (AI reads the invoices and pulls the fields) and classification (deterministic rules assign a treatment code to every line).'
+                  : undefined
+              }
             >
               {/* Connector line to previous step */}
               {i > 0 && (
