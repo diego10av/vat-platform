@@ -31,11 +31,13 @@ import { validateVatNumber } from '@/lib/validation';
 
 const VALID_REGIMES = new Set(['simplified', 'ordinary']);
 const VALID_FREQUENCIES = new Set(['monthly', 'quarterly', 'yearly']);
+// 'passive_holding' removed 2026-04-21 — pure passive SOPARFIs are not
+// VAT taxable persons (Polysar C-60/90) and should not live in cifra.
+// See migration 021 for the DB-level enforcement.
 const VALID_ENTITY_TYPES = new Set([
   'fund',
   'securitization_vehicle',
   'active_holding',
-  'passive_holding',
   'gp',
   'manco',
   'other',

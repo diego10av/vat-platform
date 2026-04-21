@@ -506,33 +506,56 @@ export default function NewClientWizardPage() {
                   className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
               </Field>
-              <Field label="Type" hint="fund / securitization_vehicle / active_holding / passive_holding / gp / manco / other">
-                <input
+              <Field label="Type" hint="Drives classification rules">
+                <select
                   value={entity.entity_type}
                   onChange={(e) => setEntity({ ...entity, entity_type: e.target.value })}
-                  placeholder="active_holding"
-                  className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                />
+                  className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+                >
+                  <option value="">—</option>
+                  <option value="fund">Fund (UCITS / SIF / RAIF / SICAR)</option>
+                  <option value="securitization_vehicle">Securitisation vehicle (Loi 2004/2022)</option>
+                  <option value="active_holding">Active holding (SOPARFI w/ services)</option>
+                  <option value="gp">General partner</option>
+                  <option value="manco">Management company (AIFM / ManCo)</option>
+                  <option value="other">Other</option>
+                </select>
               </Field>
               <Field label="Regime">
                 <select
                   value={entity.regime}
-                  onChange={(e) => setEntity({ ...entity, regime: e.target.value as EntityForm['regime'] })}
+                  onChange={(e) => {
+                    const nextRegime = e.target.value as EntityForm['regime'];
+                    setEntity({
+                      ...entity,
+                      regime: nextRegime,
+                      // LU rule: simplified regime files annually only.
+                      frequency: nextRegime === 'simplified' ? 'annual' : entity.frequency,
+                    });
+                  }}
                   className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                   <option value="simplified">Simplified</option>
                   <option value="ordinary">Ordinary</option>
                 </select>
               </Field>
-              <Field label="Frequency">
+              <Field
+                label="Frequency"
+                hint={entity.regime === 'simplified' ? 'Simplified → annual only' : undefined}
+              >
                 <select
                   value={entity.frequency}
                   onChange={(e) => setEntity({ ...entity, frequency: e.target.value as EntityForm['frequency'] })}
-                  className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  disabled={entity.regime === 'simplified'}
+                  className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-surface-alt disabled:cursor-not-allowed"
                 >
                   <option value="annual">Annual</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="monthly">Monthly</option>
+                  {entity.regime !== 'simplified' && (
+                    <>
+                      <option value="quarterly">Quarterly</option>
+                      <option value="monthly">Monthly</option>
+                    </>
+                  )}
                 </select>
               </Field>
             </div>

@@ -259,6 +259,11 @@ export default function Home() {
             <kbd className="ml-1 inline-flex items-center h-5 px-1.5 rounded bg-white/15 font-mono text-[10.5px] text-white/90 border border-white/20">⌘K</kbd>
           </button>
           <span className="text-ink-faint text-[11px] px-1">·</span>
+          <Link href="/clients/new">
+            <Button variant="secondary" size="md" icon={<PlusIcon size={14} />}>
+              New client
+            </Button>
+          </Link>
           <Button
             variant="secondary"
             size="md"

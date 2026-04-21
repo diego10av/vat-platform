@@ -57,7 +57,7 @@ JSON schema:
   "address":         string | null,   // full address as printed
   "regime":          "simplified" | "ordinary" | null,
   "frequency":       "monthly" | "quarterly" | "yearly" | null,
-  "entity_type":     string | null,   // one of: fund, securitization_vehicle, active_holding, passive_holding, gp, manco, other
+  "entity_type":     string | null,   // one of: fund, securitization_vehicle, active_holding, gp, manco, other
   "effective_date":  string | null,   // ISO "YYYY-MM-DD" when VAT registration becomes effective
   "warnings":        string[]         // things you could not read confidently; empty array when clean
 }
@@ -66,13 +66,13 @@ Rules:
 - NEVER invent a VAT number. If the letter doesn't show one clearly, set null and add a warning.
 - Matricule starts "1999" or "2000+" for modern entities; if you see a number that doesn't match, return null + warning.
 - If the letter is not an AED registration letter (e.g. it's an invoice), return all-null fields and a single warning "Document does not look like a VAT registration letter".
-- entity_type mapping:
+- entity_type mapping (6 canonical values only — 'passive_holding' REMOVED 2026-04-21 because a pure passive holding is not a VAT taxable person per Polysar C-60/90 and has no reason to be registered for VAT):
     * "fund", "UCITS", "UCI Part II", "SIF", "RAIF", "SICAR", "fonds d'investissement" → "fund"
     * "securitisation", "securitization", "véhicule de titrisation", "loi du 22 mars 2004", "compartment", "SV" with issuance of notes/securities → "securitization_vehicle"
     * "AIFM", "ManCo", "management company", "société de gestion" → "manco"
     * "general partner", "GP", "commandité" in an SCSp/SCS context → "gp"
     * "SOPARFI" with explicit services to subsidiaries (management, administration, financing-with-management) → "active_holding"
-    * "SOPARFI" without clear activity OR explicitly described as "pure holding" / "dividends only" → "passive_holding" (note: a pure passive SOPARFI is NOT a taxable person under Polysar C-60/90 and typically has no VAT registration — add a warning if the letter shows registration for a pure passive holding)
+    * "SOPARFI" without clear activity — add a warning "This letter describes a passive holding which typically is not a VAT taxable person (Polysar C-60/90). Registration may be mistaken; confirm the entity actually provides taxable services before proceeding." and set entity_type to "other"
     * Everything else → "other"
 `;
 

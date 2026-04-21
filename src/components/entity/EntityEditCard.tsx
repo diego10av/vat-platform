@@ -35,12 +35,20 @@ export interface EntityEditable {
 }
 
 const REGIMES = ['simplified', 'ordinary'] as const;
-const FREQUENCIES = ['monthly', 'quarterly', 'yearly'] as const;
+const FREQUENCIES = ['monthly', 'quarterly', 'annual'] as const;
+// LU rule: the simplified regime can ONLY be filed annually. When the
+// user picks "simplified" we lock the frequency dropdown to "annual";
+// switching to "ordinary" unlocks it again. Diego confirmed this is
+// non-negotiable — 2026-04-21.
+function frequenciesAllowedFor(regime: string): readonly string[] {
+  return regime === 'simplified' ? (['annual'] as const) : FREQUENCIES;
+}
 const LEGAL_FORMS = ['SARL', 'SA', 'SCS', 'SCSp', 'SCA', 'SICAV', 'SICAF', 'SIF', 'RAIF', 'SICAR', 'GmbH', 'Ltd', 'LP', 'LLC', 'Other'];
-// SOPARFI nuance: the label "SOPARFI" is an income-tax regime
-// (Art. 166 LIR), not a VAT entity_type. In LU market practice, most
-// SOPARFIs are pure passive holdings → map to `passive_holding` (and
-// typically have no VAT registration at all per Polysar C-60/90).
+// SOPARFI nuance: "SOPARFI" is an income-tax regime label (Art. 166 LIR),
+// not a VAT entity_type. A pure passive SOPARFI is NOT a VAT taxable
+// person (Polysar C-60/90), has no registration, no matricule, no
+// return to file — there is no valid reason to create such an entity
+// in cifra. Removed from the dropdown 2026-04-21 per Diego's call.
 // A SOPARFI with active management / financial / admin services to
 // subsidiaries maps to `active_holding` (Cibo C-16/00, Marle C-320/17).
 // See docs/classification-research.md §10.
@@ -48,30 +56,26 @@ const ENTITY_TYPES: Array<{ value: string; label: string }> = [
   { value: 'fund', label: 'Fund (UCITS / SIF / RAIF / SICAR / UCI Part II)' },
   { value: 'securitization_vehicle', label: 'Securitisation vehicle (Loi 2004/2022)' },
   { value: 'active_holding', label: 'Active holding — SOPARFI with services (Cibo / Marle)' },
-  { value: 'passive_holding', label: 'Passive holding — pure SOPARFI (Polysar)' },
   { value: 'gp', label: 'General partner' },
   { value: 'manco', label: 'Management company (AIFM / ManCo)' },
   { value: 'other', label: 'Other' },
 ];
 
 // Per-type advisory notes shown inline when the user picks an entity type.
-// Kept short + actionable — helps the reviewer avoid the most common
-// classification mistakes (pure-SOPARFI auto-registered for VAT, SV
-// treated as a passive holding, etc.).
+// Kept short + actionable — helps the reviewer pick the correct bucket
+// without having to remember the full case-law reasoning each time.
 const ENTITY_TYPE_NOTES: Record<string, string> = {
-  passive_holding:
-    'Pure passive SOPARFI — typically NOT a VAT taxable person (Polysar C-60/90) and has no VAT registration / no matricule / no return to file. Only enter VAT identifiers if the holding in fact performs active management or financial services to subsidiaries, in which case use "Active holding" instead.',
   active_holding:
-    'Active / mixed holding — taxable for its management / admin / financial services to subsidiaries (Cibo C-16/00, Marle C-320/17). Input-VAT deduction on a pro-rata basis.',
+    'Active / mixed holding — taxable for its management / admin / financial services to subsidiaries (Cibo C-16/00, Marle C-320/17). Input-VAT deduction on a pro-rata basis. A pure passive SOPARFI is NOT a valid entry in cifra — remove it and do not file.',
   securitization_vehicle:
-    'Securitisation vehicle under Loi du 22 mars 2004 (modifiée 9 février 2022). An SV IS a taxable person for VAT; registration is typically required to handle reverse-charge on cross-border incoming services. Management services received are exempt under Art. 44§1 d LTVA via Fiscale Eenheid X C-595/13 extension. Servicer agreements with debt-collection components may need to be split (Aspiro C-40/15).',
+    'Securitisation vehicle under Loi du 22 mars 2004 (modifiée 9 février 2022). An SV IS a taxable person for VAT; registration is typically required to handle reverse-charge on cross-border incoming services. Management services received are exempt under Art. 44§1 d LTVA via Fiscale Eenheid X C-595/13. Servicer agreements with debt-collection components may need to be split (Aspiro C-40/15).',
   fund:
     'Special investment fund (UCITS, UCI Part II, SIF, RAIF, SICAR, qualifying AIF). Management services received are exempt under Art. 44§1 d LTVA. BlackRock C-231/19: a single supply of management to a mixed SIF + non-SIF book is entirely taxable — no partial exemption.',
   manco:
     'AIFM / ManCo — provides management services (its outgoing is typically exempt Art. 44§1 d). INCOMING services are typically TAXABLE — the ManCo is NOT a qualifying fund itself.',
   gp:
     'General partner of an SCSp or similar. Charges the fund for its services (outgoing). Incoming services are typically taxable — the GP is NOT a qualifying fund.',
-  other: 'Other entity — the classifier cannot apply entity-specific guards (no Polysar passive-holding gate, no fund-management exemption). Flag for reviewer discretion.',
+  other: 'Other entity — the classifier cannot apply entity-specific guards (no fund-management exemption, no IGP exclusion). Flag for reviewer discretion.',
 };
 
 export function EntityEditCard({
@@ -239,16 +243,6 @@ export function EntityEditCard({
               {ENTITY_TYPE_NOTES[draft.entity_type]}
             </p>
           )}
-          {draft.entity_type === 'passive_holding'
-            && (draft.vat_number?.trim() || draft.matricule?.trim()) && (
-            <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-[10.5px] text-amber-900 leading-snug">
-              <strong>Check:</strong> a pure passive holding typically is NOT a VAT taxable person
-              (Polysar C-60/90) — it has no VAT number and no matricule. Confirm the holding performs
-              active management / admin / financial services to its subsidiaries before keeping the
-              VAT identifier — otherwise either switch the entity type to <em>Active holding</em> or
-              remove this entity from cifra (it has no returns to file).
-            </div>
-          )}
         </Field>
 
         <Field label="VAT number">
@@ -279,19 +273,31 @@ export function EntityEditCard({
         <Field label="Regime">
           <select
             value={draft.regime}
-            onChange={e => setDraft({ ...draft, regime: e.target.value })}
+            onChange={e => {
+              const nextRegime = e.target.value;
+              // LU-law rule: simplified is only allowed annually. Snap
+              // the frequency back to 'annual' when the user switches
+              // into simplified, so we never persist an impossible
+              // (simplified, monthly) or (simplified, quarterly) pair.
+              const nextFreq = nextRegime === 'simplified' ? 'annual' : draft.frequency;
+              setDraft({ ...draft, regime: nextRegime, frequency: nextFreq });
+            }}
             className="w-full border border-border-strong rounded px-2 py-1.5 text-[12.5px] bg-white"
           >
             {REGIMES.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </Field>
-        <Field label="Frequency">
+        <Field
+          label="Frequency"
+          hint={draft.regime === 'simplified' ? 'Simplified → annual only' : undefined}
+        >
           <select
             value={draft.frequency}
             onChange={e => setDraft({ ...draft, frequency: e.target.value })}
-            className="w-full border border-border-strong rounded px-2 py-1.5 text-[12.5px] bg-white"
+            disabled={draft.regime === 'simplified'}
+            className="w-full border border-border-strong rounded px-2 py-1.5 text-[12.5px] bg-white disabled:bg-surface-alt disabled:cursor-not-allowed"
           >
-            {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
+            {frequenciesAllowedFor(draft.regime).map(f => <option key={f} value={f}>{f}</option>)}
           </select>
         </Field>
         <div />

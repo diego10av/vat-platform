@@ -355,13 +355,20 @@ function NewEntityPageInner() {
               className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           </Field>
-          <Field label="Type" hint="fund / securitization_vehicle / active_holding / passive_holding / gp / manco / other">
-            <input
+          <Field label="Type" hint="Drives classification rules">
+            <select
               value={form.entity_type}
               onChange={(e) => setForm({ ...form, entity_type: e.target.value })}
-              placeholder="active_holding"
-              className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
+              className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+            >
+              <option value="">—</option>
+              <option value="fund">Fund (UCITS / SIF / RAIF / SICAR)</option>
+              <option value="securitization_vehicle">Securitisation vehicle (Loi 2004/2022)</option>
+              <option value="active_holding">Active holding (SOPARFI w/ services)</option>
+              <option value="gp">General partner</option>
+              <option value="manco">Management company (AIFM / ManCo)</option>
+              <option value="other">Other</option>
+            </select>
           </Field>
           <Field label="RCS number">
             <input
@@ -377,22 +384,39 @@ function NewEntityPageInner() {
           <Field label="Regime">
             <select
               value={form.regime}
-              onChange={(e) => setForm({ ...form, regime: e.target.value as Regime })}
+              onChange={(e) => {
+                const nextRegime = e.target.value as Regime;
+                // LU rule: simplified regime files annually ONLY. Snap
+                // the frequency back to 'annual' on switch into simplified.
+                setForm({
+                  ...form,
+                  regime: nextRegime,
+                  frequency: nextRegime === 'simplified' ? 'annual' : form.frequency,
+                });
+              }}
               className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
               <option value="simplified">Simplified</option>
               <option value="ordinary">Ordinary</option>
             </select>
           </Field>
-          <Field label="Frequency">
+          <Field
+            label="Frequency"
+            hint={form.regime === 'simplified' ? 'Simplified → annual only' : undefined}
+          >
             <select
               value={form.frequency}
               onChange={(e) => setForm({ ...form, frequency: e.target.value as Frequency })}
-              className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              disabled={form.regime === 'simplified'}
+              className="w-full border border-border-strong rounded px-3 py-2 text-[13px] focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-surface-alt disabled:cursor-not-allowed"
             >
               <option value="annual">Annual</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="monthly">Monthly</option>
+              {form.regime !== 'simplified' && (
+                <>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="monthly">Monthly</option>
+                </>
+              )}
             </select>
           </Field>
         </div>
