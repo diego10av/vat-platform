@@ -448,6 +448,9 @@ export const CREDIT_INTERMEDIATION_KEYWORDS: readonly string[] = [
   'courtier en crédit', 'courtier en prêts', 'courtier en prêts immobiliers',
   'courtage de prêt', 'courtage en prêts', 'courtage en crédits',
   'apporteur d\'affaires crédit', 'apport d\'affaires crédit',
+  'apporteur d\'affaires pour', 'apporteur d\'affaires bancaire',
+  'sous-agent de crédit', 'sous-agent crédit', 'sub-agent crédit',
+  'agent apporteur', 'intermédiaire financier', 'intermédiaire bancaire',
   'intermédiation en opérations de banque',
   // German
   'kreditvermittlung', 'kreditvermittler', 'kreditmakler',
