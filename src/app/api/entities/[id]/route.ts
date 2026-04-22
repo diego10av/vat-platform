@@ -47,6 +47,7 @@ export async function PUT(
     'client_name', 'client_email', 'csp_name', 'csp_email',
     'has_fx', 'has_outgoing', 'has_recharges', 'notes',
     'ai_mode', // 'full' | 'classifier_only' (CHECK constraint in migration 009)
+    'requires_partner_review', // migration 023 — 2-step approval toggle
   ];
 
   // Defensive validation for ai_mode — the DB CHECK will catch bad values
@@ -63,7 +64,7 @@ export async function PUT(
 
   for (const field of fields) {
     if (field in body) {
-      const boolFields = ['has_fx', 'has_outgoing', 'has_recharges'];
+      const boolFields = ['has_fx', 'has_outgoing', 'has_recharges', 'requires_partner_review'];
       const newVal = boolFields.includes(field) ? !!body[field] : (body[field] || null);
       updates.push(`${field} = $${paramIdx}`);
       values.push(newVal);

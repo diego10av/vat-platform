@@ -16,6 +16,7 @@ interface TimelineData {
     matricule: string | null; regime: string; frequency: string; address: string | null;
     rcs_number: string | null; legal_form: string | null; entity_type: string | null;
     has_fx: boolean; has_outgoing: boolean; has_recharges: boolean;
+    requires_partner_review?: boolean;
     notes: string | null;
     ai_mode: 'full' | 'classifier_only' | null;
   };
@@ -111,6 +112,7 @@ export default function EntityDetailPage() {
           has_fx: e.has_fx,
           has_outgoing: e.has_outgoing,
           has_recharges: e.has_recharges,
+          requires_partner_review: !!e.requires_partner_review,
         }}
         onSaved={(next) => setData(d => d ? { ...d, entity: { ...d.entity, ...next } } : d)}
       />

@@ -6,6 +6,7 @@ export type DeclarationStatus =
   | 'extracting'
   | 'classifying'
   | 'review'
+  | 'pending_review'   // associate submitted, awaiting partner (entity.requires_partner_review=true)
   | 'approved'
   | 'filed'
   | 'paid';
@@ -17,6 +18,14 @@ const VALID_TRANSITIONS: [DeclarationStatus, DeclarationStatus][] = [
   ['extracting', 'classifying'],
   ['classifying', 'review'],
   ['review', 'approved'],
+  // Partner review branch — only when entity.requires_partner_review=true.
+  // The PATCH handler enforces the flag; the state machine here is
+  // permissive (any entity can technically use pending_review).
+  ['review', 'pending_review'],          // associate submits
+  ['pending_review', 'approved'],        // partner approves (two-person rule in PATCH)
+  ['pending_review', 'review'],          // associate recalls
+  ['approved', 'pending_review'],        // partner reopens for re-review (rare)
+  // Forward
   ['approved', 'filed'],
   ['filed', 'paid'],
   // Reopen transitions

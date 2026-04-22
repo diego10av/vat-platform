@@ -635,15 +635,20 @@ export default function DeclarationDetailPage() {
               {activeTab === 'outputs' && data.status === 'review' ? (
                 <SummaryApproveCTA
                   blockers={{ unclassified, flagged }}
-                  requiresPartnerReview={false}
+                  requiresPartnerReview={!!data.requires_partner_review}
                   onApprove={() => handleStatusChange('approved')}
-                  onSubmitForReview={() => handleStatusChange('approved') /* migration 023 replaces with pending_review */}
+                  onSubmitForReview={() => handleStatusChange('pending_review')}
                 />
               ) : (
                 <PhaseCTA
                   status={data.status as 'created' | 'uploading' | 'extracting' | 'classifying' | 'review' | 'pending_review' | 'approved' | 'filed' | 'paid'}
                   blockers={{ unclassified, flagged }}
-                  requiresPartnerReview={false}
+                  requiresPartnerReview={!!data.requires_partner_review}
+                  // Best-effort "am I the submitter?" check: compare the
+                  // stamped role against a session cookie probe. When we
+                  // lack that info (fresh load), assume not submitter so
+                  // the partner-approve CTA is clickable; the server
+                  // enforces the two-person rule on POST anyway.
                   viewerIsSubmitter={false}
                   hasPendingDocs={pendingDocs.some(d => d.status === 'uploaded' || d.status === 'error')}
                   jobRunning={!!activeJobId}
@@ -652,7 +657,7 @@ export default function DeclarationDetailPage() {
                   onExtractAll={handleExtract}
                   onGoToSummary={() => setActiveTab('outputs')}
                   onApprove={() => handleStatusChange('approved')}
-                  onSubmitForReview={() => handleStatusChange('approved')}
+                  onSubmitForReview={() => handleStatusChange('pending_review')}
                   onPartnerApprove={() => handleStatusChange('approved')}
                   onGoToFiling={() => setActiveTab('filing')}
                 />
@@ -790,7 +795,7 @@ export default function DeclarationDetailPage() {
 
           {/* ─── Lifecycle stepper ─── */}
           <div className="mb-6 px-2 py-4 bg-surface border border-border rounded-xl shadow-xs">
-            <LifecycleStepper status={data.status} />
+            <LifecycleStepper status={data.status} requiresPartnerReview={!!data.requires_partner_review} />
           </div>
 
           {/* ─── Always-visible meta ─── */}

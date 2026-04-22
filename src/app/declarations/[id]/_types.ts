@@ -75,6 +75,18 @@ export interface DeclarationData {
   frequency: string;
   has_fx: number | boolean;
   has_outgoing: number | boolean;
+  /** Migration 023 — when the parent entity opts into 2-step approval,
+   *  this flag enables the pending_review state between review and
+   *  approved. Default false (single-step flow, backward compatible). */
+  requires_partner_review?: boolean;
+  /** Role that submitted the declaration for partner review. Null until
+   *  the associate clicks "Submit for partner review". Used by the
+   *  two-person rule: the current session role must differ from this
+   *  value to approve. */
+  submitted_by?: string | null;
+  submitted_for_review_at?: string | null;
+  partner_approved_by?: string | null;
+  partner_approved_at?: string | null;
   vat_number: string;
   matricule: string;
   filing_ref: string | null;

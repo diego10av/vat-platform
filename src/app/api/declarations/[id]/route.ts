@@ -18,7 +18,8 @@ export async function GET(
   const declaration = await queryOne(
     `SELECT d.*, e.name as entity_name, e.regime, e.frequency, e.has_fx, e.has_outgoing, e.has_recharges,
             e.vat_number, e.matricule,
-            COALESCE(e.ai_mode, 'full') AS entity_ai_mode
+            COALESCE(e.ai_mode, 'full') AS entity_ai_mode,
+            COALESCE(e.requires_partner_review, false) AS requires_partner_review
      FROM declarations d JOIN entities e ON d.entity_id = e.id WHERE d.id = $1`,
     [id]
   );
@@ -91,7 +92,37 @@ export async function PATCH(
     let idx = 2;
 
     if (newStatus === 'approved') {
-      extra += `, approved_at = NOW(), approved_by = 'founder'`;
+      // Two-person rule when coming from pending_review: the approver
+      // (partner) must NOT be the same role as the submitter (associate).
+      // Junior / reviewer submit; admin approves. The feature is
+      // enforced only when the entity flag is on AND the previous
+      // status was pending_review — otherwise we're in the single-step
+      // flow and the check is skipped.
+      if (currentStatus === 'pending_review') {
+        const { verifySession, AUTH_COOKIE_NAME } = await import('@/lib/auth');
+        const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+        const session = await verifySession(cookie);
+        const submittedBy = (declaration as { submitted_by: string | null }).submitted_by;
+        if (submittedBy && submittedBy === session.role) {
+          return NextResponse.json({
+            error: {
+              code: 'two_person_rule',
+              message: 'The partner cannot approve their own preparation — this declaration was submitted by the same role (' + submittedBy + '). Ask a different role to approve.',
+            },
+          }, { status: 403 });
+        }
+        extra += `, approved_at = NOW(), approved_by = '${session.role || 'founder'}', partner_approved_at = NOW(), partner_approved_by = '${session.role || 'founder'}'`;
+      } else {
+        extra += `, approved_at = NOW(), approved_by = 'founder'`;
+      }
+    }
+    if (newStatus === 'pending_review') {
+      // Stamp the submitter's role — the two-person rule uses this to
+      // block self-approval later.
+      const { verifySession, AUTH_COOKIE_NAME } = await import('@/lib/auth');
+      const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+      const session = await verifySession(cookie);
+      extra += `, submitted_for_review_at = NOW(), submitted_by = '${session.role || 'founder'}'`;
     }
     if (newStatus === 'filed') {
       // filing_ref is required for FILED
@@ -122,7 +153,12 @@ export async function PATCH(
         extra += `, payment_ref = NULL, payment_confirmed_at = NULL`;
       }
       if (currentStatus === 'approved' || currentStatus === 'filed' || currentStatus === 'paid') {
-        extra += `, approved_at = NULL, approved_by = NULL`;
+        extra += `, approved_at = NULL, approved_by = NULL, partner_approved_at = NULL, partner_approved_by = NULL`;
+      }
+      if (currentStatus === 'pending_review') {
+        // Associate recalls their submission → clear submission stamps
+        // so re-submission starts fresh.
+        extra += `, submitted_for_review_at = NULL, submitted_by = NULL`;
       }
     }
 

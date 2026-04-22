@@ -32,6 +32,11 @@ export interface EntityEditable {
   has_fx: boolean;
   has_outgoing: boolean;
   has_recharges: boolean;
+  /** When true, declarations for this entity go through a 2-step
+   *  approval: associate submits (status=pending_review), partner
+   *  approves (status=approved). Enforces the two-person rule on the
+   *  server — the submitter cannot self-approve. Added 2026-04-23. */
+  requires_partner_review: boolean;
 }
 
 const REGIMES = ['simplified', 'ordinary'] as const;
@@ -128,6 +133,7 @@ export function EntityEditCard({
           has_fx: draft.has_fx,
           has_outgoing: draft.has_outgoing,
           has_recharges: draft.has_recharges,
+          requires_partner_review: draft.requires_partner_review,
         }),
       });
       const body = await res.json().catch(() => ({}));
@@ -340,6 +346,18 @@ export function EntityEditCard({
             className="h-3.5 w-3.5 accent-brand-500"
           />
           Internal recharges
+        </label>
+        <label
+          className="inline-flex items-center gap-2 text-[12px] text-ink-soft cursor-pointer"
+          title="Two signatures required — associate prepares, partner approves. Recommended for large clients or complex regimes. The submitter cannot self-approve (two-person rule)."
+        >
+          <input
+            type="checkbox"
+            checked={draft.requires_partner_review}
+            onChange={e => setDraft({ ...draft, requires_partner_review: e.target.checked })}
+            className="h-3.5 w-3.5 accent-brand-500"
+          />
+          Requires partner review before approval
         </label>
       </div>
 

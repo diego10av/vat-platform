@@ -26,7 +26,7 @@ interface VisibleStep {
   dbStatuses: string[];
 }
 
-const VISIBLE_STEPS: VisibleStep[] = [
+const BASE_STEPS: VisibleStep[] = [
   { id: 'created',    label: 'Created',    short: 'Created',    dbStatuses: ['created'] },
   { id: 'upload',     label: 'Upload',     short: 'Upload',     dbStatuses: ['uploading'] },
   // `processing` folds extracting + classifying: the Haiku extractor
@@ -39,22 +39,47 @@ const VISIBLE_STEPS: VisibleStep[] = [
   { id: 'paid',       label: 'Paid',       short: 'Paid',       dbStatuses: ['paid'] },
 ];
 
-function findStepIndex(status: string): number {
-  const idx = VISIBLE_STEPS.findIndex(s => s.dbStatuses.includes(status));
+const PARTNER_REVIEW_STEP: VisibleStep = {
+  id: 'pending_review', label: 'Partner review', short: 'Partner', dbStatuses: ['pending_review'],
+};
+
+function buildVisibleSteps(requiresPartnerReview: boolean): VisibleStep[] {
+  if (!requiresPartnerReview) return BASE_STEPS;
+  // Insert partner-review between Review and Approved.
+  const out: VisibleStep[] = [];
+  for (const step of BASE_STEPS) {
+    out.push(step);
+    if (step.id === 'review') out.push(PARTNER_REVIEW_STEP);
+  }
+  return out;
+}
+
+function findStepIndex(status: string, steps: VisibleStep[]): number {
+  const idx = steps.findIndex(s => s.dbStatuses.includes(status));
   return idx === -1 ? 0 : idx;
 }
 
-export function LifecycleStepper({ status }: { status: string }) {
-  const activeIdx = findStepIndex(status);
-  const currentLabel = VISIBLE_STEPS[activeIdx]?.label ?? 'Unknown';
-  const progressPct = (activeIdx / (VISIBLE_STEPS.length - 1)) * 100;
+export function LifecycleStepper({
+  status,
+  requiresPartnerReview,
+}: {
+  status: string;
+  /** When the entity opts into two-step approval (migration 023), the
+   *  stepper shows an extra "Partner review" node between Review and
+   *  Approved. Defaults to the base 7-step bar. */
+  requiresPartnerReview?: boolean;
+}) {
+  const steps = buildVisibleSteps(!!requiresPartnerReview);
+  const activeIdx = findStepIndex(status, steps);
+  const currentLabel = steps[activeIdx]?.label ?? 'Unknown';
+  const progressPct = (activeIdx / Math.max(1, steps.length - 1)) * 100;
 
   return (
     <div className="w-full">
-      {/* Mobile compact: just step N of 7 + progress bar */}
+      {/* Mobile compact: just step N of total + progress bar */}
       <div className="md:hidden">
         <div className="flex items-center justify-between text-[11.5px] mb-2">
-          <span className="text-ink-muted">Step {activeIdx + 1} of {VISIBLE_STEPS.length}</span>
+          <span className="text-ink-muted">Step {activeIdx + 1} of {steps.length}</span>
           <span className="font-semibold text-brand-600">{currentLabel}</span>
         </div>
         <div className="h-1.5 w-full bg-surface-alt rounded-full overflow-hidden">
@@ -67,7 +92,7 @@ export function LifecycleStepper({ status }: { status: string }) {
 
       {/* Desktop: full horizontal stepper */}
       <ol className="hidden md:flex items-center gap-0 w-full">
-        {VISIBLE_STEPS.map((step, i) => {
+        {steps.map((step, i) => {
           const isDone = i < activeIdx;
           const isCurrent = i === activeIdx;
 
