@@ -39,7 +39,12 @@
 //   counts only (no names / emails / amounts).
 // ════════════════════════════════════════════════════════════════════════
 
-import 'dotenv/config';
+// Load .env.local first (Next.js convention), then .env as fallback.
+// dotenv/config only reads .env by default, which doesn't have our secrets.
+import { config as dotenv } from 'dotenv';
+dotenv({ path: '.env.local' });
+dotenv({ path: '.env' });
+
 import { Client } from '@notionhq/client';
 import { execute, query, generateId } from '../src/lib/db';
 
@@ -768,12 +773,29 @@ async function main() {
         amountIncl,
         mapEnum(readSelect(props['Status']), MAP_BILLING_STATUS) ?? 'draft',
         mapEnum(readSelect(props['Payment method']), MAP_PAYMENT_METHOD),
-        readSelect(props['Status']) === '✅ Paid' ? issueDate : null,  // best-effort
+        readSelect(props['Status']) === '✅ Paid' ? issueDate : null,  // best-effort paid_date
         null,
       ],
     );
   }
   console.log(`  ✓ crm_billing_invoices: ${billingRaw.length} rows upserted`);
+
+  // Post-processing: Notion's "✅ Paid" status doesn't carry an
+  // amount_paid alongside. For invoices marked paid but with zero
+  // amount_paid, back-fill amount_paid = amount_incl_vat so the
+  // `outstanding` computed column goes to zero. Idempotent.
+  await execute(
+    `UPDATE crm_billing_invoices
+        SET amount_paid = amount_incl_vat,
+            paid_date   = COALESCE(paid_date, issue_date),
+            updated_at  = NOW()
+      WHERE status = 'paid'
+        AND amount_paid = 0`,
+  );
+  const paidCount = await query<{ count: string }>(
+    `SELECT COUNT(*)::text AS count FROM crm_billing_invoices WHERE status = 'paid' AND amount_paid = amount_incl_vat`,
+  );
+  console.log(`  ✓ paid-invoice amount_paid reconciled: ${paidCount[0]?.count ?? '0'} rows`);
 
   // 8. Pass 2: resolve referred_by_contact_id on contacts.
   let referredCount = 0;
