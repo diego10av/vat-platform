@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { SearchIcon } from 'lucide-react';
+import { SearchIcon, PlusIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Button } from '@/components/ui/Button';
+import { CrmFormModal } from '@/components/crm/CrmFormModal';
+import { COMPANY_FIELDS } from '@/components/crm/schemas';
+import { useToast } from '@/components/Toaster';
 import {
   LABELS_CLASSIFICATION, LABELS_INDUSTRY, LABELS_SIZE,
   type CompanyClassification,
@@ -28,8 +32,10 @@ export default function CompaniesPage() {
   const [rows, setRows] = useState<Company[] | null>(null);
   const [q, setQ] = useState('');
   const [classFilter, setClassFilter] = useState<string>('');
+  const [newOpen, setNewOpen] = useState(false);
+  const toast = useToast();
 
-  useEffect(() => {
+  const load = useCallback(() => {
     const qs = new URLSearchParams();
     if (q) qs.set('q', q);
     if (classFilter) qs.set('classification', classFilter);
@@ -38,6 +44,22 @@ export default function CompaniesPage() {
       .then(setRows)
       .catch(() => setRows([]));
   }, [q, classFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleCreate(values: Record<string, unknown>) {
+    const res = await fetch('/api/crm/companies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(values),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message ?? `Create failed (${res.status})`);
+    }
+    toast.success('Company created');
+    await load();
+  }
 
   const counts = useMemo(() => {
     const by: Record<string, number> = {};
@@ -52,6 +74,20 @@ export default function CompaniesPage() {
       <PageHeader
         title="Companies"
         subtitle="CRM accounts — firms, prospects, service providers, referrers."
+        actions={
+          <Button onClick={() => setNewOpen(true)} variant="primary" size="sm" icon={<PlusIcon size={13} />}>
+            New company
+          </Button>
+        }
+      />
+      <CrmFormModal
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        mode="create"
+        title="New company"
+        subtitle="Create a new account in the CRM."
+        fields={COMPANY_FIELDS}
+        onSave={handleCreate}
       />
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="relative flex-1 min-w-[220px] max-w-xs">

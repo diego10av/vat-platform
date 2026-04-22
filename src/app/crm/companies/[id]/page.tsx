@@ -1,9 +1,15 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState, use, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { PencilIcon, Trash2Icon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
+import { Button } from '@/components/ui/Button';
+import { useToast } from '@/components/Toaster';
+import { CrmFormModal } from '@/components/crm/CrmFormModal';
+import { COMPANY_FIELDS } from '@/components/crm/schemas';
 import {
   LABELS_CLASSIFICATION, LABELS_INDUSTRY, LABELS_SIZE,
   LABELS_STAGE, LABELS_MATTER_STATUS, LABELS_INVOICE_STATUS,
@@ -20,14 +26,56 @@ interface CompanyDetail {
 
 export default function CompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
+  const toast = useToast();
   const [data, setData] = useState<CompanyDetail | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     fetch(`/api/crm/companies/${id}`, { cache: 'no-store' })
       .then(r => r.json())
       .then(setData)
       .catch(() => setData(null));
   }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleUpdate(values: Record<string, unknown>) {
+    const res = await fetch(`/api/crm/companies/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(values),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message ?? `Update failed (${res.status})`);
+    }
+    const body = await res.json();
+    if (Array.isArray(body.changed) && body.changed.length > 0) {
+      toast.success(`Updated ${body.changed.length} field${body.changed.length === 1 ? '' : 's'}`);
+    } else {
+      toast.info('No changes to save');
+    }
+    await load();
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Delete "${String(data?.company?.company_name ?? '?')}"?\n\nIt goes to the trash for 30 days — you can restore it from /crm/trash.`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/crm/companies/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err?.error?.message ?? `Delete failed (${res.status})`);
+        return;
+      }
+      toast.success('Company moved to trash', 'Restore from /crm/trash within 30 days.');
+      router.push('/crm/companies');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   if (!data) return <PageSkeleton />;
   const c = data.company as Record<string, string | number | string[] | null>;
@@ -40,6 +88,36 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
       <PageHeader
         title={String(c.company_name ?? '(unnamed)')}
         subtitle={`${c.classification ? LABELS_CLASSIFICATION[c.classification as keyof typeof LABELS_CLASSIFICATION] : ''}${c.country ? ` · ${c.country}` : ''}`}
+        actions={
+          <>
+            <Button variant="secondary" size="sm" icon={<PencilIcon size={13} />} onClick={() => setEditOpen(true)}>
+              Edit
+            </Button>
+            <Button variant="ghost" size="sm" icon={<Trash2Icon size={13} />} onClick={handleDelete} loading={deleting}>
+              Delete
+            </Button>
+          </>
+        }
+      />
+      <CrmFormModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        mode="edit"
+        title="Edit company"
+        subtitle={String(c.company_name ?? '')}
+        fields={COMPANY_FIELDS}
+        initial={{
+          company_name: c.company_name,
+          classification: c.classification,
+          country: c.country,
+          industry: c.industry,
+          size: c.size,
+          website: c.website,
+          linkedin_url: c.linkedin_url,
+          tags: c.tags ?? [],
+          notes: c.notes,
+        }}
+        onSave={handleUpdate}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">

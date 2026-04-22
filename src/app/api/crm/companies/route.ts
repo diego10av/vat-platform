@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, execute, generateId, logAudit } from '@/lib/db';
+import { apiError } from '@/lib/api-errors';
 
 // GET /api/crm/companies — list, most-recent first. Query params:
 //   ?q=text          search in company_name (case-insensitive)
@@ -48,4 +49,47 @@ export async function GET(request: NextRequest) {
     params,
   );
   return NextResponse.json(rows);
+}
+
+// POST /api/crm/companies — create a new company row.
+//
+// Body: { company_name, country?, industry?, size?, classification?,
+//         website?, linkedin_url?, tags?[], notes?, lead_counsel?, entity_id? }
+// Returns: { id, ... }
+//
+// Required: company_name (min 1 char after trim).
+// Emits audit_log 'create' with targetType='crm_company' + reason=company_name.
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => ({}));
+  const name = typeof body.company_name === 'string' ? body.company_name.trim() : '';
+  if (!name) return apiError('company_name_required', 'company_name is required.', { status: 400 });
+
+  const id = generateId();
+  await execute(
+    `INSERT INTO crm_companies
+       (id, company_name, country, industry, size, classification,
+        website, linkedin_url, tags, notes, lead_counsel, entity_id, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())`,
+    [
+      id, name,
+      body.country ?? null,
+      body.industry ?? null,
+      body.size ?? null,
+      body.classification ?? null,
+      body.website ?? null,
+      body.linkedin_url ?? null,
+      Array.isArray(body.tags) ? body.tags : [],
+      body.notes ?? null,
+      body.lead_counsel ?? null,
+      body.entity_id ?? null,
+    ],
+  );
+  await logAudit({
+    action: 'create',
+    targetType: 'crm_company',
+    targetId: id,
+    newValue: name,
+    reason: 'New CRM company',
+  });
+  return NextResponse.json({ id, company_name: name }, { status: 201 });
 }
