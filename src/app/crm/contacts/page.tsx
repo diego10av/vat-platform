@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
+import { ExportButton } from '@/components/crm/ExportButton';
 import { CONTACT_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -107,7 +108,10 @@ export default function ContactsPage() {
           <option value="">All lifecycle stages</option>
           {CONTACT_LIFECYCLES.map(s => <option key={s} value={s}>{LABELS_LIFECYCLE[s]}</option>)}
         </select>
-        <span className="ml-auto text-[11.5px] text-ink-muted">{rows.length} contacts</span>
+        <div className="ml-auto flex items-center gap-2">
+          <ExportButton entity="contacts" />
+          <span className="text-[11.5px] text-ink-muted">{rows.length} contacts</span>
+        </div>
       </div>
 
       {rows.length === 0 ? (

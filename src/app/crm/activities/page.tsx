@@ -7,6 +7,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
+import { ExportButton } from '@/components/crm/ExportButton';
 import { ACTIVITY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -99,7 +100,10 @@ export default function ActivitiesPage() {
           <option value="">All types</option>
           {ACTIVITY_TYPES.map(t => <option key={t} value={t}>{LABELS_ACTIVITY_TYPE[t]}</option>)}
         </select>
-        <span className="ml-auto text-[11.5px] text-ink-muted">{rows.length} activities</span>
+        <div className="ml-auto flex items-center gap-2">
+          <ExportButton entity="activities" />
+          <span className="text-[11.5px] text-ink-muted">{rows.length} activities</span>
+        </div>
       </div>
 
       {rows.length === 0 ? (

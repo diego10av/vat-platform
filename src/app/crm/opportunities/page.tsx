@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { PipelineKanban } from '@/components/crm/PipelineKanban';
+import { ExportButton } from '@/components/crm/ExportButton';
 import { OPPORTUNITY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -145,7 +146,10 @@ export default function OpportunitiesPage() {
             {OPPORTUNITY_STAGES.map(s => <option key={s} value={s}>{LABELS_STAGE[s]}</option>)}
           </select>
         )}
-        <span className="ml-auto text-[11.5px] text-ink-muted">{rows.length} opportunities</span>
+        <div className="ml-auto flex items-center gap-2">
+          <ExportButton entity="opportunities" />
+          <span className="text-[11.5px] text-ink-muted">{rows.length} opportunities</span>
+        </div>
       </div>
 
       {rows.length === 0 ? (

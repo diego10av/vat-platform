@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
+import { ExportButton } from '@/components/crm/ExportButton';
 import { COMPANY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -119,7 +120,10 @@ export default function CompaniesPage() {
             <option key={k} value={k}>{label}{counts[k] ? ` · ${counts[k]}` : ''}</option>
           ))}
         </select>
-        <span className="ml-auto text-[11.5px] text-ink-muted">{rows.length} companies</span>
+        <div className="ml-auto flex items-center gap-2">
+          <ExportButton entity="companies" />
+          <span className="text-[11.5px] text-ink-muted">{rows.length} companies</span>
+        </div>
       </div>
 
       {rows.length === 0 ? (

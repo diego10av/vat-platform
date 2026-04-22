@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
+import { ExportButton } from '@/components/crm/ExportButton';
 import { MATTER_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -109,7 +110,10 @@ export default function MattersPage() {
           <option value="">All statuses</option>
           {MATTER_STATUSES.map(s => <option key={s} value={s}>{LABELS_MATTER_STATUS[s]}</option>)}
         </select>
-        <span className="ml-auto text-[11.5px] text-ink-muted">{rows.length} matters</span>
+        <div className="ml-auto flex items-center gap-2">
+          <ExportButton entity="matters" />
+          <span className="text-[11.5px] text-ink-muted">{rows.length} matters</span>
+        </div>
       </div>
 
       {rows.length === 0 ? (

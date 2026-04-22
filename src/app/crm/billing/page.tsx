@@ -8,6 +8,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
+import { ExportButton } from '@/components/crm/ExportButton';
 import { INVOICE_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -148,6 +149,9 @@ export default function BillingPage() {
           <option value="">All statuses</option>
           {INVOICE_STATUSES.map(s => <option key={s} value={s}>{LABELS_INVOICE_STATUS[s]}</option>)}
         </select>
+        <div className="ml-auto">
+          <ExportButton entity="billing" extraParams={year ? { year } : undefined} />
+        </div>
       </div>
 
       {data.invoices.length === 0 ? (

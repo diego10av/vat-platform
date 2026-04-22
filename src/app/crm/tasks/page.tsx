@@ -7,6 +7,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
+import { ExportButton } from '@/components/crm/ExportButton';
 import { TASK_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -106,6 +107,9 @@ export default function TasksPage() {
           <option value="">All priorities</option>
           {TASK_PRIORITIES.map(p => <option key={p} value={p}>{LABELS_TASK_PRIORITY[p]}</option>)}
         </select>
+        <div className="ml-auto">
+          <ExportButton entity="tasks" />
+        </div>
       </div>
 
       {rows.length === 0 ? (
