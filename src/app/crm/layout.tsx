@@ -14,7 +14,9 @@ import { usePathname } from 'next/navigation';
 import {
   BuildingIcon, UsersIcon, TargetIcon, BriefcaseIcon,
   CalendarIcon, CheckSquareIcon, EuroIcon, Trash2Icon,
+  SearchIcon,
 } from 'lucide-react';
+import { GlobalSearch } from '@/components/crm/GlobalSearch';
 
 const TABS = [
   { href: '/crm/companies',     label: 'Companies',     icon: BuildingIcon },
@@ -31,6 +33,7 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
     <div className="max-w-[1400px] mx-auto px-4 pt-4">
+      <GlobalSearch />
       <nav className="flex items-center gap-1 border-b border-border mb-4 overflow-x-auto">
         {TABS.map(tab => {
           const isActive = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
@@ -50,6 +53,18 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
             </Link>
           );
         })}
+        <button
+          onClick={() => {
+            // Simulate ⌘K — dispatch a synthetic event.
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
+          }}
+          className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11.5px] text-ink-muted hover:text-ink border border-border rounded-md hover:bg-surface-alt whitespace-nowrap"
+          title="Search across all CRM entities (⌘K)"
+        >
+          <SearchIcon size={12} />
+          Search
+          <kbd className="text-[9.5px] px-1 py-0.5 rounded bg-surface-alt border border-border text-ink-faint">⌘K</kbd>
+        </button>
       </nav>
       <div>{children}</div>
     </div>

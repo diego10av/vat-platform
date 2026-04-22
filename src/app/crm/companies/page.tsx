@@ -8,6 +8,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
+import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { COMPANY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -33,7 +34,16 @@ export default function CompaniesPage() {
   const [q, setQ] = useState('');
   const [classFilter, setClassFilter] = useState<string>('');
   const [newOpen, setNewOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const toast = useToast();
+
+  const toggleOne = (id: string) => setSelected(prev => {
+    const n = new Set(prev);
+    if (n.has(id)) n.delete(id); else n.add(id);
+    return n;
+  });
+  const toggleAll = (on: boolean) => setSelected(on ? new Set((rows ?? []).map(r => r.id)) : new Set());
+  const clearSelection = () => setSelected(new Set());
 
   const load = useCallback(() => {
     const qs = new URLSearchParams();
@@ -123,6 +133,15 @@ export default function CompaniesPage() {
           <table className="w-full text-[12.5px]">
             <thead className="bg-surface-alt text-ink-muted">
               <tr>
+                <th className="px-3 py-2 w-8">
+                  <input
+                    type="checkbox"
+                    checked={selected.size > 0 && selected.size === rows.length}
+                    ref={el => { if (el) el.indeterminate = selected.size > 0 && selected.size < rows.length; }}
+                    onChange={e => toggleAll(e.target.checked)}
+                    className="h-4 w-4 accent-brand-500 cursor-pointer"
+                  />
+                </th>
                 <th className="text-left px-3 py-2 font-medium">Company</th>
                 <th className="text-left px-3 py-2 font-medium">Classification</th>
                 <th className="text-left px-3 py-2 font-medium">Country</th>
@@ -133,7 +152,15 @@ export default function CompaniesPage() {
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.id} className="border-t border-border hover:bg-surface-alt/50">
+                <tr key={r.id} className={`border-t border-border hover:bg-surface-alt/50 ${selected.has(r.id) ? 'bg-brand-50/40' : ''}`}>
+                  <td className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(r.id)}
+                      onChange={() => toggleOne(r.id)}
+                      className="h-4 w-4 accent-brand-500 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-3 py-2">
                     <Link href={`/crm/companies/${r.id}`} className="font-medium text-brand-700 hover:underline">
                       {r.company_name}
@@ -161,6 +188,13 @@ export default function CompaniesPage() {
           </table>
         </div>
       )}
+
+      <BulkActionBar
+        targetType="crm_company"
+        selectedIds={Array.from(selected)}
+        onClear={clearSelection}
+        onDone={() => { clearSelection(); load(); }}
+      />
     </div>
   );
 }
