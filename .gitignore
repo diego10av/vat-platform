@@ -40,6 +40,22 @@ yarn-error.log*
 /uploads/
 /data/
 
+# Real client documents must never be committed. The extractor
+# diagnostic (scripts/extractor-diagnostic.ts) is fed real PDFs
+# from external paths (e.g. ~/Desktop/xxx.pdf) — if one ever
+# ends up next to the repo root by accident, this catches it.
+# Synthetic fixtures go under src/__tests__/fixtures/ and are
+# whitelisted by their path.
+/*.pdf
+/*.PDF
+/*.jpg
+/*.JPG
+/*.jpeg
+/*.JPEG
+/*.png
+/*.PNG
+scripts/extractor-diagnostic/output/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
