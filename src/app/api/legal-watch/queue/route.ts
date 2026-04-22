@@ -5,11 +5,17 @@ import { query } from '@/lib/db';
 //
 // Returns items from legal_watch_queue, most-recent first.
 // Query params:
-//   ?status=new|flagged|dismissed|escalated   (default: new + flagged)
+//   ?status=new|flagged|dismissed|escalated   (default: new + flagged + escalated)
+//   ?include_dismissed=true                    (convenience: adds 'dismissed')
 //   ?limit=50                                  (default 50, max 200)
+//
+// 2026-04-23 — default filter now returns escalated too, because the
+// redesigned queue card renders escalated items in a "Pending rule
+// update" section rather than hiding them.
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const statusParam = url.searchParams.get('status');
+  const includeDismissed = url.searchParams.get('include_dismissed') === 'true';
   const limitParam = Math.min(
     200,
     Math.max(1, Number(url.searchParams.get('limit') ?? 50) || 50),
@@ -17,7 +23,9 @@ export async function GET(request: NextRequest) {
 
   const statusFilter = statusParam
     ? [statusParam]
-    : ['new', 'flagged'];
+    : includeDismissed
+      ? ['new', 'flagged', 'escalated', 'dismissed']
+      : ['new', 'flagged', 'escalated'];
 
   const rows = await query(
     `SELECT id, source, external_id, title, url, summary, published_at,
