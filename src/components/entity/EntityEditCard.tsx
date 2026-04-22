@@ -37,6 +37,17 @@ export interface EntityEditable {
    *  approves (status=approved). Enforces the two-person rule on the
    *  server — the submitter cannot self-approve. Added 2026-04-23. */
   requires_partner_review: boolean;
+  /** Stint 24 — fields captured from the AED VAT registration letter
+   *  (migration 027). Displayed read-only in the summary for now; the
+   *  edit form still covers only the legacy fields. Edit comes in a
+   *  follow-up once Diego validates the extracted values look right. */
+  tax_office?: string | null;
+  activity_code?: string | null;
+  activity_description?: string | null;
+  bank_name?: string | null;
+  bank_iban?: string | null;
+  bank_bic?: string | null;
+  deregistration_date?: string | null;
 }
 
 const REGIMES = ['simplified', 'ordinary'] as const;
@@ -153,46 +164,104 @@ export function EntityEditCard({
   }
 
   if (!editing) {
+    const hasBank = !!(entity.bank_name || entity.bank_iban || entity.bank_bic);
+    const hasActivity = !!(entity.activity_code || entity.activity_description);
+    const isDeregistered = !!entity.deregistration_date;
+
     return (
-      <div className="bg-surface border border-border rounded-lg mb-4 px-4 py-3 flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
-            <span className="uppercase tracking-wide font-semibold text-ink-muted text-[10px]">
-              Entity profile
-            </span>
-            {draftMeta.hasDraft && (
-              <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold bg-amber-50 text-amber-800 border border-amber-200 rounded px-1.5 py-0.5">
-                <ClockIcon size={9} />
-                Unsaved draft
+      <div className="mb-4">
+        {/* De-registration banner — migration 027. When AED has set
+             Date fin d'activité on the Fiche Signalétique, we render
+             a red banner so the reviewer understands the entity is
+             inactive. Declarations can still be viewed/edited but the
+             "new declaration" CTAs downstream should be hidden.
+             (Blocking new declarations is the next stint; this is
+             the visible signal.) */}
+        {isDeregistered && (
+          <div className="mb-2 bg-danger-50 border border-danger-300 text-[12px] text-danger-800 rounded-md px-3 py-2">
+            <strong className="font-semibold">Entity de-registered</strong>
+            {' · Date fin d\'activité: '}
+            <span className="font-mono">{entity.deregistration_date}</span>
+            {'. No new VAT declarations should be filed. Classifier will still run on existing ones for audit purposes.'}
+          </div>
+        )}
+        <div className="bg-surface border border-border rounded-lg px-4 py-3 flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap text-[11.5px]">
+              <span className="uppercase tracking-wide font-semibold text-ink-muted text-[10px]">
+                Entity profile
               </span>
-            )}
-          </div>
-          <dl className="mt-2 grid grid-cols-3 md:grid-cols-6 gap-x-4 gap-y-2 text-[11.5px]">
-            <MetaField label="Legal form" value={entity.legal_form} />
-            <MetaField label="Entity type" value={formatEntityType(entity.entity_type)} />
-            <MetaField label="VAT number" value={entity.vat_number} mono />
-            <MetaField label="Matricule" value={entity.matricule} mono />
-            <MetaField label="RCS" value={entity.rcs_number} mono />
-            <MetaField label="Regime" value={`${entity.regime} · ${entity.frequency}`} />
-          </dl>
-          {entity.address && (
-            <div className="mt-2 text-[11px] text-ink-muted truncate">
-              {entity.address}
+              {entity.tax_office && (
+                <span
+                  className="inline-flex items-center text-[10px] uppercase tracking-wide font-medium bg-slate-100 text-slate-700 border border-slate-200 rounded px-1.5 py-0.5"
+                  title="AED bureau d'imposition (tax office) captured from the VAT registration letter."
+                >
+                  {entity.tax_office}
+                </span>
+              )}
+              {draftMeta.hasDraft && (
+                <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide font-semibold bg-amber-50 text-amber-800 border border-amber-200 rounded px-1.5 py-0.5">
+                  <ClockIcon size={9} />
+                  Unsaved draft
+                </span>
+              )}
             </div>
-          )}
-          <div className="mt-2 flex gap-2">
-            {entity.has_fx && <FeatureChip label="FX" />}
-            {entity.has_outgoing && <FeatureChip label="Outgoing" />}
-            {entity.has_recharges && <FeatureChip label="Recharges" />}
+            <dl className="mt-2 grid grid-cols-3 md:grid-cols-6 gap-x-4 gap-y-2 text-[11.5px]">
+              <MetaField label="Legal form" value={entity.legal_form} />
+              <MetaField label="Entity type" value={formatEntityType(entity.entity_type)} />
+              <MetaField label="VAT number" value={entity.vat_number} mono />
+              <MetaField label="Matricule" value={entity.matricule} mono />
+              <MetaField label="RCS" value={entity.rcs_number} mono />
+              <MetaField label="Regime" value={`${entity.regime} · ${entity.frequency}`} />
+            </dl>
+            {entity.address && (
+              <div className="mt-2 text-[11px] text-ink-muted truncate">
+                {entity.address}
+              </div>
+            )}
+            {hasActivity && (
+              <div className="mt-1.5 text-[11px] text-ink-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+                {entity.activity_code && (
+                  <span>
+                    <span className="uppercase tracking-wide text-[9.5px] font-semibold text-ink-faint mr-1">Activity code</span>
+                    <span className="font-mono">{entity.activity_code}</span>
+                  </span>
+                )}
+                {entity.activity_description && (
+                  <span className="truncate">{entity.activity_description}</span>
+                )}
+              </div>
+            )}
+            {hasBank && (
+              <div className="mt-1.5 text-[11px] text-ink-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="uppercase tracking-wide text-[9.5px] font-semibold text-ink-faint">Bank</span>
+                {entity.bank_name && <span>{entity.bank_name}</span>}
+                {entity.bank_iban && (
+                  <span className="font-mono" title="IBAN from the VAT registration letter.">
+                    {entity.bank_iban}
+                  </span>
+                )}
+                {entity.bank_bic && (
+                  <span className="font-mono text-[10.5px]">
+                    {entity.bank_bic}
+                  </span>
+                )}
+              </div>
+            )}
+            <div className="mt-2 flex gap-2">
+              {entity.has_fx && <FeatureChip label="FX" />}
+              {entity.has_outgoing && <FeatureChip label="Outgoing" />}
+              {entity.has_recharges && <FeatureChip label="Recharges" />}
+            </div>
           </div>
+          <button
+            onClick={() => setEditing(true)}
+            className="shrink-0 h-8 px-3 rounded-md border border-border-strong text-[12px] font-medium text-ink-soft hover:text-ink hover:bg-surface-alt inline-flex items-center gap-1.5"
+          >
+            <PencilIcon size={12} />
+            Edit
+          </button>
         </div>
-        <button
-          onClick={() => setEditing(true)}
-          className="shrink-0 h-8 px-3 rounded-md border border-border-strong text-[12px] font-medium text-ink-soft hover:text-ink hover:bg-surface-alt inline-flex items-center gap-1.5"
-        >
-          <PencilIcon size={12} />
-          Edit
-        </button>
       </div>
     );
   }

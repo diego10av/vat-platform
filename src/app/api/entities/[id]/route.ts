@@ -44,6 +44,9 @@ export async function PUT(
   const fields = [
     'name', 'vat_number', 'matricule', 'rcs_number', 'legal_form', 'entity_type',
     'regime', 'frequency', 'address', 'bank_iban', 'bank_bic', 'tax_office',
+    // Stint 24 additions (migration 027) — first-class entity columns
+    // captured from the AED VAT registration letter.
+    'bank_name', 'activity_code', 'activity_description', 'deregistration_date',
     'client_name', 'client_email', 'csp_name', 'csp_email',
     'has_fx', 'has_outgoing', 'has_recharges', 'notes',
     'ai_mode', // 'full' | 'classifier_only' (CHECK constraint in migration 009)

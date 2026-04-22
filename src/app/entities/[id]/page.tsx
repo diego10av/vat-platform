@@ -19,6 +19,16 @@ interface TimelineData {
     requires_partner_review?: boolean;
     notes: string | null;
     ai_mode: 'full' | 'classifier_only' | null;
+    // Stint 24 — fields from the AED VAT registration letter (migration 027).
+    // Optional because the timeline endpoint may predate the migration; all
+    // default to null in the UI.
+    tax_office?: string | null;
+    activity_code?: string | null;
+    activity_description?: string | null;
+    bank_name?: string | null;
+    bank_iban?: string | null;
+    bank_bic?: string | null;
+    deregistration_date?: string | null;
   };
   declarations: Array<{
     id: string; year: number; period: string; status: string;
@@ -113,6 +123,16 @@ export default function EntityDetailPage() {
           has_outgoing: e.has_outgoing,
           has_recharges: e.has_recharges,
           requires_partner_review: !!e.requires_partner_review,
+          // Stint 24 — fields captured from the VAT registration letter
+          // (migration 027). Read-only display in EntityEditCard until
+          // the follow-up stint adds edit form inputs for them.
+          tax_office: e.tax_office ?? null,
+          activity_code: e.activity_code ?? null,
+          activity_description: e.activity_description ?? null,
+          bank_name: e.bank_name ?? null,
+          bank_iban: e.bank_iban ?? null,
+          bank_bic: e.bank_bic ?? null,
+          deregistration_date: e.deregistration_date ?? null,
         }}
         onSaved={(next) => setData(d => d ? { ...d, entity: { ...d.entity, ...next } } : d)}
       />
