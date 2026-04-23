@@ -12,6 +12,7 @@ import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { PipelineKanban } from '@/components/crm/PipelineKanban';
 import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { DateBadge } from '@/components/crm/DateBadge';
 import { crmLoadList } from '@/lib/useCrmFetch';
 import { OPPORTUNITY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -204,7 +205,7 @@ export default function OpportunitiesPage() {
                   <td className="px-3 py-2 text-right tabular-nums">{formatEur(r.estimated_value_eur)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{r.probability_pct !== null ? `${r.probability_pct}%` : '—'}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-medium">{formatEur(r.weighted_value_eur)}</td>
-                  <td className="px-3 py-2 text-ink-muted">{formatDate(r.estimated_close_date)}</td>
+                  <td className="px-3 py-2"><DateBadge value={r.estimated_close_date} mode="urgency" /></td>
                   <td className="px-3 py-2 text-ink-muted truncate max-w-[200px]">
                     {r.next_action ? (
                       <span title={r.next_action}>

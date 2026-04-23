@@ -11,6 +11,7 @@ import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { DateBadge } from '@/components/crm/DateBadge';
 import { crmLoadList } from '@/lib/useCrmFetch';
 import { CONTACT_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -163,7 +164,7 @@ export default function ContactsPage() {
                     <td className="px-3 py-2">{r.country ?? '—'}</td>
                     <td className="px-3 py-2">{r.lifecycle_stage ? LABELS_LIFECYCLE[r.lifecycle_stage as ContactLifecycle] : '—'}</td>
                     <td className="px-3 py-2">{eng ? LABELS_ENGAGEMENT[eng as EngagementLevel] : '—'}</td>
-                    <td className="px-3 py-2 text-ink-muted">{r.next_follow_up ?? '—'}</td>
+                    <td className="px-3 py-2"><DateBadge value={r.next_follow_up} mode="urgency" /></td>
                   </tr>
                 );
               })}

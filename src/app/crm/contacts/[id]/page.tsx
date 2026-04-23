@@ -149,6 +149,32 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
         <Card title="Engagement">{eng ? LABELS_ENGAGEMENT[eng as keyof typeof LABELS_ENGAGEMENT] : '—'}</Card>
       </div>
 
+      {(c.next_follow_up || c.birthday || c.client_anniversary) && (
+        <div className="mb-5 p-3 border border-border rounded-md bg-white">
+          <div className="text-[10.5px] uppercase tracking-wide font-semibold text-ink-muted mb-2">Important dates</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[12.5px]">
+            {c.next_follow_up && (
+              <div>
+                <div className="text-[10px] uppercase text-ink-muted mb-0.5">📞 Next follow-up</div>
+                <div className="tabular-nums">{formatDate(String(c.next_follow_up))}</div>
+              </div>
+            )}
+            {c.birthday && (
+              <div>
+                <div className="text-[10px] uppercase text-ink-muted mb-0.5">🎂 Birthday</div>
+                <div className="tabular-nums">{formatBirthday(String(c.birthday))}</div>
+              </div>
+            )}
+            {c.client_anniversary && (
+              <div>
+                <div className="text-[10px] uppercase text-ink-muted mb-0.5">🥂 Relationship since</div>
+                <div className="tabular-nums">{formatDate(String(c.client_anniversary))}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {c.notes && (
         <div className="mb-5 p-3 bg-surface-alt border border-border rounded text-[12.5px] whitespace-pre-wrap">{String(c.notes)}</div>
       )}
@@ -204,6 +230,14 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
       <RecordHistory targetType="crm_contact" targetId={id} />
     </div>
   );
+}
+
+// Birthdays: year is a placeholder (the anniversary UX only cares
+// about month/day). Render "3 Oct" without the year to reduce noise.
+function formatBirthday(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {

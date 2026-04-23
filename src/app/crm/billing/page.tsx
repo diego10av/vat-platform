@@ -11,6 +11,7 @@ import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { ExportButton } from '@/components/crm/ExportButton';
 import { BillingDashboard } from '@/components/crm/BillingDashboard';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { DateBadge } from '@/components/crm/DateBadge';
 import { crmLoadShape } from '@/lib/useCrmFetch';
 import { INVOICE_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -215,7 +216,11 @@ export default function BillingPage() {
                     {r.matter_id ? <Link href={`/crm/matters/${r.matter_id}`} className="hover:underline">{r.matter_reference}</Link> : '—'}
                   </td>
                   <td className="px-3 py-2 tabular-nums">{formatDate(r.issue_date)}</td>
-                  <td className="px-3 py-2 tabular-nums">{formatDate(r.due_date)}</td>
+                  <td className="px-3 py-2">
+                    {Number(r.outstanding) > 0 && r.status !== 'paid' && r.status !== 'cancelled' && r.status !== 'credit_note'
+                      ? <DateBadge value={r.due_date} mode="urgency" />
+                      : <span className="text-ink-muted tabular-nums">{formatDate(r.due_date)}</span>}
+                  </td>
                   <td className="px-3 py-2 text-right tabular-nums">{formatEur(r.amount_excl_vat)}</td>
                   <td className="px-3 py-2 text-right tabular-nums font-medium">{formatEur(r.amount_incl_vat)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">

@@ -11,6 +11,7 @@ import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { DateBadge } from '@/components/crm/DateBadge';
 import { crmLoadList } from '@/lib/useCrmFetch';
 import { MATTER_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -152,6 +153,7 @@ export default function MattersPage() {
                 <th className="text-right px-3 py-2 font-medium">Total billed</th>
                 <th className="text-right px-3 py-2 font-medium">Hours</th>
                 <th className="text-left px-3 py-2 font-medium">Opened</th>
+                <th className="text-left px-3 py-2 font-medium">Closing</th>
               </tr>
             </thead>
             <tbody>
@@ -180,6 +182,13 @@ export default function MattersPage() {
                   <td className="px-3 py-2 text-right tabular-nums">{formatEur(r.total_billed)}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{Number(r.total_hours).toFixed(1)}h</td>
                   <td className="px-3 py-2 text-ink-muted">{formatDate(r.opening_date)}</td>
+                  <td className="px-3 py-2">
+                    {r.status === 'active' && r.closing_date
+                      ? <DateBadge value={r.closing_date} mode="urgency" />
+                      : r.closing_date
+                        ? <span className="text-ink-muted tabular-nums">{formatDate(r.closing_date)}</span>
+                        : <span className="text-ink-muted">—</span>}
+                  </td>
                 </tr>
               ))}
             </tbody>
