@@ -11,6 +11,7 @@ import { useToast } from '@/components/Toaster';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { RecordHistory } from '@/components/crm/RecordHistory';
 import { MeetingBriefButton } from '@/components/crm/MeetingBriefButton';
+import { DraftEmailButton } from '@/components/crm/DraftEmailButton';
 import { CONTACT_FIELDS } from '@/components/crm/schemas';
 import {
   LABELS_LIFECYCLE, LABELS_ENGAGEMENT, LABELS_ACTIVITY_TYPE,
@@ -103,6 +104,13 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
         actions={
           <>
             <MeetingBriefButton contactId={id} contactName={String(c.full_name ?? 'contact')} />
+            {(() => {
+              const eng = (c.engagement_override as string | null) ?? (c.engagement_level as string | null);
+              if (eng === 'dormant' || eng === 'lapsed') {
+                return <DraftEmailButton targetType="crm_contact" targetId={id} intent="check_in" label="Draft check-in" />;
+              }
+              return <DraftEmailButton targetType="crm_contact" targetId={id} intent="follow_up" label="Draft follow-up" />;
+            })()}
             <Button variant="secondary" size="sm" icon={<PencilIcon size={13} />} onClick={() => setEditOpen(true)}>
               Edit
             </Button>

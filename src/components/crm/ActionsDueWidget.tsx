@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useCrmFetch } from '@/lib/useCrmFetch';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { DraftEmailButton } from '@/components/crm/DraftEmailButton';
 import { useToast } from '@/components/Toaster';
 
 type ActionType =
@@ -173,9 +174,13 @@ export function ActionsDueWidget() {
                       </button>
                     </>
                   )}
-                  {/* Draft-email button is added in stint 33.E — intent preview lives here */}
                   {canDraft && (
-                    <span className="sr-only" data-intent={inferIntent(a.type)}>email-eligible</span>
+                    <DraftEmailButton
+                      targetType={a.target_type as 'crm_contact' | 'crm_invoice' | 'crm_opportunity' | 'crm_matter'}
+                      targetId={a.target_id}
+                      intent={inferIntent(a.type)}
+                      compact
+                    />
                   )}
                   <span className="ml-1 text-[10px] uppercase tracking-wide tabular-nums text-ink-muted">
                     {a.priority}

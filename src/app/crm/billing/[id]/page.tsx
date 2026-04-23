@@ -11,6 +11,7 @@ import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/Toaster';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { RecordHistory } from '@/components/crm/RecordHistory';
+import { DraftEmailButton } from '@/components/crm/DraftEmailButton';
 import { INVOICE_FIELDS } from '@/components/crm/schemas';
 import { LABELS_INVOICE_STATUS, formatEur, formatDate } from '@/lib/crm-types';
 
@@ -220,6 +221,14 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
             <Button variant="secondary" size="sm" icon={<PlusIcon size={13} />} onClick={() => setPayOpen(true)}>
               Record payment
             </Button>
+            {['sent', 'partial_paid', 'overdue'].includes(String(i.status ?? '')) && Number(i.outstanding ?? 0) > 0 && (
+              <DraftEmailButton
+                targetType="crm_invoice"
+                targetId={id}
+                intent="overdue_chase"
+                label="Draft chase"
+              />
+            )}
             {['sent', 'partial_paid', 'paid', 'overdue'].includes(String(i.status ?? '')) && (
               <Button variant="secondary" size="sm" icon={<UndoIcon size={13} />} onClick={() => setCreditingOpen(true)}>
                 Credit note
