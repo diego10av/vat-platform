@@ -8,6 +8,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { ExportButton } from '@/components/crm/ExportButton';
+import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { crmLoadList } from '@/lib/useCrmFetch';
 import { TASK_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -32,6 +34,7 @@ interface Task {
 
 export default function TasksPage() {
   const [rows, setRows] = useState<Task[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string>('');
   const [priority, setPriority] = useState<string>('');
   const [newOpen, setNewOpen] = useState(false);
@@ -41,8 +44,9 @@ export default function TasksPage() {
     const qs = new URLSearchParams();
     if (status) qs.set('status', status);
     if (priority) qs.set('priority', priority);
-    fetch(`/api/crm/tasks?${qs}`, { cache: 'no-store' })
-      .then(r => r.json()).then(setRows).catch(() => setRows([]));
+    crmLoadList<Task>(`/api/crm/tasks?${qs}`)
+      .then(rows => { setRows(rows); setError(null); })
+      .catch((e: Error) => { setError(e.message || 'Network error'); setRows([]); });
   }, [status, priority]);
   useEffect(() => { load(); }, [load]);
 
@@ -96,6 +100,7 @@ export default function TasksPage() {
         initial={{ priority: 'medium', status: 'open' }}
         onSave={handleCreate}
       />
+      {error && <div className="mb-3"><CrmErrorBox message={error} onRetry={load} /></div>}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <select value={status} onChange={e => setStatus(e.target.value)}
           className="px-2 py-1.5 text-[12.5px] border border-border rounded-md bg-white">

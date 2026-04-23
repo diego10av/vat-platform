@@ -17,6 +17,7 @@ import {
   AlertCircleIcon, ClockIcon, EuroIcon, TargetIcon, UserMinusIcon, CheckSquareIcon,
   ChevronRightIcon, RefreshCwIcon,
 } from 'lucide-react';
+import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 
 interface NextAction {
   id: string;
@@ -46,18 +47,24 @@ const TONE_CLASSES = {
 export function NextBestActionWidget() {
   const [actions, setActions] = useState<NextAction[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
     setRefreshing(true);
+    setError(null);
     try {
       const res = await fetch('/api/crm/next-actions', { cache: 'no-store' });
+      if (!res.ok) { setError(`${res.status} ${res.statusText}`); setActions(null); return; }
       const body = await res.json();
       setActions(body.actions ?? []);
-    } catch { setActions([]); }
-    finally { setRefreshing(false); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error');
+      setActions(null);
+    } finally { setRefreshing(false); }
   }
   useEffect(() => { load(); }, []);
 
+  if (error) return <CrmErrorBox message={error} onRetry={load} />;
   if (actions === null) {
     return <div className="text-[12px] text-ink-muted italic px-3 py-6">Computing today&apos;s focus…</div>;
   }

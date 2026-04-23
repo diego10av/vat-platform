@@ -11,10 +11,11 @@
 // week" — every row has a direct drill-through.
 // ════════════════════════════════════════════════════════════════════════
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { EuroIcon, ChevronRightIcon } from 'lucide-react';
 import { formatEur } from '@/lib/crm-types';
+import { useCrmFetch } from '@/lib/useCrmFetch';
+import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 
 interface WipMatter {
   matter_id: string;
@@ -32,16 +33,10 @@ interface WipData {
 }
 
 export function WipWidget() {
-  const [data, setData] = useState<WipData | null>(null);
+  const { data, error, isLoading, refetch } = useCrmFetch<WipData>('/api/crm/wip');
 
-  useEffect(() => {
-    fetch('/api/crm/wip', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => setData(null));
-  }, []);
-
-  if (!data) {
+  if (error) return <CrmErrorBox message={error} onRetry={refetch} compact />;
+  if (!data || isLoading) {
     return (
       <div className="border border-border rounded-lg bg-white p-4 min-h-[110px] text-[12px] text-ink-muted italic flex items-center justify-center">
         Computing WIP…

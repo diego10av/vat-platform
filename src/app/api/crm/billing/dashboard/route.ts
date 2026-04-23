@@ -40,15 +40,28 @@ export async function GET(request: NextRequest) {
       [year],
     ),
     // Practice split comes via matter. Invoices without a matter are
-    // classified as 'unassigned'.
+    // classified as 'unassigned'. unnest() must be a FROM/LATERAL
+    // item — Postgres rejects set-returning functions inside COALESCE
+    // so we coalesce the array to a single-element fallback array
+    // before unnesting. This keeps the shape right: one row per
+    // (invoice × practice) with 'unassigned' when the invoice has no
+    // matter or the matter has no practice_areas.
     query<{ practice: string; total: string }>(
-      `SELECT COALESCE(unnest(m.practice_areas)::text, 'unassigned') AS practice,
-              SUM(b.amount_incl_vat)::text AS total
-         FROM crm_billing_invoices b
-         LEFT JOIN crm_matters m ON m.id = b.matter_id
-        WHERE EXTRACT(YEAR FROM b.issue_date) = $1
+      `SELECT practice, SUM(amount_incl_vat)::text AS total
+         FROM (
+           SELECT b.amount_incl_vat,
+                  unnest(
+                    COALESCE(
+                      NULLIF(m.practice_areas, '{}'::text[]),
+                      ARRAY['unassigned']::text[]
+                    )
+                  ) AS practice
+             FROM crm_billing_invoices b
+             LEFT JOIN crm_matters m ON m.id = b.matter_id
+            WHERE EXTRACT(YEAR FROM b.issue_date) = $1
+         ) t
         GROUP BY practice
-        ORDER BY SUM(b.amount_incl_vat) DESC`,
+        ORDER BY SUM(amount_incl_vat) DESC`,
       [year],
     ),
     query<{ bucket: string; total: string; count: string }>(

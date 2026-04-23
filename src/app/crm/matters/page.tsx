@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { ExportButton } from '@/components/crm/ExportButton';
+import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { crmLoadList } from '@/lib/useCrmFetch';
 import { MATTER_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -36,6 +38,7 @@ interface Matter {
 
 export default function MattersPage() {
   const [rows, setRows] = useState<Matter[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<string>('');
   const [newOpen, setNewOpen] = useState(false);
@@ -54,10 +57,9 @@ export default function MattersPage() {
     const qs = new URLSearchParams();
     if (q) qs.set('q', q);
     if (status) qs.set('status', status);
-    fetch(`/api/crm/matters?${qs}`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(setRows)
-      .catch(() => setRows([]));
+    crmLoadList<Matter>(`/api/crm/matters?${qs}`)
+      .then(rows => { setRows(rows); setError(null); })
+      .catch((e: Error) => { setError(e.message || 'Network error'); setRows([]); });
   }, [q, status]);
 
   useEffect(() => { load(); }, [load]);
@@ -108,6 +110,7 @@ export default function MattersPage() {
         initial={{ status: 'active', conflict_check_done: false }}
         onSave={handleCreate}
       />
+      {error && <div className="mb-3"><CrmErrorBox message={error} onRetry={load} /></div>}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="relative flex-1 min-w-[220px] max-w-xs">
           <SearchIcon size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-muted" />

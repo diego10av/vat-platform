@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { ExportButton } from '@/components/crm/ExportButton';
 import { BillingDashboard } from '@/components/crm/BillingDashboard';
+import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { crmLoadShape } from '@/lib/useCrmFetch';
 import { INVOICE_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -50,6 +52,7 @@ const thisYear = new Date().getFullYear();
 
 export default function BillingPage() {
   const [data, setData] = useState<{ invoices: Invoice[]; summary: Summary | null } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<string>('');
   const [year, setYear] = useState<string>(String(thisYear));
@@ -62,8 +65,15 @@ export default function BillingPage() {
     if (q) qs.set('q', q);
     if (status) qs.set('status', status);
     if (year) qs.set('year', year);
-    fetch(`/api/crm/billing?${qs}`, { cache: 'no-store' })
-      .then(r => r.json()).then(setData).catch(() => setData({ invoices: [], summary: null }));
+    crmLoadShape<{ invoices: Invoice[]; summary: Summary | null }>(
+      `/api/crm/billing?${qs}`,
+      body => {
+        const b = body as { invoices?: Invoice[]; summary?: Summary | null };
+        return { invoices: b.invoices ?? [], summary: b.summary ?? null };
+      },
+    )
+      .then(d => { setData(d); setError(null); })
+      .catch((e: Error) => { setError(e.message || 'Network error'); setData({ invoices: [], summary: null }); });
   }, [q, status, year]);
 
   useEffect(() => { load(); }, [load]);
@@ -124,6 +134,8 @@ export default function BillingPage() {
         }}
         onSave={handleCreate}
       />
+
+      {error && <div className="mb-3"><CrmErrorBox message={error} onRetry={load} /></div>}
 
       {data.summary && (
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">

@@ -11,6 +11,8 @@ import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { PipelineKanban } from '@/components/crm/PipelineKanban';
 import { ExportButton } from '@/components/crm/ExportButton';
+import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { crmLoadList } from '@/lib/useCrmFetch';
 import { OPPORTUNITY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -38,6 +40,7 @@ interface Opportunity {
 
 export default function OpportunitiesPage() {
   const [rows, setRows] = useState<Opportunity[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [stage, setStage] = useState<string>('');
   const [newOpen, setNewOpen] = useState(false);
@@ -57,10 +60,9 @@ export default function OpportunitiesPage() {
     const qs = new URLSearchParams();
     if (q) qs.set('q', q);
     if (stage) qs.set('stage', stage);
-    fetch(`/api/crm/opportunities?${qs}`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(setRows)
-      .catch(() => setRows([]));
+    crmLoadList<Opportunity>(`/api/crm/opportunities?${qs}`)
+      .then(rows => { setRows(rows); setError(null); })
+      .catch((e: Error) => { setError(e.message || 'Network error'); setRows([]); });
   }, [q, stage]);
 
   useEffect(() => { load(); }, [load]);
@@ -119,6 +121,7 @@ export default function OpportunitiesPage() {
         initial={{ stage: 'lead_identified', probability_pct: 20 }}
         onSave={handleCreate}
       />
+      {error && <div className="mb-3"><CrmErrorBox message={error} onRetry={load} /></div>}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="inline-flex border border-border rounded-md overflow-hidden">
           <button

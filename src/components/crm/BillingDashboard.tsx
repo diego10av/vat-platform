@@ -7,7 +7,8 @@
 // tablet shrinks naturally.
 // ════════════════════════════════════════════════════════════════════════
 
-import { useEffect, useState } from 'react';
+import { useCrmFetch } from '@/lib/useCrmFetch';
+import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { formatEur } from '@/lib/crm-types';
 
 interface DashboardData {
@@ -41,16 +42,11 @@ const AGING_TONES: Record<string, string> = {
 };
 
 export function BillingDashboard({ year }: { year: number }) {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const { data, error, isLoading, refetch } = useCrmFetch<DashboardData>(`/api/crm/billing/dashboard?year=${year}`);
 
-  useEffect(() => {
-    fetch(`/api/crm/billing/dashboard?year=${year}`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => setData(null));
-  }, [year]);
-
-  if (!data) return <div className="text-[12px] text-ink-muted italic px-3 py-4">Loading dashboard…</div>;
+  if (isLoading && !data) return <div className="text-[12px] text-ink-muted italic px-3 py-4">Loading dashboard…</div>;
+  if (error) return <CrmErrorBox message={error} onRetry={refetch} />;
+  if (!data) return <div className="text-[12px] text-ink-muted italic px-3 py-4">No data for {year}.</div>;
 
   const current = Number(data.kpis?.total_incl_vat ?? 0);
   const prev = Number(data.prev_kpis?.total_incl_vat ?? 0);

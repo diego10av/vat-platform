@@ -11,10 +11,11 @@
 // home doesn't flash a "€0 · 0 opps" skeleton that looks broken.
 // ════════════════════════════════════════════════════════════════════════
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { TargetIcon, ChevronRightIcon } from 'lucide-react';
 import { formatEur } from '@/lib/crm-types';
+import { useCrmFetch } from '@/lib/useCrmFetch';
+import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 
 interface ForecastData {
   weighted_total_eur: number;
@@ -25,16 +26,10 @@ interface ForecastData {
 }
 
 export function ForecastWidget() {
-  const [data, setData] = useState<ForecastData | null>(null);
+  const { data, error, isLoading, refetch } = useCrmFetch<ForecastData>('/api/crm/forecast');
 
-  useEffect(() => {
-    fetch('/api/crm/forecast', { cache: 'no-store' })
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => setData(null));
-  }, []);
-
-  if (!data) {
+  if (error) return <CrmErrorBox message={error} onRetry={refetch} compact />;
+  if (!data || isLoading) {
     return (
       <div className="border border-border rounded-lg bg-white p-4 min-h-[110px] text-[12px] text-ink-muted italic flex items-center justify-center">
         Computing weighted pipeline…

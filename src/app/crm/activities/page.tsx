@@ -8,6 +8,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { ExportButton } from '@/components/crm/ExportButton';
+import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { crmLoadList } from '@/lib/useCrmFetch';
 import { ACTIVITY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import {
@@ -31,6 +33,7 @@ interface Activity {
 
 export default function ActivitiesPage() {
   const [rows, setRows] = useState<Activity[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const [type, setType] = useState<string>('');
   const [newOpen, setNewOpen] = useState(false);
@@ -40,10 +43,9 @@ export default function ActivitiesPage() {
     const qs = new URLSearchParams();
     if (q) qs.set('q', q);
     if (type) qs.set('type', type);
-    fetch(`/api/crm/activities?${qs}`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then(setRows)
-      .catch(() => setRows([]));
+    crmLoadList<Activity>(`/api/crm/activities?${qs}`)
+      .then(rows => { setRows(rows); setError(null); })
+      .catch((e: Error) => { setError(e.message || 'Network error'); setRows([]); });
   }, [q, type]);
 
   useEffect(() => { load(); }, [load]);
@@ -89,6 +91,7 @@ export default function ActivitiesPage() {
         }}
         onSave={handleCreate}
       />
+      {error && <div className="mb-3"><CrmErrorBox message={error} onRetry={load} /></div>}
       <div className="flex flex-wrap items-center gap-2 mb-3">
         <div className="relative flex-1 min-w-[220px] max-w-xs">
           <SearchIcon size={13} className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-muted" />
