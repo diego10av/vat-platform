@@ -107,7 +107,7 @@ export async function GET(_request: NextRequest) {
             (CURRENT_DATE - o.stage_entered_at::date)::int AS days_in_stage,
             o.weighted_value_eur::text
        FROM crm_opportunities o
-       LEFT JOIN crm_companies c ON c.id = o.client_company_id
+       LEFT JOIN crm_companies c ON c.id = o.company_id
       WHERE o.deleted_at IS NULL
         AND o.stage NOT IN ('won', 'lost')
         AND o.stage_entered_at IS NOT NULL
@@ -175,7 +175,7 @@ export async function GET(_request: NextRequest) {
     `SELECT o.id, o.name, o.next_action, o.next_action_due::text AS next_action_due,
             c.company_name AS client_name
        FROM crm_opportunities o
-       LEFT JOIN crm_companies c ON c.id = o.client_company_id
+       LEFT JOIN crm_companies c ON c.id = o.company_id
       WHERE o.deleted_at IS NULL
         AND o.stage NOT IN ('won', 'lost')
         AND o.next_action IS NOT NULL

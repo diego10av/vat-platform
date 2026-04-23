@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
   const oppCloses = await query<{ id: string; name: string; estimated_close_date: string; client_name: string | null }>(
     `SELECT o.id, o.name, o.estimated_close_date::text, c.company_name AS client_name
        FROM crm_opportunities o
-       LEFT JOIN crm_companies c ON c.id = o.client_company_id
+       LEFT JOIN crm_companies c ON c.id = o.company_id
       WHERE o.deleted_at IS NULL
         AND o.stage NOT IN ('won', 'lost')
         AND o.estimated_close_date IS NOT NULL
