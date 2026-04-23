@@ -422,6 +422,32 @@ export const MATTER_FIELDS: FieldSchema[] = [
     type: 'date',
   },
   {
+    name: 'counterparty_name',
+    label: 'Counterparty',
+    type: 'text',
+    placeholder: 'Primary opposing party (if any)',
+    help: 'Used by the conflict check scan.',
+  },
+  {
+    name: 'related_parties',
+    label: 'Related parties',
+    type: 'tags',
+    help: 'Co-defendants, financing parties, etc. — all scanned for conflicts.',
+  },
+  {
+    name: 'estimated_budget_eur',
+    label: 'Estimated budget (€)',
+    type: 'number',
+    placeholder: '50000',
+    help: 'Agreed scope budget. Triggers alert at 75 / 90 / 100 %.',
+  },
+  {
+    name: 'cap_eur',
+    label: 'Fee cap (€)',
+    type: 'number',
+    help: 'Hard cap above which fees require client re-approval.',
+  },
+  {
     name: 'conflict_check_done',
     label: 'Conflict check done?',
     type: 'checkbox',

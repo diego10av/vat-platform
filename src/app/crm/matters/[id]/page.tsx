@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/Toaster';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { RecordHistory } from '@/components/crm/RecordHistory';
+import { ConflictCheckPanel } from '@/components/crm/ConflictCheckPanel';
 import { MATTER_FIELDS } from '@/components/crm/schemas';
 import {
   LABELS_MATTER_STATUS, LABELS_ACTIVITY_TYPE, LABELS_INVOICE_STATUS,
@@ -122,9 +123,18 @@ export default function MatterDetailPage({ params }: { params: Promise<{ id: str
 
       {!m.conflict_check_done && m.status === 'active' && (
         <div className="mb-4 p-3 bg-danger-50 border border-danger-300 rounded text-[12px] text-danger-800">
-          ⚠ Conflict check NOT marked as done. Verify before continuing work on this matter.
+          ⚠ Conflict check NOT marked as done. Run the scan below + tick the box in Edit.
         </div>
       )}
+
+      <ConflictCheckPanel
+        matterId={id}
+        clientCompanyId={(m as { client_id?: string | null }).client_id ?? null}
+        clientName={m.client_name ?? null}
+        counterpartyName={(m as { counterparty_name?: string | null }).counterparty_name ?? null}
+        relatedParties={Array.isArray((m as { related_parties?: string[] }).related_parties) ? (m as { related_parties: string[] }).related_parties : []}
+        initialResult={(m as { conflict_check_result?: { checked_at: string; hits: Array<{ matter_id: string; matter_reference: string; status: string; field: 'client' | 'counterparty' | 'related'; party: string; match_value: string; client_name: string | null }>; false_positive_ids?: string[] } | null }).conflict_check_result ?? null}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
         <Card title="Total billed">{formatEur(totalBilled)}</Card>

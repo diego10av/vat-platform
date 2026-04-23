@@ -8,6 +8,9 @@ const UPDATABLE_FIELDS = [
   'hourly_rate_eur', 'opening_date', 'closing_date',
   'conflict_check_done', 'conflict_check_date', 'lead_counsel',
   'team_members', 'documents_link', 'notes', 'tags',
+  // Stint 27 (Fase 3.1) additions.
+  'estimated_budget_eur', 'cap_eur', 'counterparty_name',
+  'related_parties', 'conflict_check_result',
 ] as const;
 type UpdatableField = typeof UPDATABLE_FIELDS[number];
 
@@ -64,24 +67,30 @@ export async function PUT(
     if (!(f in body)) continue;
     let next = body[f];
     if (typeof next === 'string') next = next.trim() || null;
-    if ((f === 'practice_areas' || f === 'team_members' || f === 'tags') && !Array.isArray(next)) next = [];
+    if ((f === 'practice_areas' || f === 'team_members' || f === 'tags' || f === 'related_parties') && !Array.isArray(next)) next = [];
     if (f === 'title' && !next) {
       return apiError('title_required', 'title cannot be empty.', { status: 400 });
     }
     if (f === 'matter_reference' && !next) {
       return apiError('matter_reference_required', 'matter_reference cannot be empty.', { status: 400 });
     }
-    if (f === 'hourly_rate_eur' && next !== null && next !== undefined) {
+    if ((f === 'hourly_rate_eur' || f === 'estimated_budget_eur' || f === 'cap_eur') && next !== null && next !== undefined) {
       const n = Number(next);
       if (!Number.isFinite(n)) next = null; else next = n;
     }
     if (f === 'conflict_check_done') next = !!next;
     const before = existing[f] ?? null;
-    const beforeStr = Array.isArray(before) ? JSON.stringify(before) : String(before ?? '');
-    const afterStr = Array.isArray(next) ? JSON.stringify(next) : String(next ?? '');
+    const isJsonField = f === 'conflict_check_result';
+    const beforeStr = isJsonField ? JSON.stringify(before) : (Array.isArray(before) ? JSON.stringify(before) : String(before ?? ''));
+    const afterStr = isJsonField ? JSON.stringify(next) : (Array.isArray(next) ? JSON.stringify(next) : String(next ?? ''));
     if (beforeStr === afterStr) continue;
-    setClauses.push(`${f} = $${idx}`);
-    values.push(next);
+    if (isJsonField) {
+      setClauses.push(`${f} = $${idx}::jsonb`);
+      values.push(next ? JSON.stringify(next) : null);
+    } else {
+      setClauses.push(`${f} = $${idx}`);
+      values.push(next);
+    }
     idx += 1;
     changed.push({ field: f, before, after: next });
   }

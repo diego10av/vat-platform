@@ -66,8 +66,10 @@ export async function POST(request: NextRequest) {
        (id, matter_reference, title, client_company_id, primary_contact_id,
         source_opportunity_id, status, practice_areas, fee_type, hourly_rate_eur,
         opening_date, closing_date, conflict_check_done, conflict_check_date,
-        lead_counsel, team_members, documents_link, notes, tags, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,NOW())`,
+        lead_counsel, team_members, documents_link, notes, tags,
+        estimated_budget_eur, cap_eur, counterparty_name, related_parties,
+        conflict_check_result, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24::jsonb,NOW())`,
     [
       id, matterRef, title,
       body.client_company_id ?? null,
@@ -86,6 +88,11 @@ export async function POST(request: NextRequest) {
       body.documents_link ?? null,
       body.notes ?? null,
       Array.isArray(body.tags) ? body.tags : [],
+      body.estimated_budget_eur ?? null,
+      body.cap_eur ?? null,
+      body.counterparty_name ?? null,
+      Array.isArray(body.related_parties) ? body.related_parties : [],
+      body.conflict_check_result ? JSON.stringify(body.conflict_check_result) : null,
     ],
   );
   await logAudit({
