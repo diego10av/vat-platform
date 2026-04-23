@@ -15,9 +15,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { ShieldAlertIcon, ShieldCheckIcon, RefreshCwIcon } from 'lucide-react';
+import { ShieldAlertIcon, ShieldCheckIcon, RefreshCwIcon, SparklesIcon, ChevronDownIcon } from 'lucide-react';
 import { useToast } from '@/components/Toaster';
 
+// Extended from the base ILIKE hit: each hit may carry an AI verdict
+// from the Opus review pass (stint 33.D). See src/lib/conflict-ai-review.ts.
 interface Hit {
   matter_id: string;
   matter_reference: string;
@@ -26,13 +28,21 @@ interface Hit {
   party: string;
   match_value: string;
   client_name: string | null;
+  verdict?: 'true_conflict' | 'false_positive' | 'uncertain';
+  confidence?: number;
+  reasoning?: string;
 }
 
 interface ConflictResult {
   checked_at: string;
   hits: Hit[];
   false_positive_ids?: string[];  // list of composite "matter_id:field:party" keys
+  ai_review_ran?: boolean;
 }
+
+// AI auto-dismisses false positives with confidence ≥ this threshold.
+// Below threshold they surface as normal hits (user decides).
+const AI_AUTO_DISMISS_MIN_CONFIDENCE = 0.8;
 
 const FIELD_LABELS = { client: 'Client', counterparty: 'Counterparty', related: 'Related party' };
 
@@ -49,6 +59,7 @@ export function ConflictCheckPanel({
   const toast = useToast();
   const [result, setResult] = useState<ConflictResult | null>(initialResult);
   const [running, setRunning] = useState(false);
+  const [showAiDismissed, setShowAiDismissed] = useState(false);
 
   async function runCheck() {
     setRunning(true);
@@ -73,6 +84,7 @@ export function ConflictCheckPanel({
         checked_at: body.checked_at,
         hits: body.hits ?? [],
         false_positive_ids: result?.false_positive_ids ?? [],
+        ai_review_ran: !!body.ai_review_ran,
       };
       setResult(newResult);
 
@@ -109,7 +121,15 @@ export function ConflictCheckPanel({
   }
 
   const falsePositiveIds = new Set(result?.false_positive_ids ?? []);
-  const activeHits = (result?.hits ?? []).filter(h => !falsePositiveIds.has(`${h.matter_id}:${h.field}:${h.party}`));
+  // Partition hits by (a) user dismissed, (b) AI auto-dismissed with
+  // high confidence, (c) still requires review.
+  const notUserDismissed = (result?.hits ?? []).filter(
+    h => !falsePositiveIds.has(`${h.matter_id}:${h.field}:${h.party}`),
+  );
+  const aiAutoDismissed = notUserDismissed.filter(
+    h => h.verdict === 'false_positive' && (h.confidence ?? 0) >= AI_AUTO_DISMISS_MIN_CONFIDENCE,
+  );
+  const activeHits = notUserDismissed.filter(h => !aiAutoDismissed.includes(h));
 
   return (
     <div className="border border-border rounded-lg bg-white overflow-hidden mb-4">
@@ -154,13 +174,23 @@ export function ConflictCheckPanel({
         {result && activeHits.length > 0 && (
           <div>
             <p className="mb-2 text-danger-700">
-              Found {activeHits.length} potential conflict{activeHits.length === 1 ? '' : 's'}. Review each — mark false positives to dismiss.
+              {activeHits.length} potential conflict{activeHits.length === 1 ? '' : 's'} need review.
+              {aiAutoDismissed.length > 0 && (
+                <span className="text-ink-muted font-normal"> AI dismissed {aiAutoDismissed.length} obvious false positive{aiAutoDismissed.length === 1 ? '' : 's'} below.</span>
+              )}
             </p>
             <ul className="space-y-1.5">
               {activeHits.map(h => {
                 const key = `${h.matter_id}:${h.field}:${h.party}`;
+                const isTrueConflict = h.verdict === 'true_conflict';
+                const isUncertain = h.verdict === 'uncertain';
+                const borderTone = isTrueConflict
+                  ? 'border-danger-400 bg-danger-50/30'
+                  : isUncertain
+                    ? 'border-amber-300 bg-amber-50/30'
+                    : 'border-border';
                 return (
-                  <li key={key} className="border border-border rounded-md px-2.5 py-1.5 flex items-start gap-2">
+                  <li key={key} className={`border rounded-md px-2.5 py-1.5 flex items-start gap-2 ${borderTone}`}>
                     <div className="flex-1 min-w-0">
                       <Link href={`/crm/matters/${h.matter_id}`} className="font-mono text-[11.5px] font-medium text-brand-700 hover:underline">
                         {h.matter_reference}
@@ -171,6 +201,16 @@ export function ConflictCheckPanel({
                       <div className="text-[11px] text-ink-muted">
                         <strong>{FIELD_LABELS[h.field]}</strong> of matter matched party <em>&ldquo;{h.party}&rdquo;</em> via <em>&ldquo;{h.match_value}&rdquo;</em>
                       </div>
+                      {h.verdict && h.reasoning && (
+                        <div className={`mt-1 text-[11px] flex items-start gap-1.5 ${isTrueConflict ? 'text-danger-700' : 'text-ink-soft'}`}>
+                          <SparklesIcon size={11} className="shrink-0 mt-0.5" />
+                          <span>
+                            <strong className="font-semibold">AI verdict: {h.verdict === 'true_conflict' ? 'real conflict' : 'uncertain'}</strong>
+                            {typeof h.confidence === 'number' && <span className="text-ink-muted"> ({Math.round(h.confidence * 100)}%)</span>}
+                            {' — '}{h.reasoning}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <button
                       onClick={() => dismissHit(key)}
@@ -183,9 +223,46 @@ export function ConflictCheckPanel({
                 );
               })}
             </ul>
+
+            {aiAutoDismissed.length > 0 && (
+              <div className="mt-2 border border-border rounded-md bg-surface-alt/40">
+                <button
+                  onClick={() => setShowAiDismissed(s => !s)}
+                  className="w-full px-2.5 py-1.5 text-left text-[11px] text-ink-muted hover:text-ink inline-flex items-center gap-1.5"
+                >
+                  <SparklesIcon size={11} />
+                  {aiAutoDismissed.length} false positive{aiAutoDismissed.length === 1 ? '' : 's'} dismissed by AI (click to review)
+                  <ChevronDownIcon size={11} className={`ml-auto transition-transform ${showAiDismissed ? 'rotate-180' : ''}`} />
+                </button>
+                {showAiDismissed && (
+                  <ul className="px-2.5 pb-2 space-y-1">
+                    {aiAutoDismissed.map(h => {
+                      const key = `${h.matter_id}:${h.field}:${h.party}`;
+                      return (
+                        <li key={key} className="border border-border rounded-md px-2 py-1.5 bg-white">
+                          <Link href={`/crm/matters/${h.matter_id}`} className="font-mono text-[11px] font-medium text-brand-700 hover:underline">
+                            {h.matter_reference}
+                          </Link>
+                          {h.client_name && <span className="ml-2 text-[11px] text-ink-muted">· {h.client_name}</span>}
+                          <div className="text-[10.5px] text-ink-muted">
+                            <strong>{FIELD_LABELS[h.field]}</strong> matched <em>&ldquo;{h.party}&rdquo;</em> via <em>&ldquo;{h.match_value}&rdquo;</em>
+                          </div>
+                          {h.reasoning && (
+                            <div className="text-[10.5px] text-ink-soft mt-0.5 italic">
+                              AI ({typeof h.confidence === 'number' ? `${Math.round(h.confidence * 100)}%` : '—'}): {h.reasoning}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+
             {result.false_positive_ids && result.false_positive_ids.length > 0 && (
               <p className="mt-2 text-[10.5px] text-ink-muted italic">
-                {result.false_positive_ids.length} prior hit{result.false_positive_ids.length === 1 ? '' : 's'} marked as false positive (hidden).
+                {result.false_positive_ids.length} prior hit{result.false_positive_ids.length === 1 ? '' : 's'} manually marked as false positive (hidden).
               </p>
             )}
           </div>

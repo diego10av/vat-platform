@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { query, logAudit } from '@/lib/db';
+import { reviewConflictHits } from '@/lib/conflict-ai-review';
 
 // POST /api/crm/matters/conflict-check
 //
@@ -147,9 +148,41 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // ── AI review pass ──
+  // Runs Opus 4.7 over the raw hits to flag obvious false positives
+  // with reasoning. Fails open — if the call fails, we return the
+  // un-annotated hits and the UI falls back to manual review.
+  //
+  // Gated on body.skip_ai_review for tests + cost-conscious callers.
+  const skipAiReview = body.skip_ai_review === true;
+  let reviewedHits = hits;
+  let aiReviewRan = false;
+  if (!skipAiReview && hits.length > 0) {
+    const relatedParties = Array.isArray(body.related_parties)
+      ? body.related_parties.filter((p: unknown): p is string => typeof p === 'string')
+      : [];
+    reviewedHits = await reviewConflictHits(hits, {
+      client_name: clientName,
+      counterparty_name: typeof body.counterparty_name === 'string' ? body.counterparty_name : null,
+      related_parties: relatedParties,
+    });
+    aiReviewRan = reviewedHits.some(h => 'verdict' in h && h.verdict);
+    if (aiReviewRan && excludeId) {
+      await logAudit({
+        action: 'conflict_ai_reviewed',
+        targetType: 'crm_matter',
+        targetId: excludeId,
+        field: 'conflict_check',
+        newValue: `${reviewedHits.length} hits reviewed`,
+        reason: 'AI-assisted conflict review (Opus 4.7)',
+      });
+    }
+  }
+
   return NextResponse.json({
-    hits,
+    hits: reviewedHits,
     checked_at: new Date().toISOString(),
     parties_checked: parties,
+    ai_review_ran: aiReviewRan,
   });
 }
