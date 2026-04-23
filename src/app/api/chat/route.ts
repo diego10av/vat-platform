@@ -45,7 +45,8 @@ import { apiError, apiOk, apiFail } from '@/lib/api-errors';
 import { anthropicCreate, priceCall } from '@/lib/anthropic-wrapper';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireBudget, requireUserBudget } from '@/lib/budget-guard';
-import { buildSystemPrompt, type ChatContextInput } from '@/lib/chat-context';
+import { buildSystemPrompt, isCrmPath, type ChatContextInput } from '@/lib/chat-context';
+import { CRM_TOOLS, executeCrmTool } from '@/lib/crm-chat-tools';
 import { persistTurn } from '@/lib/chat-persistence';
 import { logger } from '@/lib/logger';
 
@@ -117,6 +118,9 @@ export async function POST(request: NextRequest) {
     const context: ChatContextInput = {
       entity_id: body.context?.entity_id ?? null,
       declaration_id: body.context?.declaration_id ?? null,
+      path: body.context?.path ?? null,
+      crm_target_type: body.context?.crm_target_type ?? null,
+      crm_target_id: body.context?.crm_target_id ?? null,
     };
     const inboundThreadId =
       typeof body.thread_id === 'string' && body.thread_id.length > 0
@@ -150,39 +154,101 @@ export async function POST(request: NextRequest) {
     // ── Build system prompt from current page context ──
     const systemPrompt = await buildSystemPrompt(context);
 
-    // ── Anthropic call ──
+    // ── Tool setup (CRM mode) ──
+    // When the user is inside /crm, expose the 6 read-only query tools
+    // so the model can ground answers in the user's actual data instead
+    // of guessing or asking for data the system can fetch itself.
+    const onCrm = isCrmPath(context.path);
+    const tools: Anthropic.Tool[] | undefined = onCrm ? CRM_TOOLS : undefined;
+
+    // ── Anthropic call with tool-use loop ──
+    // Bounded to 4 iterations: user turn → (tool calls → tool results)
+    // × up to 3 → final text. Each tool_use block executes, results
+    // get appended as a user-role message, and the model is re-invoked.
     const timer = log.time('chat turn complete');
-    const anthropicBody: Anthropic.MessageCreateParamsNonStreaming = {
-      model,
-      max_tokens: useOpus ? 4000 : 2000,
-      system: [
-        // Marking the system prompt as cache-eligible cuts input cost
-        // ~90% from turn 2 onward. The TTL is 5 min — plenty for a
-        // conversation.
-        {
-          type: 'text',
-          text: systemPrompt,
-          cache_control: { type: 'ephemeral' },
-        },
-      ],
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    const MAX_TOOL_ROUNDS = 4;
+
+    type AggUsage = {
+      input_tokens: number; output_tokens: number;
+      cache_read_input_tokens: number; cache_creation_input_tokens: number;
+    };
+    const aggUsage: AggUsage = {
+      input_tokens: 0, output_tokens: 0,
+      cache_read_input_tokens: 0, cache_creation_input_tokens: 0,
     };
 
-    const message = await anthropicCreate(anthropicBody, {
-      agent: useOpus ? 'chat-opus' : 'chat-haiku',
-      user_id: MOCK_USER_ID,
-      declaration_id: context.declaration_id ?? undefined,
-      entity_id: context.entity_id ?? undefined,
-      label: `chat turn ${messages.length}`,
-    });
+    const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
+    let finalReply = '';
+    let toolCallsCount = 0;
 
-    const reply = message.content.find((b) => b.type === 'text')?.text || '';
-    const usage = message.usage as {
-      input_tokens?: number;
-      output_tokens?: number;
-      cache_read_input_tokens?: number;
-      cache_creation_input_tokens?: number;
-    };
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+      const anthropicBody: Anthropic.MessageCreateParamsNonStreaming = {
+        model,
+        max_tokens: useOpus ? 4000 : 2000,
+        system: [
+          // Marking the system prompt as cache-eligible cuts input cost
+          // ~90% from turn 2 onward. The TTL is 5 min — plenty for a
+          // conversation.
+          {
+            type: 'text',
+            text: systemPrompt,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+        messages: convo,
+        ...(tools ? { tools } : {}),
+      };
+
+      const message = await anthropicCreate(anthropicBody, {
+        agent: useOpus ? 'chat-opus' : 'chat-haiku',
+        user_id: MOCK_USER_ID,
+        declaration_id: context.declaration_id ?? undefined,
+        entity_id: context.entity_id ?? undefined,
+        label: `chat turn ${messages.length} round ${round + 1}`,
+      });
+
+      const u = message.usage as {
+        input_tokens?: number; output_tokens?: number;
+        cache_read_input_tokens?: number; cache_creation_input_tokens?: number;
+      };
+      aggUsage.input_tokens            += u.input_tokens ?? 0;
+      aggUsage.output_tokens           += u.output_tokens ?? 0;
+      aggUsage.cache_read_input_tokens += u.cache_read_input_tokens ?? 0;
+      aggUsage.cache_creation_input_tokens += u.cache_creation_input_tokens ?? 0;
+
+      const toolUses = message.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use');
+      const textBlocks = message.content.filter((b): b is Anthropic.TextBlock => b.type === 'text');
+
+      if (message.stop_reason !== 'tool_use' || toolUses.length === 0) {
+        // Terminal turn — capture the model's answer and break.
+        finalReply = textBlocks.map(t => t.text).join('\n').trim();
+        break;
+      }
+
+      // Append the assistant turn (with tool_use blocks) to the convo.
+      convo.push({ role: 'assistant', content: message.content });
+
+      // Execute every tool in parallel, then append one user turn with
+      // all the tool_result blocks.
+      const toolResults = await Promise.all(
+        toolUses.map(async (tu) => {
+          toolCallsCount += 1;
+          const result = await executeCrmTool(tu.name, (tu.input as Record<string, unknown>) ?? {});
+          return {
+            type: 'tool_result' as const,
+            tool_use_id: tu.id,
+            content: result.slice(0, 15000),  // safety clamp
+          };
+        }),
+      );
+      convo.push({ role: 'user', content: toolResults });
+
+      // Loop continues — next iteration will re-invoke the model with
+      // the tool_results attached.
+    }
+
+    const reply = finalReply;
+    const usage = aggUsage;
     const actualCost = priceCall(model, usage);
     timer({
       model,

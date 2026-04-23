@@ -33,7 +33,9 @@ import {
 } from '@/lib/anthropic-wrapper';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireBudget, requireUserBudget } from '@/lib/budget-guard';
-import { buildSystemPrompt, type ChatContextInput } from '@/lib/chat-context';
+import { buildSystemPrompt, isCrmPath, type ChatContextInput } from '@/lib/chat-context';
+import { CRM_TOOLS, executeCrmTool } from '@/lib/crm-chat-tools';
+import { anthropicCreate } from '@/lib/anthropic-wrapper';
 import { persistTurn } from '@/lib/chat-persistence';
 import { logger } from '@/lib/logger';
 
@@ -112,6 +114,9 @@ export async function POST(request: NextRequest) {
   const context: ChatContextInput = {
     entity_id: body.context?.entity_id ?? null,
     declaration_id: body.context?.declaration_id ?? null,
+    path: body.context?.path ?? null,
+    crm_target_type: body.context?.crm_target_type ?? null,
+    crm_target_id: body.context?.crm_target_id ?? null,
   };
 
   // ── Gate 1.5: per-entity AI mode ──
@@ -166,38 +171,105 @@ export async function POST(request: NextRequest) {
   // ── Build system prompt ──
   const systemPrompt = await buildSystemPrompt(context);
 
+  // ── CRM-mode detection ──
+  // When the user is inside /crm we need tool-use, which requires
+  // multiple model round-trips. The cleanest integration with the
+  // existing SSE protocol: run the non-streaming tool loop, then
+  // emit the final answer as a single text_delta event. The client
+  // sees the same events as normal streaming, just without typewriter.
+  const onCrm = isCrmPath(context.path);
+
   // ── Start the SSE stream ──
   const started = Date.now();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       try {
-        const anthropicBody: Anthropic.MessageCreateParamsStreaming = {
-          model,
-          max_tokens: useOpus ? 4000 : 2000,
-          stream: true,
-          system: [
-            { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
-          ],
-          messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        };
-
         let accumulated = '';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let usage: any;
 
-        const anthropicStream = getAnthropicClient().messages.stream(anthropicBody);
+        if (onCrm) {
+          // ── CRM mode: tool loop, no streaming inside the loop. ──
+          const MAX_TOOL_ROUNDS = 4;
+          const aggUsage = {
+            input_tokens: 0, output_tokens: 0,
+            cache_read_input_tokens: 0, cache_creation_input_tokens: 0,
+          };
+          const convo: Anthropic.MessageParam[] = messages.map((m) => ({ role: m.role, content: m.content }));
 
-        for await (const event of anthropicStream) {
-          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            const delta = event.delta.text;
-            accumulated += delta;
-            controller.enqueue(sseEvent({ type: 'text_delta', text: delta }));
+          for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
+            const body: Anthropic.MessageCreateParamsNonStreaming = {
+              model,
+              max_tokens: useOpus ? 4000 : 2000,
+              system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+              messages: convo,
+              tools: CRM_TOOLS,
+            };
+            const msg = await anthropicCreate(body, {
+              agent: useOpus ? 'chat-opus' : 'chat-haiku',
+              user_id: MOCK_USER_ID,
+              declaration_id: context.declaration_id ?? undefined,
+              entity_id: context.entity_id ?? undefined,
+              label: `chat stream crm round ${round + 1}`,
+            });
+            const u = msg.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+            aggUsage.input_tokens            += u.input_tokens ?? 0;
+            aggUsage.output_tokens           += u.output_tokens ?? 0;
+            aggUsage.cache_read_input_tokens += u.cache_read_input_tokens ?? 0;
+            aggUsage.cache_creation_input_tokens += u.cache_creation_input_tokens ?? 0;
+
+            const toolUses = msg.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use');
+            if (msg.stop_reason !== 'tool_use' || toolUses.length === 0) {
+              accumulated = msg.content
+                .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+                .map(b => b.text).join('\n').trim();
+              break;
+            }
+            // Send a lightweight progress signal so the UI can show
+            // "looking things up…" while tools execute.
+            controller.enqueue(sseEvent({
+              type: 'tool_progress',
+              tool_names: toolUses.map(t => t.name),
+            }));
+
+            convo.push({ role: 'assistant', content: msg.content });
+            const results = await Promise.all(toolUses.map(async (tu) => ({
+              type: 'tool_result' as const,
+              tool_use_id: tu.id,
+              content: (await executeCrmTool(tu.name, (tu.input as Record<string, unknown>) ?? {})).slice(0, 15000),
+            })));
+            convo.push({ role: 'user', content: results });
           }
-        }
+          // Emit the full reply as one text_delta so the client's
+          // existing parser just appends it as if it streamed.
+          if (accumulated) {
+            controller.enqueue(sseEvent({ type: 'text_delta', text: accumulated }));
+          }
+          usage = aggUsage;
+        } else {
+          const anthropicBody: Anthropic.MessageCreateParamsStreaming = {
+            model,
+            max_tokens: useOpus ? 4000 : 2000,
+            stream: true,
+            system: [
+              { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } },
+            ],
+            messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          };
 
-        // Authoritative usage comes from finalMessage — the per-event
-        // message_delta usage is a nullable-partial and mixing it in
-        // here would complicate typing for no benefit.
-        const finalMessage = await anthropicStream.finalMessage();
-        const usage = finalMessage.usage as Anthropic.Usage | undefined;
+          const anthropicStream = getAnthropicClient().messages.stream(anthropicBody);
+
+          for await (const event of anthropicStream) {
+            if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+              const delta = event.delta.text;
+              accumulated += delta;
+              controller.enqueue(sseEvent({ type: 'text_delta', text: delta }));
+            }
+          }
+
+          const finalMessage = await anthropicStream.finalMessage();
+          usage = finalMessage.usage as Anthropic.Usage | undefined;
+        }
 
         const cost = priceCall(model, {
           input_tokens: usage?.input_tokens || 0,

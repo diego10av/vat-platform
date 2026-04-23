@@ -67,14 +67,14 @@ describe('buildSystemPrompt', () => {
 
   it('states no context when nothing in focus', async () => {
     const prompt = await buildSystemPrompt({});
-    expect(prompt).toMatch(/no specific entity or declaration/i);
+    expect(prompt).toMatch(/no specific entity[,\s]/i);
   });
 
   it('tolerates a missing entity row without crashing', async () => {
     mockQueryOne.mockResolvedValueOnce(null);
     const prompt = await buildSystemPrompt({ entity_id: 'does-not-exist' });
     // Falls back to the no-context message
-    expect(prompt).toMatch(/no specific entity or declaration/i);
+    expect(prompt).toMatch(/no specific entity[,\s]/i);
   });
 
   it('tolerates a DB error while loading entity', async () => {

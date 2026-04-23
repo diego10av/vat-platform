@@ -59,16 +59,51 @@ interface ThreadSummary {
   declaration_id: string | null;
 }
 
-// Extract entity / declaration id from the current URL if the user is
-// on one of those pages. Keeps the drawer context-aware without
-// requiring a global store.
-function useUrlContext(): { entity_id: string | null; declaration_id: string | null } {
+interface UrlContext {
+  entity_id: string | null;
+  declaration_id: string | null;
+  path: string | null;
+  crm_target_type: 'crm_company' | 'crm_contact' | 'crm_opportunity' | 'crm_matter' | 'crm_invoice' | null;
+  crm_target_id: string | null;
+}
+
+// Extract page context (entity/declaration/CRM record) from the URL
+// so the chat drawer can ground answers in whatever the user is looking
+// at. Keeps the drawer context-aware without a global store.
+function useUrlContext(): UrlContext {
   const pathname = usePathname() || '/';
   const entMatch = pathname.match(/^\/entities\/([^/]+)/);
   const declMatch = pathname.match(/^\/declarations\/([^/]+)/);
+
+  // CRM detail routes: /crm/<section>/<id>
+  // Sections: companies / contacts / opportunities / matters / billing.
+  // Mapping below covers the 5 that carry a record id in the chat context.
+  const crmMap: Record<string, UrlContext['crm_target_type']> = {
+    companies:     'crm_company',
+    contacts:      'crm_contact',
+    opportunities: 'crm_opportunity',
+    matters:       'crm_matter',
+    billing:       'crm_invoice',
+  };
+  let crmTargetType: UrlContext['crm_target_type'] = null;
+  let crmTargetId: string | null = null;
+  const crmMatch = pathname.match(/^\/crm\/([^/]+)\/([^/]+)$/);
+  if (crmMatch) {
+    const section = crmMatch[1]!;
+    const id = crmMatch[2]!;
+    // Skip list-level non-id paths like /crm/matters/new.
+    if (crmMap[section] && id !== 'new') {
+      crmTargetType = crmMap[section]!;
+      crmTargetId = id;
+    }
+  }
+
   return {
     entity_id: entMatch?.[1] ?? null,
     declaration_id: declMatch?.[1] ?? null,
+    path: pathname,
+    crm_target_type: crmTargetType,
+    crm_target_id: crmTargetId,
   };
 }
 
@@ -199,6 +234,7 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
             try {
               const ev = JSON.parse(json) as
                 | { type: 'text_delta'; text: string }
+                | { type: 'tool_progress'; tool_names: string[] }
                 | { type: 'done'; reply: string; model: string; cost_eur: number;
                     thread_id: string | null; tokens: { input: number; output: number; cache_read: number };
                     budget: BudgetSnapshot }
@@ -206,6 +242,10 @@ export function ChatDrawer({ open, onClose }: ChatDrawerProps) {
               if (ev.type === 'text_delta') {
                 accumulated += ev.text;
                 onDelta(ev.text);
+              } else if (ev.type === 'tool_progress') {
+                // Surface a one-line status while the AI queries CRM data.
+                // Shown as a system-style message that the next text_delta replaces.
+                onDelta(`\n\n_Querying CRM: ${ev.tool_names.join(', ')}…_\n\n`);
               } else if (ev.type === 'done') {
                 finalPayload = ev;
                 if (ev.budget) {
