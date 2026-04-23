@@ -142,12 +142,14 @@ export const COMPANY_FIELDS: FieldSchema[] = [
     label: 'Country',
     type: 'select',
     options: COUNTRIES,
+    taxonomyKind: 'country',
   },
   {
     name: 'industry',
     label: 'Industry',
     type: 'select',
     options: asOptions(COMPANY_INDUSTRIES, LABELS_INDUSTRY),
+    taxonomyKind: 'industry',
   },
   {
     name: 'size',
@@ -245,6 +247,7 @@ export const CONTACT_FIELDS: FieldSchema[] = [
     label: 'Country',
     type: 'select',
     options: COUNTRIES,
+    taxonomyKind: 'country',
   },
   {
     name: 'preferred_language',
@@ -265,6 +268,7 @@ export const CONTACT_FIELDS: FieldSchema[] = [
     label: 'Role tags',
     type: 'multiselect',
     options: ROLE_TAGS,
+    taxonomyKind: 'role_tag',
     placeholder: 'Select all roles that apply.',
   },
   {
@@ -279,6 +283,7 @@ export const CONTACT_FIELDS: FieldSchema[] = [
     label: 'How we met',
     type: 'select',
     options: SOURCES,
+    taxonomyKind: 'source',
   },
   {
     name: 'engagement_override',
@@ -368,12 +373,14 @@ export const OPPORTUNITY_FIELDS: FieldSchema[] = [
     label: 'Practice areas',
     type: 'multiselect',
     options: PRACTICE_AREAS,
+    taxonomyKind: 'practice_area',
   },
   {
     name: 'source',
     label: 'Source',
     type: 'select',
     options: SOURCES,
+    taxonomyKind: 'source',
   },
   {
     name: 'next_action',
@@ -392,6 +399,7 @@ export const OPPORTUNITY_FIELDS: FieldSchema[] = [
     label: 'Loss reason',
     type: 'select',
     options: LOSS_REASONS,
+    taxonomyKind: 'loss_reason',
     visibleWhen: { field: 'stage', equals: 'lost' },
   },
   {
@@ -436,12 +444,14 @@ export const MATTER_FIELDS: FieldSchema[] = [
     label: 'Practice areas',
     type: 'multiselect',
     options: PRACTICE_AREAS,
+    taxonomyKind: 'practice_area',
   },
   {
     name: 'fee_type',
     label: 'Fee type',
     type: 'select',
     options: FEE_TYPES,
+    taxonomyKind: 'fee_type',
   },
   {
     name: 'hourly_rate_eur',

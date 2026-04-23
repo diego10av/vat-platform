@@ -1,9 +1,8 @@
 import Link from 'next/link';
-import { BuildingIcon, ChevronRightIcon, ZapIcon } from 'lucide-react';
+import { BuildingIcon, ChevronRightIcon, ZapIcon, ListChecksIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 
-// CRM settings landing — lists sub-areas (firm identity + automations
-// today; task templates, saved views coming in later fases).
+// CRM settings landing — lists sub-areas.
 export default function CrmSettingsIndex() {
   const items = [
     {
@@ -17,6 +16,12 @@ export default function CrmSettingsIndex() {
       icon: ZapIcon,
       title: 'Automations',
       blurb: 'Rules that auto-create follow-up tasks on stage changes, invoice events, etc.',
+    },
+    {
+      href: '/crm/settings/taxonomies',
+      icon: ListChecksIcon,
+      title: 'Categories',
+      blurb: 'Editable dropdown values — countries, industries, practice areas, fee types, contact roles, sources, loss reasons.',
     },
   ];
   return (

@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/Toaster';
+import { useTaxonomy } from '@/lib/useTaxonomy';
 
 export type FieldType =
   | 'text' | 'textarea' | 'email' | 'tel' | 'url'
@@ -30,6 +31,11 @@ export interface FieldSchema {
   type: FieldType;
   required?: boolean;
   options?: Array<{ value: string; label: string }>;
+  /** When set, options hydrate from GET /api/crm/taxonomies?kind=<value>.
+   *  The static `options` array becomes the SSR-friendly fallback used
+   *  until the fetch resolves. */
+  taxonomyKind?: 'country' | 'industry' | 'practice_area' | 'fee_type'
+              | 'role_tag' | 'source' | 'loss_reason';
   placeholder?: string;
   help?: string;
   /** For number: number format hint. For text: maxLength. */
@@ -166,6 +172,11 @@ function FieldRenderer({
   error?: string;
   onChange: (v: unknown) => void;
 }) {
+  // Hydrate options from crm_taxonomies when the field declares a kind.
+  // Fallback is the static `options` array defined in schemas.ts, so
+  // the dropdown renders correctly on first paint before the fetch.
+  const taxonomyOpts = useTaxonomy(field.taxonomyKind, field.options ?? []);
+  const effectiveOptions = field.taxonomyKind ? taxonomyOpts : (field.options ?? []);
   const full = field.type === 'textarea' || field.type === 'tags' || field.type === 'multiselect';
   return (
     <div className={full ? 'md:col-span-2' : ''}>
@@ -232,13 +243,13 @@ function FieldRenderer({
           }`}
         >
           <option value="">—</option>
-          {field.options?.map(o => (
+          {effectiveOptions.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
       ) : field.type === 'multiselect' ? (
         <MultiSelectField
-          options={field.options ?? []}
+          options={effectiveOptions}
           value={Array.isArray(value) ? value as string[] : []}
           onChange={onChange}
           placeholder={field.placeholder}
