@@ -11,6 +11,7 @@ import { useToast } from '@/components/Toaster';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { RecordHistory } from '@/components/crm/RecordHistory';
 import { ConflictCheckPanel } from '@/components/crm/ConflictCheckPanel';
+import { MatterTimeTracker } from '@/components/crm/MatterTimeTracker';
 import { MATTER_FIELDS } from '@/components/crm/schemas';
 import {
   LABELS_MATTER_STATUS, LABELS_ACTIVITY_TYPE, LABELS_INVOICE_STATUS,
@@ -134,6 +135,14 @@ export default function MatterDetailPage({ params }: { params: Promise<{ id: str
         counterpartyName={(m as { counterparty_name?: string | null }).counterparty_name ?? null}
         relatedParties={Array.isArray((m as { related_parties?: string[] }).related_parties) ? (m as { related_parties: string[] }).related_parties : []}
         initialResult={(m as { conflict_check_result?: { checked_at: string; hits: Array<{ matter_id: string; matter_reference: string; status: string; field: 'client' | 'counterparty' | 'related'; party: string; match_value: string; client_name: string | null }>; false_positive_ids?: string[] } | null }).conflict_check_result ?? null}
+      />
+
+      <MatterTimeTracker
+        matterId={id}
+        defaultRateEur={m.hourly_rate_eur !== null && m.hourly_rate_eur !== undefined ? Number(m.hourly_rate_eur) : null}
+        estimatedBudgetEur={(m as { estimated_budget_eur?: number | null }).estimated_budget_eur !== null && (m as { estimated_budget_eur?: number | null }).estimated_budget_eur !== undefined ? Number((m as { estimated_budget_eur?: number | null }).estimated_budget_eur) : null}
+        capEur={(m as { cap_eur?: number | null }).cap_eur !== null && (m as { cap_eur?: number | null }).cap_eur !== undefined ? Number((m as { cap_eur?: number | null }).cap_eur) : null}
+        billedSoFar={totalBilled}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
