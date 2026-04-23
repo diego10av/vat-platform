@@ -218,18 +218,32 @@ No silent "should work" ships.
 
 ---
 
-## 9. Scheduled reminders (optional)
+## 9. Scheduled tasks (live)
 
-If Diego wants truly automated reminders (independent of whether he
-opens the chat), we can set up scheduled tasks that fire a prompt at
-a specific time. Options:
+Scheduled tasks are registered via the scheduled-tasks MCP and fire a
+prompt at a specific time in Diego's local timezone. Each task's
+prompt curls a deployed endpoint on `app.cifracompliance.com` and
+reports the outcome back. Failures degrade silently (don't retry).
 
-- Daily 8:00 Luxembourg: "Run the morning brief"
-- Weekly Monday 8:00: "Archive last week + propose new week priorities"
-- Monthly 1st: "Review the business plan"
+### Active crons (2026-04-23)
 
-Setup requires explicit opt-in by Diego (it creates cron jobs that
-run even when he's not at the computer). Propose as and when wanted.
+| Task | Cadence | Endpoint | What it does |
+|------|---------|----------|--------------|
+| `cifra-morning-brief` | Mon-Sat 08:30 CET | n/a (reads docs + git log) | Daily 5-line briefing of what shipped + what's next |
+| `cifra-legal-watch-scan` | Daily 07:15 CET | `/api/legal-watch/scan` | Pull VATupdate + Curia RSS, queue hits for triage |
+| `cifra-model-tier-watch` | Mon 06:30 CET | n/a (reads Anthropic models list) | Detect new Haiku/Sonnet/Opus tiers, propose swaps |
+| `cifra-crm-engagement-recompute` | Daily 06:00 CET | `/api/crm/scheduled/engagement-recompute` | Derive active/dormant/lapsed from last-activity timestamps |
+| `cifra-crm-payment-reminders` | Daily 08:00 CET | `/api/crm/scheduled/payment-reminders` | Create reminder tasks for invoices in friendly/overdue/escalated buckets |
+| `cifra-crm-anniversaries` | Mon 08:00 CET | `/api/crm/scheduled/anniversaries` | Scan next-7-day birthday + client-anniversary, create low-priority tasks |
+| `cifra-crm-trash-purge` | Sun 03:00 CET | `/api/crm/scheduled/trash-purge` | Hard-delete soft-deleted CRM rows > 30 days old |
+| `cifra-crm-lead-scoring` | 1st of month 07:00 CET | `/api/crm/scheduled/lead-scoring` | Haiku 4.5 scores up to 50 lead/prospect contacts; ~€0.02/mo budget |
+
+### Adding a new cron
+
+1. Build the endpoint under `/api/crm/scheduled/<name>/route.ts` — it should be a plain `POST` that returns a JSON summary. Alias `GET = POST` for manual testing.
+2. Register via `mcp__scheduled-tasks__create_scheduled_task` with: taskId `cifra-<area>-<name>`, a cron expression in local time, and a prompt that curls the endpoint + reports key counts in ≤3 lines.
+3. Set `notifyOnCompletion: false` unless the output is daily-actionable — avoids toast-noise from silent sweeps.
+4. Document it in the table above.
 
 ---
 

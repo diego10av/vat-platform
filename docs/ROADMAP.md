@@ -5,9 +5,11 @@
 > conversation. When something ships, move it to the "Shipped" section
 > at the bottom with the commit hash.
 >
-> Last updated: 2026-04-19 — added directors/pro-rata/SPV P0 items,
-> multi-contact + auto-inherit, multi-user w/ junior role, landing
-> page unpark (Veeva + Factorial-inspired), in-house mode, Fase 5.
+> Last updated: 2026-04-23 — CRM professional rebuild (Fases 1-5)
+> shipped stints 26-31. `/crm` now replaces Notion for client +
+> pipeline + matter + billing + activity work. Remaining CRM items
+> deliberately deferred (see "Deferred CRM items (stint 31)" section
+> below).
 
 Priority legend:
 - **P0** — blocks selling / shows unprofessionalism in a demo
@@ -189,12 +191,27 @@ predecessor is stable + profitable.
 
 ---
 
+## 🧊 Deferred CRM items (stint 31, 2026-04-23)
+
+The CRM rebuild (Fases 1-5) shipped with 5 items consciously deferred because each requires a signal we don't yet have. Reachable — not forgotten. Re-evaluate when the signal changes.
+
+| Item | Why deferred | Trigger to unpark |
+|------|--------------|-------------------|
+| **Stage velocity report** `/crm/opportunities/velocity` (avg days-per-stage × BD × source × practice) | `stage_entered_at` + audit_log already answer ad-hoc questions via URL filters on the opps list. Full dashboard is a Veeva-style reporting suite (weeks of work). | 2+ BD lawyers ask for the same cross-cut more than once. |
+| **`crm_matter_templates`** table (fund_formation / ma_deal / tax_opinion / litigation / regulatory pre-defined structures) | 70% overlap with `crm_task_templates` (mig 043 — stint 30.C). | Diego has opened 5+ matters and can name the pattern that isn't covered by task templates. |
+| **`crm_matter_team_members` junction** with role + fee_share_pct | `team_members TEXT[]` adequate until revenue attribution lands. Migrating an array to a junction is mechanical once requirements firm up; speculative builds bake the wrong schema. | Internal revenue attribution by lawyer becomes a workflow need. |
+| **Conflict-checker layer with Opus 4.7** false-positive validation | Manual dismiss UI (shipped) catches name matches; Opus adds cost without proven ROI until a real false-positive has cost 10 minutes of review. | 20+ real scans run and false-positive rate is > 50%. |
+| **Saved views** (`crm_saved_views` + UI) — save/apply filter+sort state per list | URL params + paginación (shipped stint 12) cover the ~3 repeat filter combos. Saved views are a cross-cutting DB+UI investment that pays off at 10+ simultaneous users. | Multi-user goes live (P0 #2) and Diego sees his junior hunting for the same filter combo twice. |
+
+---
+
 ## ✅ Shipped (for historical record)
 
 Recent milestones landed on `main` — see `docs/TODO.md` "Done this week" section for detail per stint.
 
 | Date | Commit | What |
 |------|--------|------|
+| 2026-04-23 | stints 26-31 (30+ commits) | **CRM professional rebuild — Fases 1-5 complete.** Replaces Notion for clients/pipeline/matters/billing. Highlights: full CRUD + audit for 7 entities, soft-delete trash with 30-day purge cron + undo toasts, ⌘K global search, drag-drop kanban + billing dashboards + Excel export + saved-view-by-URL, matter intake wizard (4-step: parties/scope/team/conflict) + time tracker with 75/90/100% budget alerts + disbursements + closing checklist + 7-step gate on status=closed, invoice PDF (pdf-lib) + retainer ledger + credit notes + ECB FX snapshot + approval threshold + payment-reminder cron, engagement-recompute cron + Haiku lead scoring cron + Next Best Action widget + automation rules engine (3 pre-seeded rules) + task templates + Opus meeting-prep briefs + anniversary cron + forecast/WIP home widgets. 5 crons registered via scheduled-tasks MCP. Migrations 028-043. See "Deferred CRM items" above for the 5 consciously deferred follow-ups. |
 | 2026-04-23 | bcb4746 + fe682c0 + 2a6cdda + ca092d4 | **Stint 23: RULE 11X + PhaseCTA Reopen + LifecycleStepper click-through + Modify-patch + Curia RSS.** (Slice A) RULE 11X closes the F105/F106 gap for EU/non-EU suppliers charging foreign VAT on services — cites Art. 44/196 Directive + Art. 17§1 LTVA + C-333/20 + Art. 49 LTVA; added F111 (non-EU) + F112 (goods-vs-service regression guard). (Slice B) PhaseCTA gains optional `onReopen` + `CTAGroup`; LifecycleStepper gains `onStepClick` making done steps clickable; unified `handleReopen()` in page.tsx picks confirmation copy based on status (filed/paid get AED-rectification warning). (Slice C) Migration 025 adds `ai_patch_modified_by_human / _at / _by / _original_diff`; new `PATCH update-patch` endpoint re-enforces whitelist; accept-patch emits `human_edited: true` trailer when applicable; `Modificar` button opens textarea, saves via API, shows "Edited by reviewer" chip + stale-tests banner. (Slice D) `src/lib/legal-watch-curia.ts` hits the official CJEU Latest Rulings RSS with multilingual VAT pre-filter; `parseRss` exported + generalised; default scan sources now `['curia', 'vatupdate']`. 579/579 tests green; CI passing. |
 | 2026-04-21 | 9011bb3 + d3a7ab7 + 8b18ef2 | **Stint 18: migration 019 + legal-watch feed + corpus expansion.** Migration 019 — CHECK constraint on entities.entity_type (repaired stale 'soparfi' row → active_holding). Migration 020 + 941 LOC — legal-watch automated feed: `legal_watch_queue` table + `src/lib/legal-watch-scan.ts` (VATupdate live fetcher + sample seed + `matchKeywords()` over 90-phrase watchlist) + 3 API routes (`/api/legal-watch/scan \| queue \| queue/[id]`) + `LegalWatchQueueCard` UI section on `/legal-watch` (Scan now + Seed samples + Flag / Escalate / Dismiss triage) + daily 07:15 cron `cifra-legal-watch-scan` injecting into morning brief. Corpus expansion F096–F107 covering construction-RC regression guard, Art. 54 non-deductibility, Art. 199a scrap, Art. 57 franchise, Ludwig sub-agent chain, Skandia/Danske Bank VAT-group cross-border, BlackRock SaaS exclusion, Art. 45 opt-in outgoing, SV pure admin vs. servicer split, NO_MATCH edge cases for EU-supplier-mistakenly-charged-foreign-VAT, carry service-GP substance test. 577/577 tests green, typecheck clean. |
 | 2026-04-21 | 9b36384 + f874f73 | **Stint 17: landing Sign in affordance.** TopNav gets "Sign in →" text link + Get-in-touch primary pill, vertical divider separator, crisper backdrop-blur on scroll. Versãofast citation in Depth grid refreshed from the old "referral fees" wording to the actual credit-intermediation ruling. Middleware host-based routing was already in place — no code change needed for when Diego activates the DNS. |

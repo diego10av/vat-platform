@@ -98,6 +98,24 @@ Things worth remembering but not actionable yet:
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
 
+**2026-04-23 (night)** — Stint 31: close Fases 1-3 of the CRM rebuild (5 commits)
+
+Shipped the last 6 HIGH-priority gaps from the audit; parked 5 MEDIUM/LOW items in `ROADMAP.md` → "Deferred CRM items (stint 31)" with signal triggers for when to unpark each. Every commit passed typecheck + 594 tests + build.
+
+- **31.A · Trash purge cron + 5-cron registration** (`7095727`). New `POST /api/crm/scheduled/trash-purge` hard-deletes rows in `crm_companies`/`_contacts`/`_opportunities`/`_matters` whose `deleted_at` is > 30 days old. Registered all 5 CRM scheduled tasks via the scheduled-tasks MCP: trash-purge (Sun 03:00), payment-reminders (daily 08:00), engagement-recompute (daily 06:00), lead-scoring (monthly 1st 07:00), anniversaries (Mon 08:00). Each task's prompt curls the deployed endpoint on `app.cifracompliance.com` and reports counts to Diego.
+
+- **31.B · Undo toast after soft-delete** (`404f469`). Extended `src/components/Toaster.tsx` with optional `action: { label, onClick }`. Toasts carrying an action live 5s. Wired `toast.withAction(...)` in the 4 soft-deletable detail pages (companies/contacts/opportunities/matters); clicking Undo hits `POST /api/crm/trash/<kind>/<id>` and navigates back to the restored record. Invoices skipped — hard-delete is audit-gated and not safe to undo mid-flight.
+
+- **31.C · Forecast + WIP widgets on `/crm` home** (`afcc01a`). New `GET /api/crm/forecast` sums `crm_opportunities.weighted_value_eur` for open opps closing this quarter + returns count + quarter label. New `<ForecastWidget />` drills through to `/crm/opportunities?close_from=…&close_to=…`. New `<WipWidget />` reuses the existing `/api/crm/wip` endpoint, shows total unbilled € + top 5 matters with click-through. Both actionable-first per CLAUDE.md Rule §11.
+
+- **31.D · Budget threshold auto-tasks at 75/90/100%** (`e29852d`). `POST /api/crm/matters/[id]/time` now calls `checkBudgetThresholds()` after every insert. Back-derives spent_before by subtracting the new entry's contribution; for each of [0.75, 0.90, 1.00] that's crossed upward, creates a dedup-guarded `crm_tasks` row with tailored copy (priority high at 100%, medium below) due tomorrow. Matters with no `estimated_budget_eur` set are a no-op. Fails open — budget-alert errors never block the primary time-log POST.
+
+- **31.E · Matter intake wizard + living docs** (this commit). New route `/crm/matters/new` — 4-step wizard (Parties → Scope → Team → Conflict check). Step 4 embeds the existing `<ConflictCheckPanel />` logic; if active hits remain, the "Open matter" button stays disabled until the user ticks "I acknowledge these conflicts and have documented a waiver". `src/app/crm/matters/page.tsx` now exposes two buttons: "New matter (wizard)" (primary) + "Quick add" (secondary, for historic imports that bypass the conflict gate). Updated `docs/ROADMAP.md`, `docs/TODO.md`, `docs/PROTOCOLS.md`.
+
+Deferred (rationale in ROADMAP): stage velocity report, `crm_matter_templates`, `crm_matter_team_members` junction, conflict-checker Opus layer, saved views. None are blockers for daily use — `/crm` fully replaces Notion today.
+
+---
+
 **2026-04-23 (evening)** — Stint 23: classifier gap (RULE 11X) + PhaseCTA Reopen + LifecycleStepper click-through + Modify-patch + Curia RSS + RULE 30 activation + validator cache + corpus gap audit
 
 **Eight commits** pushed to main, all green on typecheck + tests + build. Split into two batches — the first five before Diego went to lunch (A-E below), the last three during lunch (F-H autonomous).

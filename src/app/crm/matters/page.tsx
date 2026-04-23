@@ -84,17 +84,26 @@ export default function MattersPage() {
         title="Matters"
         subtitle="Client engagements — active and historical."
         actions={
-          <Button onClick={() => setNewOpen(true)} variant="primary" size="sm" icon={<PlusIcon size={13} />}>
-            New matter
-          </Button>
+          <>
+            <Link
+              href="/crm/matters/new"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-md bg-brand-600 text-white text-[12.5px] font-semibold hover:bg-brand-700"
+            >
+              <PlusIcon size={13} />
+              New matter (wizard)
+            </Link>
+            <Button onClick={() => setNewOpen(true)} variant="secondary" size="sm" icon={<PlusIcon size={13} />}>
+              Quick add
+            </Button>
+          </>
         }
       />
       <CrmFormModal
         open={newOpen}
         onClose={() => setNewOpen(false)}
         mode="create"
-        title="New matter"
-        subtitle="Opening a matter — reference will auto-generate as MP-YYYY-NNNN if blank."
+        title="Quick add matter"
+        subtitle="Bypasses conflict-check wizard — use only for historic/imported matters."
         fields={MATTER_FIELDS}
         initial={{ status: 'active', conflict_check_done: false }}
         onSave={handleCreate}
