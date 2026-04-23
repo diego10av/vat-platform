@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { NextBestActionWidget } from '@/components/crm/NextBestActionWidget';
 import { ForecastWidget } from '@/components/crm/ForecastWidget';
 import { WipWidget } from '@/components/crm/WipWidget';
+import { UpcomingThisWeekWidget } from '@/components/crm/UpcomingThisWeekWidget';
 import {
   BuildingIcon, UsersIcon, TargetIcon, BriefcaseIcon,
   CalendarIcon, CheckSquareIcon, EuroIcon,
@@ -37,7 +38,10 @@ export default function CrmHomePage() {
         <WipWidget />
       </div>
 
-      <NextBestActionWidget />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <UpcomingThisWeekWidget />
+        <NextBestActionWidget />
+      </div>
 
       <section>
         <h2 className="text-[12px] uppercase tracking-wide font-semibold text-ink-muted mb-2">Jump into</h2>

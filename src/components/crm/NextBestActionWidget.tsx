@@ -21,7 +21,8 @@ import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 
 interface NextAction {
   id: string;
-  type: 'task' | 'invoice_overdue' | 'opp_stuck' | 'opp_next_action' | 'dormant_key_account';
+  type: 'task' | 'invoice_overdue' | 'opp_stuck' | 'opp_next_action' | 'dormant_key_account'
+      | 'contact_follow_up' | 'matter_closing_soon';
   priority: number;
   title: string;
   detail: string;
@@ -36,6 +37,8 @@ const TYPE_META: Record<NextAction['type'], { icon: typeof AlertCircleIcon; tone
   opp_stuck:             { icon: ClockIcon,        tone: 'amber' },
   dormant_key_account:   { icon: UserMinusIcon,    tone: 'amber' },
   opp_next_action:       { icon: TargetIcon,       tone: 'blue'  },
+  contact_follow_up:     { icon: UserMinusIcon,    tone: 'amber' },
+  matter_closing_soon:   { icon: AlertCircleIcon,  tone: 'amber' },
 };
 
 const TONE_CLASSES = {

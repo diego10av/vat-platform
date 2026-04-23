@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   BuildingIcon, UsersIcon, TargetIcon, BriefcaseIcon,
-  CalendarIcon, CheckSquareIcon, EuroIcon, Trash2Icon,
+  CalendarIcon, CalendarDaysIcon, CheckSquareIcon, EuroIcon, Trash2Icon,
   SearchIcon, SettingsIcon,
 } from 'lucide-react';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
@@ -26,6 +26,7 @@ const TABS = [
   { href: '/crm/activities',    label: 'Activities',    icon: CalendarIcon },
   { href: '/crm/tasks',         label: 'Tasks',         icon: CheckSquareIcon },
   { href: '/crm/billing',       label: 'Billing',       icon: EuroIcon },
+  { href: '/crm/calendar',      label: 'Calendar',      icon: CalendarDaysIcon },
   { href: '/crm/trash',         label: 'Trash',         icon: Trash2Icon },
   { href: '/crm/settings',      label: 'Settings',      icon: SettingsIcon },
 ];

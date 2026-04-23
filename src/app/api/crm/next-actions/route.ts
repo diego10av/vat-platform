@@ -18,7 +18,8 @@ import { query } from '@/lib/db';
 // Never more than 20 actions returned. Deduplicated by (type, id).
 export interface NextAction {
   id: string;
-  type: 'task' | 'invoice_overdue' | 'opp_stuck' | 'opp_next_action' | 'dormant_key_account';
+  type: 'task' | 'invoice_overdue' | 'opp_stuck' | 'opp_next_action' | 'dormant_key_account'
+      | 'contact_follow_up' | 'matter_closing_soon';
   priority: number;
   title: string;
   detail: string;
@@ -189,6 +190,61 @@ export async function GET(_request: NextRequest) {
       detail: `${a.name} · ${a.client_name ?? '—'}`,
       link: `/crm/opportunities/${a.id}`,
       target_type: 'crm_opportunity', target_id: a.id,
+    });
+  }
+
+  // ─── 7. Contact follow-ups hitting today or earlier ───────────────
+  const contactFollowUps = await query<{
+    id: string; full_name: string; job_title: string | null;
+    next_follow_up: string; days_delta: number;
+  }>(
+    `SELECT id, full_name, job_title,
+            next_follow_up::text,
+            (next_follow_up - CURRENT_DATE)::int AS days_delta
+       FROM crm_contacts
+      WHERE deleted_at IS NULL
+        AND next_follow_up IS NOT NULL
+        AND next_follow_up <= CURRENT_DATE
+      ORDER BY next_follow_up ASC
+      LIMIT 10`,
+  );
+  for (const f of contactFollowUps) {
+    const overdue = f.days_delta < 0;
+    actions.push({
+      id: `follow_up:${f.id}`, type: 'contact_follow_up',
+      priority: overdue ? 75 : 55,
+      title: `Follow up with ${f.full_name}`,
+      detail: overdue
+        ? `${Math.abs(f.days_delta)}d overdue · ${f.job_title ?? ''}`.trim()
+        : `Due today · ${f.job_title ?? ''}`.trim(),
+      link: `/crm/contacts/${f.id}`,
+      target_type: 'crm_contact', target_id: f.id,
+    });
+  }
+
+  // ─── 8. Matters closing in the next 14 days ──────────────────────
+  const matterCloses = await query<{
+    id: string; matter_reference: string; title: string;
+    closing_date: string; days_until: number;
+  }>(
+    `SELECT id, matter_reference, title, closing_date::text,
+            (closing_date - CURRENT_DATE)::int AS days_until
+       FROM crm_matters
+      WHERE deleted_at IS NULL
+        AND status = 'active'
+        AND closing_date IS NOT NULL
+        AND closing_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
+      ORDER BY closing_date ASC
+      LIMIT 10`,
+  );
+  for (const m of matterCloses) {
+    actions.push({
+      id: `matter_close:${m.id}`, type: 'matter_closing_soon',
+      priority: m.days_until <= 3 ? 65 : 45,
+      title: `Prep closing of ${m.title}`,
+      detail: `${m.matter_reference} · closes in ${m.days_until}d`,
+      link: `/crm/matters/${m.id}`,
+      target_type: 'crm_matter', target_id: m.id,
     });
   }
 
