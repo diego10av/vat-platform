@@ -16,7 +16,7 @@ import {
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import {
-  preparedWithColumn, commentsColumn, deadlineColumn, familyColumn,
+  preparedWithColumn, lastChasedColumn, commentsColumn, deadlineColumn, familyColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 import { AssessmentInlineEditor } from '@/components/tax-ops/AssessmentInlineEditor';
@@ -114,6 +114,7 @@ export default function CitPage() {
     { key: periodLabel, label: `Status ${year}`, widthClass: 'w-[140px]' },
     deadlineColumn(periodLabel, tolerance),
     preparedWithColumn([periodLabel], current.refetch),
+    lastChasedColumn([periodLabel], current.refetch),
     {
       key: `assessment_${year - 1}`,
       label: `Assessment ${year - 1}`,

@@ -69,6 +69,8 @@ interface MatrixCell {
   amount_due: string | null;
   amount_paid: string | null;
   prepared_with: string[];
+  /** Stint 39.F — last chase date to client/CSP for this filing. */
+  last_info_request_sent_at: string | null;
 }
 
 interface EntityRow {
@@ -160,6 +162,7 @@ export async function GET(request: NextRequest) {
     tax_assessment_received_at: string | null;
     amount_due: string | null; amount_paid: string | null;
     prepared_with: string[];
+    last_info_request_sent_at: string | null;
   }> = [];
 
   if (obligationIds.length > 0 && periodLabels.length > 0) {
@@ -170,7 +173,8 @@ export async function GET(request: NextRequest) {
               f.filed_at::text, f.draft_sent_at::text,
               f.tax_assessment_received_at::text,
               f.amount_due::text, f.amount_paid::text,
-              f.prepared_with
+              f.prepared_with,
+              f.last_info_request_sent_at::text AS last_info_request_sent_at
          FROM tax_filings f
         WHERE f.obligation_id = ANY($1::text[])
           AND f.period_label = ANY($2::text[])`,
@@ -193,6 +197,7 @@ export async function GET(request: NextRequest) {
       amount_due: f.amount_due,
       amount_paid: f.amount_paid,
       prepared_with: f.prepared_with ?? [],
+      last_info_request_sent_at: f.last_info_request_sent_at,
     });
   }
 

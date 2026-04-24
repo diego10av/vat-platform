@@ -14,7 +14,7 @@ import {
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import {
-  preparedWithColumn, commentsColumn, familyColumn,
+  preparedWithColumn, lastChasedColumn, commentsColumn, familyColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 import { AddEntityRow } from '@/components/tax-ops/AddEntityRow';
@@ -44,6 +44,7 @@ export default function SubscriptionTaxPage() {
       columns.push({ key: label, label: shortPeriodLabel(label), widthClass: 'w-[80px]' });
     }
     columns.push(preparedWithColumn(data.period_labels, refetch));
+    columns.push(lastChasedColumn(data.period_labels, refetch));
     columns.push(commentsColumn(data.period_labels, refetch));
   }
 

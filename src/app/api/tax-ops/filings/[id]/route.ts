@@ -85,6 +85,8 @@ const ALLOWED_FIELDS = [
   'tax_assessment_received_at', 'tax_assessment_url',
   'amount_due', 'amount_paid', 'paid_at',
   'csp_contacts', 'comments', 'internal_matter_code',
+  // Stint 39.F — last chase date for info requests to client/CSP.
+  'last_info_request_sent_at',
 ] as const;
 
 export async function PATCH(

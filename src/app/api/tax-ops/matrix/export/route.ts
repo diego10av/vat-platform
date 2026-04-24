@@ -69,6 +69,8 @@ interface FilingRow {
   deadline_date: string | null;
   comments: string | null;
   prepared_with: string[];
+  /** Stint 39.F — last chase date; surfaced in export too. */
+  last_info_request_sent_at: string | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -127,7 +129,8 @@ export async function GET(request: NextRequest) {
   if (obligationIds.length > 0 && periodLabels.length > 0) {
     filings = await query<FilingRow>(
       `SELECT obligation_id, period_label, status,
-              deadline_date::text AS deadline_date, comments, prepared_with
+              deadline_date::text AS deadline_date, comments, prepared_with,
+              last_info_request_sent_at::text AS last_info_request_sent_at
          FROM tax_filings
         WHERE obligation_id = ANY($1::text[])
           AND period_label = ANY($2::text[])`,
@@ -149,6 +152,7 @@ export async function GET(request: NextRequest) {
   const header: string[] = ['Group', 'Entity'];
   for (const label of periodLabels) header.push(shortPeriodLabel(label));
   header.push('Prepared with');
+  header.push('Last chased');
   header.push('Comments');
   ws.addRow(header);
   ws.getRow(1).font = { bold: true };
@@ -163,14 +167,18 @@ export async function GET(request: NextRequest) {
       row.push(cell ? humanStatus(cell.status) : '');
       if (cell) cells.push(cell);
     }
-    // Aggregate prepared_with + comments from any filed cell on the row.
+    // Aggregate prepared_with + comments + latest-chase across the row.
     const preparedSet = new Set<string>();
     let comment: string | null = null;
+    const chaseDates: string[] = [];
     for (const c of cells) {
       if (c.prepared_with) c.prepared_with.forEach(v => preparedSet.add(v));
       if (!comment && c.comments) comment = c.comments;
+      if (c.last_info_request_sent_at) chaseDates.push(c.last_info_request_sent_at);
     }
+    const latestChase = chaseDates.length === 0 ? '' : chaseDates.sort().slice(-1)[0]!;
     row.push(Array.from(preparedSet).join(', '));
+    row.push(latestChase);
     row.push(comment ?? '');
     ws.addRow(row);
   }
@@ -182,7 +190,8 @@ export async function GET(request: NextRequest) {
     ws.getColumn(3 + i).width = 12;
   }
   ws.getColumn(3 + periodLabels.length).width = 20;
-  ws.getColumn(4 + periodLabels.length).width = 50;
+  ws.getColumn(4 + periodLabels.length).width = 14;  // Last chased
+  ws.getColumn(5 + periodLabels.length).width = 50;
 
   // Freeze header row + first two cols (Group + Entity) — matches the
   // on-screen sticky-header feel.

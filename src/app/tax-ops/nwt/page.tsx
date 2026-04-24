@@ -13,7 +13,7 @@ import {
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import {
-  preparedWithColumn, commentsColumn, deadlineColumn, familyColumn,
+  preparedWithColumn, lastChasedColumn, commentsColumn, deadlineColumn, familyColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { InlineDateCell } from '@/components/tax-ops/inline-editors';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
@@ -60,6 +60,7 @@ export default function NwtReviewsPage() {
     { key: periodLabel, label: `Status ${year}`, widthClass: 'w-[140px]' },
     deadlineColumn(periodLabel, data?.admin_tolerance_days ?? 0),
     preparedWithColumn([periodLabel], refetch),
+    lastChasedColumn([periodLabel], refetch),
     {
       key: 'interim_received',
       label: 'Interim financials',

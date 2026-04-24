@@ -35,6 +35,8 @@ export interface MatrixCell {
   amount_due: string | null;
   amount_paid: string | null;
   prepared_with: string[];
+  /** Stint 39.F — last chase date to client/CSP for this filing. */
+  last_info_request_sent_at: string | null;
 }
 
 export interface MatrixEntity {

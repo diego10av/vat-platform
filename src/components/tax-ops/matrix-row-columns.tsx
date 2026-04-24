@@ -6,7 +6,7 @@
 // UX later.
 
 import type { MatrixColumn, MatrixEntity, MatrixCell } from './TaxTypeMatrix';
-import { InlineTagsCell, InlineTextCell } from './inline-editors';
+import { InlineTagsCell, InlineTextCell, InlineDateCell } from './inline-editors';
 import { DeadlineWithTolerance } from './DeadlineWithTolerance';
 import { familyChipClasses } from './familyColors';
 
@@ -72,6 +72,49 @@ export function preparedWithColumn(periodLabels: string[], refetch: () => void):
           placeholder="Gab, Andrew"
           onSave={async (next) => {
             await patchAllFilings(allFilingIds, { prepared_with: next });
+            refetch();
+          }}
+        />
+      );
+    },
+  };
+}
+
+/**
+ * Stint 39.F — "Last chased" date column.
+ *
+ * Diego's workflow: when an entity is in info_to_request or
+ * awaiting_client_clarification state, he chases the client or the CSP
+ * by email and needs to know at a glance when he last did so (so he
+ * doesn't double-chase on day 1 or forget for 3 weeks).
+ *
+ * Stored per-filing; the row-level column writes the same date to every
+ * filing in the row (mirroring preparedWithColumn's pattern) since
+ * chasing usually covers "anything pending for this entity-year", not
+ * a specific period. Display shows the most-recent date across the row.
+ */
+export function lastChasedColumn(periodLabels: string[], refetch: () => void): MatrixColumn {
+  return {
+    key: 'last_chased',
+    label: 'Last chased',
+    widthClass: 'w-[130px]',
+    render: (e) => {
+      const allFilingIds = periodLabels
+        .map(l => e.cells[l]?.filing_id)
+        .filter((x): x is string => !!x);
+      // Show the max date across all filings in the row — "most recently
+      // chased" is more informative than "chase date of Q1 specifically".
+      const dates = periodLabels
+        .map(l => e.cells[l]?.last_info_request_sent_at)
+        .filter((x): x is string => !!x);
+      const latest = dates.length === 0 ? null : dates.sort().slice(-1)[0]!;
+      return (
+        <InlineDateCell
+          value={latest}
+          disabled={allFilingIds.length === 0}
+          mode="neutral"
+          onSave={async (next) => {
+            await patchAllFilings(allFilingIds, { last_info_request_sent_at: next });
             refetch();
           }}
         />
