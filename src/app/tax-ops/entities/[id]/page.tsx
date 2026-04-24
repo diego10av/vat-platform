@@ -160,7 +160,16 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
           className="w-full text-[15px] font-semibold text-ink bg-transparent border-0 p-0 focus:ring-0 focus:outline-none focus:bg-surface-alt/60 px-1 rounded"
         />
         <div className="text-[12px] text-ink-muted mt-0.5 flex items-center gap-2 flex-wrap">
-          {data.entity.group_name && <span>{data.entity.group_name}</span>}
+          {data.entity.group_name && data.entity.group_id && (
+            <Link
+              href={`/tax-ops/families/${data.entity.group_id}`}
+              className="hover:text-brand-700 hover:underline"
+              title={`Open ${data.entity.group_name} family overview`}
+            >
+              {data.entity.group_name}
+            </Link>
+          )}
+          {data.entity.group_name && !data.entity.group_id && <span>{data.entity.group_name}</span>}
           {data.entity.is_active ? (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-green-100 text-green-800">Active</span>
           ) : (

@@ -303,12 +303,30 @@ function GroupBlock({
         <tr>
           <td
             colSpan={totalCols}
-            className="sticky left-0 bg-surface-alt/70 border-b border-border px-2.5 py-1 font-semibold text-[11.5px] text-ink cursor-pointer hover:bg-surface-alt"
-            onClick={() => toggleGroup(group.name)}
+            className="sticky left-0 bg-surface-alt/70 border-b border-border px-2.5 py-1 font-semibold text-[11.5px] text-ink"
           >
+            {/* Stint 40.P — group header has two affordances: chevron
+                toggles collapse, name links to family overview. */}
             <span className="inline-flex items-center gap-1">
-              {isCollapsed ? <ChevronRightIcon size={11} /> : <ChevronDownIcon size={11} />}
-              {group.name}
+              <button
+                type="button"
+                aria-label={isCollapsed ? 'Expand group' : 'Collapse group'}
+                onClick={() => toggleGroup(group.name)}
+                className="inline-flex items-center cursor-pointer hover:text-brand-700"
+              >
+                {isCollapsed ? <ChevronRightIcon size={11} /> : <ChevronDownIcon size={11} />}
+              </button>
+              {groupId ? (
+                <Link
+                  href={`/tax-ops/families/${groupId}`}
+                  className="hover:text-brand-700 hover:underline cursor-pointer"
+                  title={`Open ${group.name} family overview`}
+                >
+                  {group.name}
+                </Link>
+              ) : (
+                <span>{group.name}</span>
+              )}
               <span className="ml-1 text-ink-muted font-normal">({group.items.length})</span>
             </span>
           </td>

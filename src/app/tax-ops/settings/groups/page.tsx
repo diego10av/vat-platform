@@ -235,7 +235,14 @@ export default function ClientGroupsPage() {
                   </>
                 ) : (
                   <>
-                    <td className="px-3 py-1.5 font-medium">{g.name}</td>
+                    <td className="px-3 py-1.5 font-medium">
+                      <Link
+                        href={`/tax-ops/families/${g.id}`}
+                        className="hover:text-brand-700 hover:underline"
+                      >
+                        {g.name}
+                      </Link>
+                    </td>
                     <td className="px-3 py-1.5 text-ink-soft">{g.notes ?? '—'}</td>
                     <td className="px-3 py-1.5 text-right tabular-nums">{g.entity_count}</td>
                     <td className="px-3 py-1.5">
