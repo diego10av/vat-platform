@@ -55,15 +55,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'invalid_year' }, { status: 400 });
   }
 
-  // 1. Fetch active obligations on active entities
+  // 1. Fetch active obligations on entities that haven't been
+  //    liquidated before the target year. Liquidated-this-year
+  //    entities are excluded from rollover into NEXT year by not
+  //    matching this predicate (liquidation_date < start of next
+  //    year implies they shouldn't get new filings). Stint 40.H.
   const obligations = await query<ObligationForRollover>(
     `SELECT o.id, o.entity_id, e.legal_name AS entity_name,
             o.tax_type, o.period_pattern
        FROM tax_obligations o
        JOIN tax_entities e ON e.id = o.entity_id
       WHERE o.is_active = TRUE
-        AND e.is_active  = TRUE
+        AND (e.is_active = TRUE
+             OR (e.liquidation_date IS NOT NULL AND e.liquidation_date >= make_date($1::int, 1, 1)))
       ORDER BY e.legal_name, o.tax_type`,
+    [year],
   );
 
   // 2. Load deadline rules

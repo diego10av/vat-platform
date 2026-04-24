@@ -92,6 +92,8 @@ export async function GET(request: NextRequest) {
   const periodLabels = periodLabelsFor(period_pattern, year);
 
   // Entity set — same logic as /api/tax-ops/matrix.
+  // Stint 40.H — match matrix view's rule: keep entities liquidated
+  // in-year visible so exports cover the complete year.
   const entityQuery = showInactive
     ? `
       SELECT e.id AS entity_id, e.legal_name,
@@ -105,7 +107,8 @@ export async function GET(request: NextRequest) {
                LIMIT 1) AS obligation_id
         FROM tax_entities e
         LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
-       WHERE e.is_active = TRUE
+       WHERE (e.is_active = TRUE
+              OR (e.liquidation_date IS NOT NULL AND e.liquidation_date >= make_date($4::int, 1, 1)))
        ORDER BY g.name ASC NULLS LAST, e.legal_name ASC
       `
     : `
@@ -119,10 +122,11 @@ export async function GET(request: NextRequest) {
          AND o.period_pattern = $2
          AND o.service_kind = $3
          AND o.is_active = TRUE
-         AND e.is_active = TRUE
+         AND (e.is_active = TRUE
+              OR (e.liquidation_date IS NOT NULL AND e.liquidation_date >= make_date($4::int, 1, 1)))
        ORDER BY g.name ASC NULLS LAST, e.legal_name ASC
       `;
-  const entities = await query<Row>(entityQuery, [tax_type, period_pattern, service_kind]);
+  const entities = await query<Row>(entityQuery, [tax_type, period_pattern, service_kind, year]);
 
   const obligationIds = entities.map(e => e.obligation_id).filter((x): x is string => !!x);
   let filings: FilingRow[] = [];

@@ -114,6 +114,12 @@ export async function GET(request: NextRequest) {
   //   - When showInactive=1: every active entity (so Diego can opt-in a new one from the UI).
   //   - When showInactive=0 (default): only entities that have an ACTIVE obligation
   //     of this (tax_type, period_pattern, service_kind).
+  //
+  // Stint 40.H — entities marked liquidated DURING the requested year
+  // still appear in that year's matrix so Diego can wrap up the
+  // in-flight filings (e.g. VAT Q1-Q4 2025 for an entity liquidated
+  // 2025-06). They drop out of subsequent years automatically because
+  // the liquidation_date predates those years' start.
   const entityQuery = showInactive
     ? `
       SELECT e.id, e.legal_name,
@@ -128,7 +134,8 @@ export async function GET(request: NextRequest) {
                LIMIT 1) AS obligation_id
         FROM tax_entities e
         LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
-       WHERE e.is_active = TRUE
+       WHERE (e.is_active = TRUE
+              OR (e.liquidation_date IS NOT NULL AND e.liquidation_date >= make_date($4::int, 1, 1)))
        ORDER BY g.name ASC NULLS LAST, e.legal_name ASC
       `
     : `
@@ -142,7 +149,8 @@ export async function GET(request: NextRequest) {
          AND o.period_pattern = $2
          AND o.service_kind = $3
          AND o.is_active = TRUE
-         AND e.is_active = TRUE
+         AND (e.is_active = TRUE
+              OR (e.liquidation_date IS NOT NULL AND e.liquidation_date >= make_date($4::int, 1, 1)))
        ORDER BY g.name ASC NULLS LAST, e.legal_name ASC
       `;
 
@@ -150,7 +158,7 @@ export async function GET(request: NextRequest) {
     id: string; legal_name: string;
     group_id: string | null; group_name: string | null;
     obligation_id: string | null;
-  }>(entityQuery, [tax_type, period_pattern, service_kind]);
+  }>(entityQuery, [tax_type, period_pattern, service_kind, year]);
 
   // Load every filing for these (obligation, period_label) pairs in one round-trip.
   const obligationIds = entities.map(e => e.obligation_id).filter((x): x is string => !!x);

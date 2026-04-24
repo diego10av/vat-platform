@@ -5,6 +5,7 @@
 
 import { useEffect, useState, useCallback, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeftIcon } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
@@ -62,6 +63,7 @@ function humanTaxType(t: string): string {
 
 export default function EntityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const [data, setData] = useState<Response | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editName, setEditName] = useState<string>('');
@@ -86,7 +88,11 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
 
   useEffect(() => { load(); }, [load]);
 
-  async function save(patch: Record<string, unknown>, msg: string) {
+  async function save(
+    patch: Record<string, unknown>,
+    msg: string,
+    undoAction?: { label: string; onClick: () => void | Promise<void> },
+  ) {
     try {
       const res = await fetch(`/api/tax-ops/entities/${id}`, {
         method: 'PATCH',
@@ -94,7 +100,11 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
         body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success(msg);
+      if (undoAction) {
+        toast.withAction('success', msg, undefined, undoAction);
+      } else {
+        toast.success(msg);
+      }
       await load();
     } catch (e) {
       toast.error(`Save failed: ${String(e instanceof Error ? e.message : e)}`);
@@ -122,9 +132,20 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="space-y-4 max-w-5xl">
-      <Link href="/tax-ops/entities" className="inline-flex items-center gap-1 text-[12px] text-ink-muted hover:text-ink">
-        <ArrowLeftIcon size={12} /> Back to entities
-      </Link>
+      {/* Stint 40.H — back button uses router.back() so Diego returns
+          to the page he came from (VAT quarterly, CIT, Tasks, etc.),
+          not always /tax-ops/entities. Fallback link if there's no
+          history (direct URL open). */}
+      <button
+        type="button"
+        onClick={() => {
+          if (window.history.length > 1) router.back();
+          else router.push('/tax-ops/entities');
+        }}
+        className="inline-flex items-center gap-1 text-[12px] text-ink-muted hover:text-ink"
+      >
+        <ArrowLeftIcon size={12} /> Back
+      </button>
 
       {/* Identity header */}
       <div className="rounded-md border border-border bg-surface px-4 py-3">
@@ -150,14 +171,32 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
           {/* Lifecycle actions (stint 39.C) — archive or reactivate.
               Archived entities are skipped by year-rollover + hidden by
               default from matrix pages. */}
+          {/* Stint 40.H — archive emits a toast with Undo. Reactivating
+              a just-archived entity via the toast reverses both
+              is_active and liquidation_date atomically. */}
           {data.entity.is_active ? (
             <>
               <button
                 type="button"
-                onClick={() => {
-                  const date = window.prompt('Liquidation / de-registration date (YYYY-MM-DD, leave empty to just mark inactive):', new Date().toISOString().slice(0, 10));
+                onClick={async () => {
+                  const date = window.prompt(
+                    'Liquidation / de-registration date (YYYY-MM-DD, leave empty to just mark inactive):',
+                    new Date().toISOString().slice(0, 10),
+                  );
                   if (date === null) return;
-                  save({ is_active: false, liquidation_date: date || null }, 'Entity archived');
+                  const priorActive = data.entity.is_active;
+                  const priorLiq = data.entity.liquidation_date;
+                  await save(
+                    { is_active: false, liquidation_date: date || null },
+                    'Entity archived',
+                    {
+                      label: 'Undo',
+                      onClick: () => save(
+                        { is_active: priorActive, liquidation_date: priorLiq },
+                        'Archive undone',
+                      ),
+                    },
+                  );
                 }}
                 className="ml-2 text-[10.5px] text-ink-muted hover:text-danger-600 underline"
               >
@@ -167,7 +206,21 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
           ) : (
             <button
               type="button"
-              onClick={() => save({ is_active: true, liquidation_date: null }, 'Entity reactivated')}
+              onClick={async () => {
+                const priorActive = data.entity.is_active;
+                const priorLiq = data.entity.liquidation_date;
+                await save(
+                  { is_active: true, liquidation_date: null },
+                  'Entity reactivated',
+                  {
+                    label: 'Undo',
+                    onClick: () => save(
+                      { is_active: priorActive, liquidation_date: priorLiq },
+                      'Reactivate undone',
+                    ),
+                  },
+                );
+              }}
               className="ml-2 text-[10.5px] text-ink-muted hover:text-brand-700 underline"
             >
               Reactivate
