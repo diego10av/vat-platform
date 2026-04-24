@@ -149,7 +149,7 @@ function ShortcutsHelp({ currentPath }: { currentPath: string }) {
         <Row keys={['g', 'c']} desc="Go to Clients" />
         <Row keys={['g', 'e']} desc="Go to Entities" />
         <Row keys={['g', 'd']} desc="Go to Declarations" />
-        <Row keys={['g', 't']} desc="Go to Tax-Ops (compliance tracker + tasks)" />
+        <Row keys={['g', 't']} desc="Go to Tax-Ops overview (CIT · NWT · VAT · WHT · BCL · …)" />
         <Row keys={['g', 'i']} desc="Go to AED inbox" />
         <Row keys={['g', 'p']} desc="Go to Closing dashboard (current quarter)" />
         <Row keys={['g', 'l']} desc="Go to Legal watch (admin / reviewer)" />

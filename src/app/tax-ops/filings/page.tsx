@@ -121,8 +121,8 @@ export default function FilingsListPage() {
   return (
     <div>
       <PageHeader
-        title="Filings"
-        subtitle={`All compliance filings across active entities. ${total} matching the current filters.`}
+        title="Search filings"
+        subtitle={`Cross-tax-type advanced search. For day-to-day work, use the sidebar categories (CIT, VAT, WHT, …). ${total} filings match the current filters.`}
       />
 
       <div className="flex flex-wrap gap-2 items-center mb-3">
