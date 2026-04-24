@@ -14,6 +14,8 @@ import {
 import { InlineDateCell } from '@/components/tax-ops/inline-editors';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 
+// Tolerance usage below reads data.admin_tolerance_days.
+
 const YEAR_OPTIONS = [2024, 2025, 2026, 2027];
 
 export default function NwtReviewsPage() {
@@ -44,7 +46,7 @@ export default function NwtReviewsPage() {
       ),
     },
     { key: periodLabel, label: `Status ${year}`, widthClass: 'w-[140px]' },
-    deadlineColumn(periodLabel),
+    deadlineColumn(periodLabel, data?.admin_tolerance_days ?? 0),
     preparedWithColumn([periodLabel], refetch),
     {
       key: 'interim_received',

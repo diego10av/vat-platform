@@ -5,9 +5,9 @@
 // everywhere. Keeps per-page code tight + avoids drift when we tweak
 // UX later.
 
-import { DateBadge } from '@/components/crm/DateBadge';
 import type { MatrixColumn, MatrixEntity, MatrixCell } from './TaxTypeMatrix';
 import { InlineTagsCell, InlineTextCell } from './inline-editors';
+import { DeadlineWithTolerance } from './DeadlineWithTolerance';
 
 // Patch helper — works off the cell's filing_id. When the cell is empty,
 // the edit is blocked (we don't create an empty filing just to attach a
@@ -102,16 +102,23 @@ export function commentsColumn(periodLabels: string[], refetch: () => void): Mat
   };
 }
 
-export function deadlineColumn(periodLabel: string): MatrixColumn {
+export function deadlineColumn(periodLabel: string, toleranceDays = 0): MatrixColumn {
   // Pure display — deadline is auto-computed from the rule; editing
-  // happens in the filing detail page (overrides individual deadlines).
+  // happens in the filing detail page. Admin tolerance (stint 37.C) makes
+  // deadlines past statutory but within tolerance amber instead of red.
   return {
     key: 'deadline',
     label: 'Deadline',
-    widthClass: 'w-[130px]',
+    widthClass: 'w-[180px]',
     render: (e) => {
       const cell = e.cells[periodLabel];
-      return <DateBadge value={cell?.deadline_date ?? null} mode="urgency" />;
+      return (
+        <DeadlineWithTolerance
+          value={cell?.deadline_date ?? null}
+          toleranceDays={toleranceDays}
+          label="Deadline"
+        />
+      );
     },
   };
 }

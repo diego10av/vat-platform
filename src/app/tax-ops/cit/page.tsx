@@ -32,9 +32,10 @@ export default function CitPage() {
   }, [prior.data, year]);
 
   const periodLabel = String(year);
+  const tolerance = current.data?.admin_tolerance_days ?? 0;
   const columns: MatrixColumn[] = [
     { key: periodLabel, label: `Status ${year}`, widthClass: 'w-[140px]' },
-    deadlineColumn(periodLabel),
+    deadlineColumn(periodLabel, tolerance),
     preparedWithColumn([periodLabel], current.refetch),
     {
       key: `assessment_${year - 1}`,

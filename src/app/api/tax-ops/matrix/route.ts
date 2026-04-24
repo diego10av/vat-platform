@@ -98,6 +98,16 @@ export async function GET(request: NextRequest) {
 
   const periodLabels = periodLabelsFor(period_pattern, year);
 
+  // Fetch admin tolerance for this (tax_type, period_pattern) rule — used by
+  // the UI to render "within tolerance" vs "overdue" states on DeadlineBadge.
+  const ruleRows = await query<{ admin_tolerance_days: number }>(
+    `SELECT admin_tolerance_days FROM tax_deadline_rules
+      WHERE tax_type = $1 AND period_pattern = $2
+      LIMIT 1`,
+    [tax_type, period_pattern],
+  );
+  const adminToleranceDays = ruleRows[0]?.admin_tolerance_days ?? 0;
+
   // Base entity set:
   //   - When showInactive=1: every active entity (so Diego can opt-in a new one from the UI).
   //   - When showInactive=0 (default): only entities that have an ACTIVE obligation
@@ -209,6 +219,7 @@ export async function GET(request: NextRequest) {
     tax_type,
     period_pattern,
     service_kind,
+    admin_tolerance_days: adminToleranceDays,
     period_labels: periodLabels,
     entities: rows,
   });

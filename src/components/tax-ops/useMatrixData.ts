@@ -12,6 +12,9 @@ export interface MatrixResponse {
   tax_type: string;
   period_pattern: string;
   service_kind: string;
+  /** Administrative tolerance days past the statutory deadline before
+   *  the filing is truly overdue. 0 when no tolerance. (Stint 37.C) */
+  admin_tolerance_days: number;
   period_labels: string[];
   entities: MatrixEntity[];
 }

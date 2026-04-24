@@ -25,9 +25,10 @@ export default function WhtAnnualPage() {
   });
 
   const periodLabel = String(year);
+  const tolerance = data?.admin_tolerance_days ?? 0;
   const columns: MatrixColumn[] = [
     { key: periodLabel, label: `Status ${year}`, widthClass: 'w-[140px]' },
-    deadlineColumn(periodLabel),
+    deadlineColumn(periodLabel, tolerance),
     preparedWithColumn([periodLabel], refetch),
     commentsColumn([periodLabel], refetch),
   ];

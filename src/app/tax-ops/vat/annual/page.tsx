@@ -36,6 +36,7 @@ export default function VatAnnualPage() {
   }
 
   const periodLabel = String(year);
+  const tolerance = standard.data?.admin_tolerance_days ?? simplified.data?.admin_tolerance_days ?? 0;
   const columns: MatrixColumn[] = [
     {
       key: 'subtype',
@@ -54,7 +55,7 @@ export default function VatAnnualPage() {
       },
     },
     { key: periodLabel, label: `Status ${year}`, widthClass: 'w-[140px]' },
-    deadlineColumn(periodLabel),
+    deadlineColumn(periodLabel, tolerance),
     preparedWithColumn([periodLabel], refetch),
     commentsColumn([periodLabel], refetch),
   ];
