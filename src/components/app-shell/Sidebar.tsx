@@ -11,7 +11,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   HomeIcon, Building2Icon, FileTextIcon, CalendarIcon,
-  BookOpenIcon, BriefcaseIcon,
+  BookOpenIcon, BriefcaseIcon, FileStackIcon,
   BarChart3Icon, ShieldCheckIcon, SettingsIcon,
   type LucideIcon,
 } from 'lucide-react';
@@ -73,6 +73,17 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
       roles: ['admin', 'reviewer'],
       items: [
         { href: '/crm',          label: 'CRM',           icon: BriefcaseIcon },
+      ],
+    },
+    {
+      // 2026-04-24 (stint 34): /tax-ops replaces Diego's annual Excel
+      // rebuild — CIT + NWT + VAT + WHT + FATCA/CRS + BCL filings,
+      // 214 entities, editable deadline rules, state-of-art tasks
+      // module. Independent from /crm by Diego's explicit call.
+      label: 'Tax-Ops',
+      roles: ['admin', 'reviewer'],
+      items: [
+        { href: '/tax-ops',      label: 'Tax-Ops',       icon: FileStackIcon },
       ],
     },
     {
