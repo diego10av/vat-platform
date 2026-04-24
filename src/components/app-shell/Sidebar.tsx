@@ -17,10 +17,10 @@ import { useEffect, useState } from 'react';
 import {
   HomeIcon, Building2Icon, FileTextIcon, CalendarIcon,
   BookOpenIcon, BriefcaseIcon, FileStackIcon,
-  LandmarkIcon, SearchCheckIcon, ReceiptIcon, WalletIcon,
-  CoinsIcon, LibraryBigIcon, FolderIcon, CheckSquareIcon,
+  LandmarkIcon, SearchCheckIcon, EuroIcon, ReceiptIcon,
+  WalletIcon, CoinsIcon, LibraryBigIcon, FolderIcon, CheckSquareIcon,
   BarChart3Icon, ShieldCheckIcon, SettingsIcon, ChevronRightIcon,
-  TargetIcon, CircleIcon,
+  TargetIcon, CircleIcon, PercentIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -28,10 +28,10 @@ import {
 // lucide icon name; this map decodes. Anything not here falls back
 // to CircleIcon.
 const ICON_MAP: Record<string, LucideIcon> = {
-  LandmarkIcon, SearchCheckIcon, ReceiptIcon, WalletIcon,
+  LandmarkIcon, SearchCheckIcon, EuroIcon, ReceiptIcon, WalletIcon,
   CoinsIcon, LibraryBigIcon, FolderIcon, FileStackIcon,
   FileTextIcon, Building2Icon, CalendarIcon, BriefcaseIcon,
-  TargetIcon, CircleIcon,
+  TargetIcon, CircleIcon, PercentIcon,
 };
 function iconFor(name: string | null | undefined): LucideIcon {
   return (name && ICON_MAP[name]) || CircleIcon;
@@ -105,14 +105,14 @@ function buildTaxCategoryNavItems(categories: TaxCategory[]): NavItem[] {
       {
         href: '/tax-ops/vat',
         label: 'VAT filings',
-        icon: ReceiptIcon,
+        icon: EuroIcon,
         children: [
           { href: '/tax-ops/vat/annual',    label: 'Annual',    icon: ReceiptIcon },
           { href: '/tax-ops/vat/quarterly', label: 'Quarterly', icon: ReceiptIcon },
           { href: '/tax-ops/vat/monthly',   label: 'Monthly',   icon: ReceiptIcon },
         ],
       },
-      { href: '/tax-ops/subscription-tax', label: 'Subscription tax',     icon: CoinsIcon },
+      { href: '/tax-ops/subscription-tax', label: 'Subscription tax',     icon: PercentIcon },
       { href: '/tax-ops/wht',              label: 'Withholding tax',      icon: WalletIcon },
       { href: '/tax-ops/bcl',              label: 'BCL reporting',        icon: LibraryBigIcon },
     ];
@@ -163,23 +163,42 @@ function buildGroups(badges: SidebarBadges, taxCategories: TaxCategory[]): NavGr
   // Tax-Ops is now fully collapsible (click chevron to hide all 9
   // sub-items) so the sidebar doesn't saturate the viewport.
   return [
+    // Home alone at top (stint 39.A: order was Home/VAT/CRM/Tax-Ops;
+    // Diego: "Tax Ops lo pondría debajo de Home. Luego iría VAT.
+    // Luego iría CRM." Applied.)
     {
-      // Home — solo, sin label de grupo.
       items: [
         { href: '/', label: 'Home', icon: HomeIcon },
       ],
     },
+    // Tax-Ops — promoted above VAT (stint 39.A).
     {
-      // VAT module — Diego's original product. Clients, declarations,
-      // deadlines, and legal-watch all belong here (legal-watch is
-      // VAT-specific: LTVA + Directive 2006/112 + AED circulars +
-      // CJEU VAT rulings).
       roles: ['admin', 'reviewer'],
       items: [
         {
-          href: '/declarations',  // parent goes to the default VAT page
+          href: '/tax-ops',
+          label: 'Tax-Ops',
+          icon: FileStackIcon,
+          children: [
+            { href: '/tax-ops',                  label: 'Overview',              icon: FileStackIcon },
+            { href: '/tax-ops/tasks',            label: 'Tasks',                 icon: CheckSquareIcon },
+            // Tax-type children are data-driven from /api/tax-ops/categories.
+            ...buildTaxCategoryNavItems(taxCategories),
+            { href: '/tax-ops/other',            label: 'Other (ad-hoc)',       icon: FolderIcon },
+            { href: '/tax-ops/entities',         label: 'Entities',             icon: Building2Icon },
+            { href: '/tax-ops/settings',         label: 'Settings',             icon: SettingsIcon },
+          ],
+        },
+      ],
+    },
+    // VAT — Diego's original module, now second.
+    {
+      roles: ['admin', 'reviewer'],
+      items: [
+        {
+          href: '/declarations',
           label: 'VAT',
-          icon: ReceiptIcon,
+          icon: EuroIcon,
           children: [
             { href: '/clients',      label: 'Clients',      icon: Building2Icon },
             { href: '/declarations', label: 'Declarations', icon: FileTextIcon,
@@ -201,27 +220,6 @@ function buildGroups(badges: SidebarBadges, taxCategories: TaxCategory[]): NavGr
           children: [
             { href: '/crm',          label: 'Overview', icon: BriefcaseIcon },
             { href: '/crm/outreach', label: 'Outreach', icon: TargetIcon },
-          ],
-        },
-      ],
-    },
-    {
-      roles: ['admin', 'reviewer'],
-      items: [
-        {
-          href: '/tax-ops',
-          label: 'Tax-Ops',
-          icon: FileStackIcon,
-          children: [
-            { href: '/tax-ops',                  label: 'Overview',              icon: FileStackIcon },
-            { href: '/tax-ops/tasks',            label: 'Tasks',                 icon: CheckSquareIcon },
-            // Tax-type children are data-driven from /api/tax-ops/categories
-            // (stint 38.A). Archived rules + invisible rules hide here
-            // automatically. Fallback to hardcoded list if the fetch fails.
-            ...buildTaxCategoryNavItems(taxCategories),
-            { href: '/tax-ops/other',            label: 'Other (ad-hoc)',       icon: FolderIcon },
-            { href: '/tax-ops/entities',         label: 'Entities',             icon: Building2Icon },
-            { href: '/tax-ops/settings',         label: 'Settings',             icon: SettingsIcon },
           ],
         },
       ],
