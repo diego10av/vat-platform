@@ -24,7 +24,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeftIcon, MergeIcon, XIcon, RefreshCwIcon } from 'lucide-react';
+import { ArrowLeftIcon, MergeIcon, XIcon, RefreshCwIcon, ZapIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
@@ -165,6 +165,48 @@ export default function DedupePage() {
   }
 
   const visibleClusters = (data?.clusters ?? []).filter(c => !ignored.has(clusterKey(c)));
+  // Stint 42.E — clusters where every member normalises to the same
+  // string are confidence 1.00 and safe to auto-merge. Pick canonical
+  // via the richest-history default (same logic the page uses for
+  // manual clicks) so the bulk action matches what Diego would do.
+  const exactClusters = visibleClusters.filter(c => c.confidence >= 0.9999);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
+
+  async function runBulkMerge() {
+    if (exactClusters.length === 0) return;
+    setBulkProgress({ done: 0, total: exactClusters.length, failed: 0 });
+    let done = 0;
+    let failed = 0;
+    for (const cluster of exactClusters) {
+      const key = clusterKey(cluster);
+      const canonicalId = canonicalByCluster[key];
+      if (!canonicalId) { failed += 1; done += 1; setBulkProgress({ done, total: exactClusters.length, failed }); continue; }
+      const sourceIds = cluster.members.map(m => m.id).filter(id => id !== canonicalId);
+      try {
+        const res = await fetch(`/api/tax-ops/entities/${canonicalId}/merge`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source_entity_ids: sourceIds }),
+        });
+        if (!res.ok) failed += 1;
+      } catch {
+        failed += 1;
+      }
+      done += 1;
+      setBulkProgress({ done, total: exactClusters.length, failed });
+    }
+    setBulkOpen(false);
+    setBulkProgress(null);
+    const succeeded = exactClusters.length - failed;
+    if (succeeded > 0) {
+      toast.success(`Auto-merged ${succeeded} cluster${succeeded === 1 ? '' : 's'}` + (failed > 0 ? ` · ${failed} failed` : ''));
+    }
+    if (failed > 0 && succeeded === 0) {
+      toast.error(`Auto-merge failed on all ${failed} clusters`);
+    }
+    await load();
+  }
 
   return (
     <div>
@@ -207,6 +249,16 @@ export default function DedupePage() {
               className="inline-flex items-center gap-1 px-2.5 py-1 text-[12px] rounded-md border border-border hover:bg-surface-alt"
             >
               Restore {ignored.size} skipped
+            </button>
+          )}
+          {exactClusters.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setBulkOpen(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-[12px] rounded-md bg-brand-50 border border-brand-300 text-brand-700 hover:bg-brand-100"
+              title="Merge all clusters whose members are identical after normalisation (confidence 100%)"
+            >
+              <ZapIcon size={12} /> Auto-merge exact matches ({exactClusters.length})
             </button>
           )}
           <div className="ml-auto text-[11.5px] text-ink-muted">
@@ -310,6 +362,80 @@ export default function DedupePage() {
           );
         })}
       </div>
+
+      {bulkOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setBulkOpen(false)}>
+          <div className="absolute inset-0 bg-black/30" />
+          <div className="relative bg-surface border border-border rounded-lg shadow-xl max-w-2xl w-full p-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <ZapIcon size={14} className="text-brand-500" />
+              <h2 className="text-[14px] font-semibold text-ink flex-1">Auto-merge exact matches</h2>
+              <button
+                type="button"
+                onClick={() => setBulkOpen(false)}
+                aria-label="Close"
+                className="text-ink-muted hover:text-ink p-1"
+              >
+                <XIcon size={14} />
+              </button>
+            </div>
+            <p className="text-[12px] text-ink-muted">
+              These {exactClusters.length} cluster{exactClusters.length === 1 ? '' : 's'} have members whose normalised names are
+              identical — legal-suffix and punctuation variants of the same entity. The canonical
+              pick defaults to the entity with the most filings history. You can review the list
+              below; Apply merges everything at once.
+            </p>
+            <div className="max-h-[360px] overflow-auto border border-border rounded">
+              <table className="w-full text-[11.5px]">
+                <thead className="bg-surface-alt text-ink-muted sticky top-0">
+                  <tr className="text-left">
+                    <th className="px-2 py-1 font-medium">Canonical (kept)</th>
+                    <th className="px-2 py-1 font-medium">Will be merged into it</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {exactClusters.map(c => {
+                    const key = clusterKey(c);
+                    const canonicalId = canonicalByCluster[key];
+                    const canonical = c.members.find(m => m.id === canonicalId);
+                    const sources = c.members.filter(m => m.id !== canonicalId);
+                    return (
+                      <tr key={key} className="border-t border-border/70">
+                        <td className="px-2 py-1 font-medium text-ink">{canonical?.legal_name ?? '—'}</td>
+                        <td className="px-2 py-1 text-ink-soft">
+                          {sources.map(s => s.legal_name).join(' · ')}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {bulkProgress && (
+              <div className="text-[11.5px] text-ink">
+                Merging {bulkProgress.done} / {bulkProgress.total}{bulkProgress.failed > 0 ? ` · ${bulkProgress.failed} failed` : ''}…
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setBulkOpen(false)}
+                className="px-3 py-1 text-[12px] rounded-md border border-border hover:bg-surface-alt"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void runBulkMerge()}
+                disabled={!!bulkProgress}
+                className="inline-flex items-center gap-1 px-3 py-1 text-[12px] rounded-md bg-brand-500 hover:bg-brand-600 text-white disabled:opacity-50"
+              >
+                <ZapIcon size={11} /> {bulkProgress ? 'Merging…' : `Apply ${exactClusters.length} merge${exactClusters.length === 1 ? '' : 's'}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
