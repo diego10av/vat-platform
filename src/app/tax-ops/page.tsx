@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import {
-  CalendarPlusIcon, LandmarkIcon, SearchCheckIcon, ReceiptIcon,
-  CoinsIcon, WalletIcon, LibraryBigIcon, FolderIcon,
+  CalendarPlusIcon, LandmarkIcon, EuroIcon, PercentIcon,
+  WalletIcon, LibraryBigIcon, FolderIcon,
 } from 'lucide-react';
 import { TaxOpsHomeWidgets } from '@/components/tax-ops/HomeWidgets';
+import { TasksDueWidget } from '@/components/tax-ops/TasksDueWidget';
 import { RolloverModal } from '@/components/tax-ops/RolloverModal';
 
 // /tax-ops home — daily landing for compliance work.
@@ -23,28 +24,32 @@ import { RolloverModal } from '@/components/tax-ops/RolloverModal';
 // Paths like /tax-ops/tasks and /tax-ops/settings are in the sidebar
 // and don't get their own home card (secondary workflows).
 
+// Stint 40.J — NWT Reviews card removed from the grid: Diego said
+// "esa caja habría que borrarla porque no tiene sentido que esté ahí".
+// NWT is a column inside CIT (stint 37.D) and still reachable via sidebar.
+// BCL now routes to /tax-ops/bcl (stint 40.D merge).
 const CATEGORIES = [
   {
     href: '/tax-ops/cit',
     icon: LandmarkIcon,
     title: 'Corporate tax returns',
-    description: 'Form 500 — annual CIT + municipal business tax',
+    description: 'Form 500 — annual CIT + municipal business tax + NWT reviews',
   },
   {
-    href: '/tax-ops/nwt',
-    icon: SearchCheckIcon,
-    title: 'NWT reviews',
-    description: 'Year-end advisory review — opted-in clients only',
+    href: '/tax-ops/bcl',
+    icon: LibraryBigIcon,
+    title: 'BCL reporting',
+    description: 'SBS quarterly + 2.16 monthly (both in one flow)',
   },
   {
     href: '/tax-ops/vat/annual',
-    icon: ReceiptIcon,
+    icon: EuroIcon,
     title: 'VAT',
     description: 'Annual · Quarterly · Monthly (tabs inside)',
   },
   {
     href: '/tax-ops/subscription-tax',
-    icon: CoinsIcon,
+    icon: PercentIcon,
     title: 'Subscription tax',
     description: 'UCI / AIF quarterly — strict deadlines',
   },
@@ -52,13 +57,7 @@ const CATEGORIES = [
     href: '/tax-ops/wht/monthly',
     icon: WalletIcon,
     title: 'Withholding tax',
-    description: 'Director fees — monthly / semester / annual',
-  },
-  {
-    href: '/tax-ops/bcl/sbs',
-    icon: LibraryBigIcon,
-    title: 'BCL reporting',
-    description: 'SBS quarterly + 2.16 monthly',
+    description: 'Director fees — monthly / semester / annual / ad-hoc',
   },
   {
     href: '/tax-ops/other',
@@ -117,6 +116,8 @@ export default function TaxOpsHomePage() {
           );
         })}
       </div>
+
+      <TasksDueWidget />
 
       <TaxOpsHomeWidgets />
 
