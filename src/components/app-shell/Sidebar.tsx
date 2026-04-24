@@ -5,6 +5,11 @@
 // built has a link". An item can carry a small count badge (number of
 // declarations in review, AED letters urgent, etc.) so Diego sees at a
 // glance what's waiting. Active state is a 3px pink rail + pink-50 bg.
+//
+// Stint 35 (2026-04-24): items can carry `children?: NavItem[]` — used
+// by Tax-Ops to expose tax-type sub-categories (VAT → Annual / Quarterly
+// / Monthly). Click on the parent navigates to its href; click on the
+// chevron toggles children visibility. State persisted in localStorage.
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -12,7 +17,9 @@ import { useEffect, useState } from 'react';
 import {
   HomeIcon, Building2Icon, FileTextIcon, CalendarIcon,
   BookOpenIcon, BriefcaseIcon, FileStackIcon,
-  BarChart3Icon, ShieldCheckIcon, SettingsIcon,
+  LandmarkIcon, SearchCheckIcon, ReceiptIcon, WalletIcon,
+  CoinsIcon, LibraryBigIcon, FolderIcon, CheckSquareIcon,
+  BarChart3Icon, ShieldCheckIcon, SettingsIcon, ChevronRightIcon,
   type LucideIcon,
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
@@ -35,6 +42,9 @@ type NavItem = {
   badge?: number | undefined;
   /** Roles that can see this item. Defaults to all roles. */
   roles?: readonly Role[];
+  /** Nested sub-items, rendered indented under the parent. When present,
+   *  a chevron button appears next to the label to toggle visibility. */
+  children?: NavItem[];
 };
 type NavGroup = { label?: string; items: NavItem[]; roles?: readonly Role[] };
 
@@ -43,27 +53,9 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
     {
       items: [
         { href: '/',             label: 'Home',         icon: HomeIcon },
-        // 2026-04-18 restructure: Clients is now a top-level concept
-        // with entities hanging off it. Previously "Clients" in the
-        // sidebar pointed at /entities (a flat list, no hierarchy),
-        // which confused Diego. Clients absorbs Entities per his
-        // decision — entities are reachable by drilling into a client.
         { href: '/clients',      label: 'Clients',      icon: Building2Icon },
         { href: '/declarations', label: 'Declarations', icon: FileTextIcon,
           badge: badges.declarationsInReview },
-        // 2026-04-21 (Diego first-use review): Closing dashboard removed
-        // from top-level nav. It's a multi-entity quarter-at-a-glance
-        // view that only earns its place when there are 10+ entities
-        // under management. For 1-5 entities it's pure noise. Route
-        // `/closing` stays live and reachable via ⌘K ("closing") for
-        // the day the book grows.
-        // 2026-04-18: AED removed from top-level. It lives inside each
-        // entity now (/entities/[id] → AED tab) because a flat "AED
-        // inbox across all entities" view was a dashboard-only concept
-        // that doesn't match how VAT reviewers work (per-entity). The
-        // urgent AEDs still surface globally in the Inbox button
-        // (top-right of the topbar) — that's the actionable view.
-        // Route /aed-letters stays alive for back-compat deep-links.
         { href: '/deadlines',    label: 'Deadlines',    icon: CalendarIcon,
           badge: badges.deadlinesUrgent },
       ],
@@ -76,26 +68,39 @@ function buildGroups(badges: SidebarBadges): NavGroup[] {
       ],
     },
     {
-      // 2026-04-24 (stint 34): /tax-ops replaces Diego's annual Excel
-      // rebuild — CIT + NWT + VAT + WHT + FATCA/CRS + BCL filings,
-      // 214 entities, editable deadline rules, state-of-art tasks
-      // module. Independent from /crm by Diego's explicit call.
+      // 2026-04-24 stint 35: Tax-Ops restructured from a single item into
+      // a tax-type-category tree. Matches Diego's Excel mental model
+      // (4 CIT sheets + 7 VAT sheets). NWT split into its own item
+      // because it's a year-end advisory review, not a filing.
       label: 'Tax-Ops',
       roles: ['admin', 'reviewer'],
       items: [
-        { href: '/tax-ops',      label: 'Tax-Ops',       icon: FileStackIcon },
+        { href: '/tax-ops',                  label: 'Overview',             icon: FileStackIcon },
+        { href: '/tax-ops/cit',              label: 'Corporate tax returns', icon: LandmarkIcon },
+        { href: '/tax-ops/nwt',              label: 'NWT reviews',          icon: SearchCheckIcon },
+        {
+          href: '/tax-ops/vat',
+          label: 'VAT',
+          icon: ReceiptIcon,
+          children: [
+            { href: '/tax-ops/vat/annual',    label: 'Annual',    icon: ReceiptIcon },
+            { href: '/tax-ops/vat/quarterly', label: 'Quarterly', icon: ReceiptIcon },
+            { href: '/tax-ops/vat/monthly',   label: 'Monthly',   icon: ReceiptIcon },
+          ],
+        },
+        { href: '/tax-ops/subscription-tax', label: 'Subscription tax',     icon: CoinsIcon },
+        { href: '/tax-ops/wht',              label: 'Withholding tax',      icon: WalletIcon },
+        { href: '/tax-ops/bcl',              label: 'BCL reporting',        icon: LibraryBigIcon },
+        { href: '/tax-ops/other',            label: 'Other (ad-hoc)',       icon: FolderIcon },
+        { href: '/tax-ops/entities',         label: 'Entities',             icon: Building2Icon },
+        { href: '/tax-ops/tasks',            label: 'Tasks',                icon: CheckSquareIcon },
+        { href: '/tax-ops/settings',         label: 'Settings',             icon: SettingsIcon },
       ],
     },
     {
       label: 'Library',
       roles: ['admin', 'reviewer'],
       items: [
-        // Two items previously lived here that no longer do:
-        //   · Registrations  →  folded into Client lifecycle (vat_status =
-        //     'pending_registration'). Route kept for back-compat.
-        //   · Legal overrides →  folded into the Legal watch page as a
-        //     top section. Route kept for back-compat + deep-links from
-        //     agent explanations.
         { href: '/legal-watch',      label: 'Legal watch',     icon: BookOpenIcon },
       ],
     },
@@ -121,9 +126,14 @@ function filterForRole(groups: NavGroup[], role: Role): NavGroup[] {
     .filter(g => g.items.length > 0);
 }
 
+// localStorage key for the expanded state of a given parent href
+const EXPANDED_KEY_PREFIX = 'cifra-sidebar-expanded-';
+
 export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
   const pathname = usePathname() || '/';
   const [role, setRole] = useState<Role>('admin');
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
   useEffect(() => {
     let cancelled = false;
     fetch('/api/auth/me')
@@ -134,12 +144,119 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
       .catch(() => { /* swallow — defaults to admin */ });
     return () => { cancelled = true; };
   }, []);
+
+  // Load persisted expand state per-parent from localStorage on mount.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const next: Record<string, boolean> = {};
+    for (const key of Object.keys(window.localStorage)) {
+      if (!key.startsWith(EXPANDED_KEY_PREFIX)) continue;
+      const href = key.slice(EXPANDED_KEY_PREFIX.length);
+      next[href] = window.localStorage.getItem(key) === '1';
+    }
+    setExpanded(next);
+  }, []);
+
   const groups = filterForRole(buildGroups(badges), role);
 
   // Match rule: exact "/" for Home; otherwise startsWith for nested routes
   // (so /declarations/xyz still lights up the Declarations item).
   const isActive = (href: string): boolean =>
     href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(href + '/');
+
+  // Auto-expand a parent when its own route or one of its children is active,
+  // so a deep-link to /tax-ops/vat/quarterly shows the tree opened.
+  const isParentAutoExpanded = (item: NavItem): boolean => {
+    if (!item.children) return false;
+    if (isActive(item.href)) return true;
+    return item.children.some(c => isActive(c.href));
+  };
+
+  const isExpanded = (item: NavItem): boolean => {
+    if (!item.children) return false;
+    return expanded[item.href] ?? isParentAutoExpanded(item);
+  };
+
+  const toggleExpand = (href: string) => {
+    setExpanded(prev => {
+      const nextVal = !(prev[href] ?? false);
+      const next = { ...prev, [href]: nextVal };
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(`${EXPANDED_KEY_PREFIX}${href}`, nextVal ? '1' : '0');
+      }
+      return next;
+    });
+  };
+
+  const renderItem = (item: NavItem, isChild = false): React.ReactNode => {
+    const active = isActive(item.href);
+    const Icon = item.icon;
+    const hasChildren = !!(item.children && item.children.length > 0);
+    const open = isExpanded(item);
+    return (
+      <li key={item.href} className="relative">
+        {active && (
+          <span
+            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-brand-500"
+            aria-hidden="true"
+          />
+        )}
+        <div className="flex items-center">
+          <Link
+            href={item.href}
+            className={[
+              'flex items-center gap-2.5 pr-1 h-8 rounded-md text-[13px]',
+              'transition-colors duration-150 flex-1 min-w-0',
+              isChild ? 'pl-8' : 'pl-3',
+              active
+                ? 'bg-brand-50 text-brand-700 font-medium'
+                : 'text-ink-soft hover:bg-surface-alt hover:text-ink',
+            ].join(' ')}
+          >
+            <Icon
+              size={isChild ? 13 : 16}
+              strokeWidth={active ? 2.2 : 1.8}
+              className={active ? 'text-brand-500' : 'text-ink-muted'}
+            />
+            <span className="flex-1 truncate">{item.label}</span>
+            {typeof item.badge === 'number' && item.badge > 0 && (
+              <span
+                className={[
+                  'tabular-nums inline-flex items-center justify-center',
+                  'min-w-[18px] h-[18px] px-1 rounded-full text-[10.5px] font-semibold',
+                  active
+                    ? 'bg-brand-500 text-white'
+                    : 'bg-brand-50 text-brand-700 border border-brand-100',
+                ].join(' ')}
+                aria-label={`${item.badge} items`}
+              >
+                {item.badge > 99 ? '99+' : item.badge}
+              </span>
+            )}
+          </Link>
+          {hasChildren && (
+            <button
+              type="button"
+              onClick={() => toggleExpand(item.href)}
+              aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
+              aria-expanded={open}
+              className="shrink-0 p-1 mr-1 rounded text-ink-muted hover:text-ink hover:bg-surface-alt"
+            >
+              <ChevronRightIcon
+                size={12}
+                className={`transition-transform duration-150 ${open ? 'rotate-90' : ''}`}
+              />
+            </button>
+          )}
+        </div>
+        {hasChildren && open && (
+          <ul className="space-y-0.5 mt-0.5">
+            {item.children!.map(child => renderItem(child, true))}
+          </ul>
+        )}
+      </li>
+    );
+  };
 
   return (
     <aside
@@ -163,52 +280,7 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
               </div>
             )}
             <ul className="space-y-0.5">
-              {group.items.map(item => {
-                const active = isActive(item.href);
-                const Icon = item.icon;
-                return (
-                  <li key={item.href} className="relative">
-                    {/* Active indicator rail */}
-                    {active && (
-                      <span
-                        className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-brand-500"
-                        aria-hidden="true"
-                      />
-                    )}
-                    <Link
-                      href={item.href}
-                      className={[
-                        'flex items-center gap-2.5 pl-3 pr-2 h-8 rounded-md text-[13px]',
-                        'transition-colors duration-150',
-                        active
-                          ? 'bg-brand-50 text-brand-700 font-medium'
-                          : 'text-ink-soft hover:bg-surface-alt hover:text-ink',
-                      ].join(' ')}
-                    >
-                      <Icon
-                        size={16}
-                        strokeWidth={active ? 2.2 : 1.8}
-                        className={active ? 'text-brand-500' : 'text-ink-muted'}
-                      />
-                      <span className="flex-1 truncate">{item.label}</span>
-                      {typeof item.badge === 'number' && item.badge > 0 && (
-                        <span
-                          className={[
-                            'tabular-nums inline-flex items-center justify-center',
-                            'min-w-[18px] h-[18px] px-1 rounded-full text-[10.5px] font-semibold',
-                            active
-                              ? 'bg-brand-500 text-white'
-                              : 'bg-brand-50 text-brand-700 border border-brand-100',
-                          ].join(' ')}
-                          aria-label={`${item.badge} items`}
-                        >
-                          {item.badge > 99 ? '99+' : item.badge}
-                        </span>
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
+              {group.items.map(item => renderItem(item))}
             </ul>
           </div>
         ))}
@@ -223,10 +295,6 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
 }
 
 function UserMenu({ role }: { role: Role }) {
-  // Minimalist text-only user chip (à la Linear). The internal role
-  // value ('junior') never surfaces in the UI per Diego 2026-04-19 —
-  // the restricted-view user simply reads as "Associate". Same pattern
-  // as "founder" for admin.
   const label = role === 'junior' ? 'Associate' : role === 'reviewer' ? 'Reviewer' : 'Diego';
   const tagline =
     role === 'junior' ? 'cifra · associate' :
