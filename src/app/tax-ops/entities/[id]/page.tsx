@@ -13,6 +13,7 @@ import { useToast } from '@/components/Toaster';
 import { CspContactsEditor, type CspContact } from '@/components/tax-ops/CspContactsEditor';
 import { EntityFilingsMatrix } from '@/components/tax-ops/EntityFilingsMatrix';
 import { EntityTaxStatusPills } from '@/components/tax-ops/EntityTaxStatusPills';
+import { EntityTimeline } from '@/components/tax-ops/EntityTimeline';
 
 interface EntityDetail {
   id: string;
@@ -340,6 +341,18 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
           <span className="text-[11px] text-ink-muted">Click a status badge to open that filing.</span>
         </div>
         <EntityFilingsMatrix filings={data.filings} years={years} />
+      </div>
+
+      {/* Activity timeline (stint 42.A) — chronological audit-log view */}
+      <div className="rounded-md border border-border bg-surface px-4 py-3">
+        <h3 className="text-[13px] font-semibold text-ink mb-2">
+          Activity
+        </h3>
+        <p className="text-[11.5px] text-ink-muted mb-3">
+          Status changes, family moves, contact edits, merges, archives — everything
+          that happened to this entity, newest first.
+        </p>
+        <EntityTimeline entityId={id} />
       </div>
     </div>
   );
