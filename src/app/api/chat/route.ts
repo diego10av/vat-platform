@@ -45,8 +45,9 @@ import { apiError, apiOk, apiFail } from '@/lib/api-errors';
 import { anthropicCreate, priceCall } from '@/lib/anthropic-wrapper';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireBudget, requireUserBudget } from '@/lib/budget-guard';
-import { buildSystemPrompt, isCrmPath, type ChatContextInput } from '@/lib/chat-context';
+import { buildSystemPrompt, isCrmPath, isTaxOpsPath, type ChatContextInput } from '@/lib/chat-context';
 import { CRM_TOOLS, executeCrmTool } from '@/lib/crm-chat-tools';
+import { TAX_OPS_TOOLS, executeTaxOpsTool } from '@/lib/tax-ops-chat-tools';
 import { persistTurn } from '@/lib/chat-persistence';
 import { logger } from '@/lib/logger';
 
@@ -154,12 +155,17 @@ export async function POST(request: NextRequest) {
     // ── Build system prompt from current page context ──
     const systemPrompt = await buildSystemPrompt(context);
 
-    // ── Tool setup (CRM mode) ──
-    // When the user is inside /crm, expose the 6 read-only query tools
-    // so the model can ground answers in the user's actual data instead
-    // of guessing or asking for data the system can fetch itself.
+    // ── Tool setup ──
+    // CRM mode: 6 CRM read-only tools.
+    // Tax-Ops mode: 4 tax-ops read-only tools.
+    // Neither is compatible with the other (different DB scopes + framing),
+    // so we pick one based on the current page path.
     const onCrm = isCrmPath(context.path);
-    const tools: Anthropic.Tool[] | undefined = onCrm ? CRM_TOOLS : undefined;
+    const onTaxOps = isTaxOpsPath(context.path);
+    const tools: Anthropic.Tool[] | undefined =
+      onTaxOps ? TAX_OPS_TOOLS
+      : onCrm   ? CRM_TOOLS
+      : undefined;
 
     // ── Anthropic call with tool-use loop ──
     // Bounded to 4 iterations: user turn → (tool calls → tool results)
@@ -233,7 +239,13 @@ export async function POST(request: NextRequest) {
       const toolResults = await Promise.all(
         toolUses.map(async (tu) => {
           toolCallsCount += 1;
-          const result = await executeCrmTool(tu.name, (tu.input as Record<string, unknown>) ?? {});
+          const input = (tu.input as Record<string, unknown>) ?? {};
+          // Dispatch to the right executor based on the tool-name prefix.
+          // (Both tool sets are never exposed simultaneously, but pref
+          // matching keeps the branch defensive if that ever changes.)
+          const result = tu.name.startsWith('tax_')
+            ? await executeTaxOpsTool(tu.name, input)
+            : await executeCrmTool(tu.name, input);
           return {
             type: 'tool_result' as const,
             tool_use_id: tu.id,

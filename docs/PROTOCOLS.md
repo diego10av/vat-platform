@@ -225,7 +225,7 @@ prompt at a specific time in Diego's local timezone. Each task's
 prompt curls a deployed endpoint on `app.cifracompliance.com` and
 reports the outcome back. Failures degrade silently (don't retry).
 
-### Active crons (2026-04-23)
+### Active crons (2026-04-24)
 
 | Task | Cadence | Endpoint | What it does |
 |------|---------|----------|--------------|
@@ -237,6 +237,8 @@ reports the outcome back. Failures degrade silently (don't retry).
 | `cifra-crm-anniversaries` | Mon 08:00 CET | `/api/crm/scheduled/anniversaries` | Scan next-7-day birthday + client-anniversary, create low-priority tasks |
 | `cifra-crm-trash-purge` | Sun 03:00 CET | `/api/crm/scheduled/trash-purge` | Hard-delete soft-deleted CRM rows > 30 days old |
 | `cifra-crm-lead-scoring` | 1st of month 07:00 CET | `/api/crm/scheduled/lead-scoring` | Haiku 4.5 scores up to 50 lead/prospect contacts; ~€0.02/mo budget |
+| `cifra-taxops-deadline-alerts` | Daily 07:00 CET | `/api/tax-ops/scheduled/deadline-alerts` | Create priority-coded alert tasks for filings at 14/7/3 days + overdue. Idempotent via `last_alert_kind` escalation. |
+| `cifra-taxops-recurrence-expand` | Daily 03:00 CET | `/api/tax-ops/scheduled/recurrence-expand` | For each tax-ops task with `recurrence_rule` marked done, create the next occurrence. Tagged `recurring_from:<id>` for idempotency. |
 
 ### Adding a new cron
 

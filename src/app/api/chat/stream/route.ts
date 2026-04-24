@@ -33,8 +33,9 @@ import {
 } from '@/lib/anthropic-wrapper';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { requireBudget, requireUserBudget } from '@/lib/budget-guard';
-import { buildSystemPrompt, isCrmPath, type ChatContextInput } from '@/lib/chat-context';
+import { buildSystemPrompt, isCrmPath, isTaxOpsPath, type ChatContextInput } from '@/lib/chat-context';
 import { CRM_TOOLS, executeCrmTool } from '@/lib/crm-chat-tools';
+import { TAX_OPS_TOOLS, executeTaxOpsTool } from '@/lib/tax-ops-chat-tools';
 import { anthropicCreate } from '@/lib/anthropic-wrapper';
 import { persistTurn } from '@/lib/chat-persistence';
 import { logger } from '@/lib/logger';
@@ -172,12 +173,15 @@ export async function POST(request: NextRequest) {
   const systemPrompt = await buildSystemPrompt(context);
 
   // ── CRM-mode detection ──
-  // When the user is inside /crm we need tool-use, which requires
-  // multiple model round-trips. The cleanest integration with the
-  // existing SSE protocol: run the non-streaming tool loop, then
+  // When the user is inside /crm or /tax-ops we need tool-use, which
+  // requires multiple model round-trips. The cleanest integration with
+  // the existing SSE protocol: run the non-streaming tool loop, then
   // emit the final answer as a single text_delta event. The client
   // sees the same events as normal streaming, just without typewriter.
   const onCrm = isCrmPath(context.path);
+  const onTaxOps = isTaxOpsPath(context.path);
+  const useToolLoop = onCrm || onTaxOps;
+  const activeTools: Anthropic.Tool[] = onTaxOps ? TAX_OPS_TOOLS : CRM_TOOLS;
 
   // ── Start the SSE stream ──
   const started = Date.now();
@@ -188,8 +192,8 @@ export async function POST(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         let usage: any;
 
-        if (onCrm) {
-          // ── CRM mode: tool loop, no streaming inside the loop. ──
+        if (useToolLoop) {
+          // ── Tool-use mode (CRM or Tax-Ops): non-streaming loop. ──
           const MAX_TOOL_ROUNDS = 4;
           const aggUsage = {
             input_tokens: 0, output_tokens: 0,
@@ -203,14 +207,14 @@ export async function POST(request: NextRequest) {
               max_tokens: useOpus ? 4000 : 2000,
               system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
               messages: convo,
-              tools: CRM_TOOLS,
+              tools: activeTools,
             };
             const msg = await anthropicCreate(body, {
               agent: useOpus ? 'chat-opus' : 'chat-haiku',
               user_id: MOCK_USER_ID,
               declaration_id: context.declaration_id ?? undefined,
               entity_id: context.entity_id ?? undefined,
-              label: `chat stream crm round ${round + 1}`,
+              label: `chat stream ${onTaxOps ? 'tax-ops' : 'crm'} round ${round + 1}`,
             });
             const u = msg.usage as { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
             aggUsage.input_tokens            += u.input_tokens ?? 0;
@@ -233,11 +237,17 @@ export async function POST(request: NextRequest) {
             }));
 
             convo.push({ role: 'assistant', content: msg.content });
-            const results = await Promise.all(toolUses.map(async (tu) => ({
-              type: 'tool_result' as const,
-              tool_use_id: tu.id,
-              content: (await executeCrmTool(tu.name, (tu.input as Record<string, unknown>) ?? {})).slice(0, 15000),
-            })));
+            const results = await Promise.all(toolUses.map(async (tu) => {
+              const input = (tu.input as Record<string, unknown>) ?? {};
+              const raw = tu.name.startsWith('tax_')
+                ? await executeTaxOpsTool(tu.name, input)
+                : await executeCrmTool(tu.name, input);
+              return {
+                type: 'tool_result' as const,
+                tool_use_id: tu.id,
+                content: raw.slice(0, 15000),
+              };
+            }));
             convo.push({ role: 'user', content: results });
           }
           // Emit the full reply as one text_delta so the client's

@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-23 evening (23rd stint shipped in 8 commits: RULE 11X + PhaseCTA Reopen + Stepper click-through + Modify-patch UI + Curia RSS + RULE 30 prepayment decorator + validator cache + corpus gap fixtures. Test-sandbox design note ready for next stint)
+> Last updated: 2026-04-24 (stint 34 shipped in 6 commits — /tax-ops module: schema + importer + surfaces + settings + tasks + chat tools. 214 entities + 263 filings live in prod.)
 
 ---
 
@@ -97,6 +97,26 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-24** — Stint 34: `/tax-ops` module — Excel replacement + state-of-art tasks (6 commits)
+
+The biggest stint to date. Replaces Diego's two annual Excels (CIT 148 entities × 4 sheets; VAT & Others 83 filings × 7 sheets) and his Notion "Tasks & Follow-ups" DB with a live Postgres-backed module. Every commit passed typecheck + 612 tests + build.
+
+- **34.A · Schema + deadline rules seed** (`d741740`). Migration 045 creates 8 tables — `tax_client_groups`, `tax_entities`, `tax_deadline_rules`, `tax_obligations`, `tax_filings`, `tax_team_members`, `tax_ops_tasks`, `tax_ops_task_comments`. Seeds 13 deadline rules based on LU statutory law + AED administrative tolerance (CIT 31 Mar + 31 Dec extension, VAT annual 1 Mar, quarterly/monthly 15-day, WHT director 10-day, FATCA/CRS 30 Jun strict, BCL variants). New `src/lib/tax-ops-deadlines.ts` — pure `computeDeadline(rule, year, periodLabel)` helper + 18 unit tests covering all rule kinds × leap-year edge cases.
+
+- **34.B · Excel importer** (`a24482e`). CLI `scripts/tax-ops-import.ts` with `--dry-run` / `--commit` modes. Parses CIT sheets (4 container-detection heuristic for per-row group labels) + VAT sheets (7 with per-period Q1-Q4/Jan-Dec cell expansion). Normalizes group names (uppercase + whitespace collapse to merge "Peninsula"/"PENINSULA" variants). Dedup entities by `(group, normalized_legal_name)`. Deadline auto-computed at insert via 34.A helper. Prod commit: **19 groups · 214 entities · 233 obligations · 263 filings** in a single audit-logged transaction. Notion task migration deferred to 34.E where the tasks UI lands.
+
+- **34.C · Home + filings + entities + year rollover** (`4a9f779`). 16 new files. `/tax-ops` home = 4 actionable widgets (Deadline radar · Pending my action · Pending client approval · Stale assessments) + "Open YYYY+1" button. `/tax-ops/filings` grid with 8-dim filters (year · tax type · status · group · overdue · text search · pagination). `/tax-ops/filings/[id]` detail with live status dropdown, 5-date timeline, CSP editor, amounts, assessment URL, blur-save comments, deadline-rule sidebar. `/tax-ops/entities` grouped list with YTD filed % color-coded. `/tax-ops/entities/[id]` with inline-editable identity, CSP defaults, multi-year filings matrix. `RolloverModal` — two-phase preview → commit with per-tax-type counts + idempotent `ON CONFLICT DO NOTHING`.
+
+- **34.D · Settings: team + editable deadline rules** (`177e39a`). `/tax-ops/settings/team` — CRUD for the 8-ish team roster. `/tax-ops/settings/deadlines` — editable table of the 13 rules with **open_filings_count per row** (impact signal). `DeadlineRuleEditor` 3-step modal: edit params (rule-kind-aware inputs) → confirm preview (diff of old→new deadline for first 50 affected filings) → done. Two save paths: "no propagation" (edit the market note only) vs "propagate to N filings" (transactional bulk update, audit-logged with old/new params + propagated count, excludes filed/paid/waived/assessment_received).
+
+- **34.E · Tasks module state-of-art** (`4cfec45`). The Notion replacement. Tables already in migration 045 (`tax_ops_tasks` + `tax_ops_task_comments`). `/tax-ops/tasks` with List ⟷ Board toggle (Kanban with HTML5 drag-drop between 4 columns), 4 quick-filter pills (Mine · Overdue · Waiting · This week), 7 backend filters. `/tax-ops/tasks/[id]` detail: inline editable title, live status/priority/due/assignee dropdowns, markdown description, subtasks panel (inline +Add, checkbox toggle, per-row delete), dependencies panel (blocked-by chip + blocking-N downstream list), recurrence editor (5 types: weekly/monthly/quarterly/yearly/every_n_days), linear comments thread (⌘+Enter to send), related entity/filing links, meta. `QuickCaptureModal` — press **N** anywhere in `/tax-ops` → title + due + priority → Enter → redirected to new task. `scheduled/recurrence-expand` — daily 03:00 cron, idempotent via `recurring_from:<id>` tag.
+
+- **34.F · Ask cifra tax-ops tools + deadline alerts + docs** (this commit). `src/lib/tax-ops-chat-tools.ts` exposes 4 read-only tools (`tax_query_filings`, `tax_query_entities`, `tax_query_tasks`, `tax_find_record`) registered in both `/api/chat` + `/api/chat/stream` conditional on `isTaxOpsPath(context.path)`. `chat-context.ts` adds `isTaxOpsPath()` helper + `loadTaxOpsSnapshot()` + "Tax-Ops mode" guidance block. `scheduled/deadline-alerts` daily 07:00 cron creates priority-coded alert tasks (14d→low, 7d→medium, 3d→high, overdue→urgent) with escalation via `last_alert_kind` rank — never down-rank, never duplicate. Both crons registered via scheduled-tasks MCP post-ship. Migration audit trail at `docs/tax-ops-migration-2026-04-24.md`.
+
+**Deferred to stint 35** (rationale in `ROADMAP.md`): rich-text WYSIWYG for task descriptions, natural-language date parser ("end of Q1"), AI paste-and-extract (email → task tree), full calendar view at `/tax-ops/calendar`, bridge between `/tax-ops` and `/crm` (today they're independent per Diego's explicit call). None block daily use — `/tax-ops` fully replaces the Excels + Notion as of today.
+
+---
 
 **2026-04-23 (night)** — Stint 31: close Fases 1-3 of the CRM rebuild (5 commits)
 

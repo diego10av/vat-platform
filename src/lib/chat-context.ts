@@ -33,6 +33,10 @@ export interface ChatContextInput {
    *  Extracted client-side from the URL. */
   crm_target_type?: 'crm_company' | 'crm_contact' | 'crm_opportunity' | 'crm_matter' | 'crm_invoice' | null;
   crm_target_id?: string | null;
+  /** Optional tax-ops record id in focus (entity/filing/task).
+   *  Extracted client-side from the URL under /tax-ops/*. */
+  tax_ops_target_type?: 'tax_entity' | 'tax_filing' | 'tax_task' | null;
+  tax_ops_target_id?: string | null;
 }
 
 interface EntitySnapshot {
@@ -237,6 +241,64 @@ async function loadCrmSnapshot(
   return null;
 }
 
+// ─────────────────────────── Tax-Ops context loader ─────────────────────
+
+// Compact snapshot of the tax-ops record in focus. Mirrors loadCrmSnapshot
+// — one-liner string, no heavy fetch. Tool-calling handles the broader
+// queries.
+async function loadTaxOpsSnapshot(
+  type: NonNullable<ChatContextInput['tax_ops_target_type']>,
+  id: string,
+): Promise<string | null> {
+  try {
+    if (type === 'tax_entity') {
+      const r = await queryOne<{
+        legal_name: string; group_name: string | null; is_active: boolean;
+        obligations_count: string; vat_number: string | null;
+      }>(
+        `SELECT e.legal_name, g.name AS group_name, e.is_active, e.vat_number,
+                (SELECT COUNT(*) FROM tax_obligations o
+                  WHERE o.entity_id = e.id AND o.is_active)::text AS obligations_count
+           FROM tax_entities e
+           LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
+          WHERE e.id = $1`,
+        [id],
+      );
+      if (!r) return null;
+      return `Entity: ${r.legal_name}${r.group_name ? ` · ${r.group_name}` : ''}${r.vat_number ? ` · VAT ${r.vat_number}` : ''} · ${r.obligations_count} obligations${r.is_active ? '' : ' · INACTIVE'}`;
+    }
+    if (type === 'tax_filing') {
+      const r = await queryOne<{
+        entity_name: string; tax_type: string; period_label: string;
+        status: string; deadline_date: string | null; assigned_to: string | null;
+      }>(
+        `SELECT e.legal_name AS entity_name, o.tax_type, f.period_label,
+                f.status, f.deadline_date::text, f.assigned_to
+           FROM tax_filings f
+           JOIN tax_obligations o ON o.id = f.obligation_id
+           JOIN tax_entities e    ON e.id = o.entity_id
+          WHERE f.id = $1`,
+        [id],
+      );
+      if (!r) return null;
+      return `Filing: ${r.entity_name} · ${r.tax_type} · ${r.period_label} · status=${r.status}${r.deadline_date ? ` · deadline ${r.deadline_date}` : ''}${r.assigned_to ? ` · assigned to ${r.assigned_to}` : ''}`;
+    }
+    if (type === 'tax_task') {
+      const r = await queryOne<{
+        title: string; status: string; priority: string;
+        due_date: string | null; assignee: string | null;
+      }>(
+        `SELECT title, status, priority, due_date::text, assignee
+           FROM tax_ops_tasks WHERE id = $1`,
+        [id],
+      );
+      if (!r) return null;
+      return `Task: ${r.title} · ${r.status} · ${r.priority}${r.due_date ? ` · due ${r.due_date}` : ''}${r.assignee ? ` · ${r.assignee}` : ''}`;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 // ─────────────────────────────── public API ─────────────────────────────
 
 /** True when the current page is within /crm. Enables CRM tool-calling
@@ -245,13 +307,23 @@ export function isCrmPath(path?: string | null): boolean {
   return typeof path === 'string' && (path === '/crm' || path.startsWith('/crm/'));
 }
 
+/** True when the current page is within /tax-ops. Enables tax-ops
+ *  tool-calling + tax-ops-flavoured guidance in the system prompt. */
+export function isTaxOpsPath(path?: string | null): boolean {
+  return typeof path === 'string' && (path === '/tax-ops' || path.startsWith('/tax-ops/'));
+}
+
 export async function buildSystemPrompt(input: ChatContextInput): Promise<string> {
   const entity = input.entity_id ? await loadEntity(input.entity_id) : null;
   const declaration = input.declaration_id ? await loadDeclaration(input.declaration_id) : null;
   const crmSnapshot = input.crm_target_type && input.crm_target_id
     ? await loadCrmSnapshot(input.crm_target_type, input.crm_target_id)
     : null;
+  const taxOpsSnapshot = input.tax_ops_target_type && input.tax_ops_target_id
+    ? await loadTaxOpsSnapshot(input.tax_ops_target_type, input.tax_ops_target_id)
+    : null;
   const onCrm = isCrmPath(input.path);
+  const onTaxOps = isTaxOpsPath(input.path);
 
   const parts: string[] = [];
 
@@ -297,7 +369,7 @@ ${getCachedIndex()}
 `);
 
   // ── Current page context ──
-  if (entity || declaration || crmSnapshot) {
+  if (entity || declaration || crmSnapshot || taxOpsSnapshot) {
     parts.push('\n## Current context (what the user is looking at)');
     if (entity) {
       parts.push(`\n### Entity / Client\n${renderEntity(entity)}`);
@@ -308,8 +380,11 @@ ${getCachedIndex()}
     if (crmSnapshot) {
       parts.push(`\n### CRM record\n${crmSnapshot}`);
     }
+    if (taxOpsSnapshot) {
+      parts.push(`\n### Tax-ops record\n${taxOpsSnapshot}`);
+    }
   } else {
-    parts.push('\n## Current context\nNo specific entity, declaration, or CRM record in focus. Ask the user which they mean if needed.');
+    parts.push('\n## Current context\nNo specific entity, declaration, CRM or tax-ops record in focus. Ask the user which they mean if needed.');
   }
 
   // ── CRM-mode guidance ──
@@ -339,6 +414,39 @@ citations are rarely what they want here. Instead:
   /crm/contacts/[id] → Edit").
 - **Currency**: amounts are EUR unless the invoice's \`currency\` field says
   otherwise.
+`);
+  }
+
+  // ── Tax-Ops mode guidance ──
+  // When the user is inside /tax-ops, questions are about compliance
+  // filings, entities, deadlines, follow-up tasks — not VAT-treatment
+  // or CRM relationship ops. Different tools, different framing.
+  if (onTaxOps) {
+    parts.push(`
+## Tax-Ops mode (user is inside /tax-ops)
+
+The user is managing tax compliance: CIT, NWT, VAT, WHT director, subscription
+tax, FATCA/CRS, BCL — across ~180 legal entities organised into fund-family
+groups. Annual Excel rebuild is now replaced by a live DB with state machines,
+editable deadline rules, and year-rollover.
+
+- **Use the tax-ops tools** (\`tax_query_filings\`, \`tax_query_entities\`,
+  \`tax_query_tasks\`, \`tax_find_record\`) to answer any question about
+  compliance state. Don't speculate — query.
+- Prefer **one precise tool call** with filters. Example: for "CIT 2026
+  filings still pending info for Gab", call
+  \`tax_query_filings({ tax_type: 'cit_annual', year: 2026, status: 'pending_info', assigned_to: 'Gab' })\`.
+- **Quote numbers + names verbatim** from tool results. Days-until-deadline
+  and status are the two signals the user scans for — surface them first.
+- **Respect the deadline rule hierarchy**: each filing's \`deadline_date\` is
+  computed from the editable rule (statutory + admin tolerance). If the user
+  asks "when is X really due?", reference the rule, not a general statement
+  about LU tax law.
+- **Concise lists.** Tax-ops answers = a filtered list + a one-line summary
+  ("4 CIT filings overdue; 3 assigned to Gab, 1 unassigned").
+- **Read-only.** You cannot create, edit, or delete. Suggest the user act
+  via the relevant /tax-ops page (e.g. "Mark as filed at /tax-ops/filings/[id]").
+- **Currency**: amounts are EUR.
 `);
   }
 
