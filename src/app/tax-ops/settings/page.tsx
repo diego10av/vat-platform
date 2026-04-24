@@ -1,5 +1,8 @@
 import Link from 'next/link';
-import { UsersIcon, ClockIcon, RefreshCwIcon, LayersIcon, MergeIcon, ChevronRightIcon } from 'lucide-react';
+import {
+  UsersIcon, ClockIcon, RefreshCwIcon, LayersIcon, MergeIcon,
+  CalendarIcon, ChevronRightIcon,
+} from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 // /tax-ops/settings — small index of admin surfaces.
@@ -43,6 +46,12 @@ export default function TaxOpsSettingsPage() {
           icon={MergeIcon}
           title="Entity deduplication"
           description="Find and merge entities whose names are near-duplicates (different punctuation, whitespace, legal-suffix variants). Pick the canonical row, the others fold into it."
+        />
+        <SettingsCard
+          href="/tax-ops/settings/calendar"
+          icon={CalendarIcon}
+          title="Calendar subscription"
+          description="Subscribe all upcoming deadlines to Google / Apple / Outlook Calendar via a read-only iCal feed."
         />
         <SettingsCard
           href="#"
