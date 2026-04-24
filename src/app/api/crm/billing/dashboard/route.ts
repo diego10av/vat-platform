@@ -40,28 +40,36 @@ export async function GET(request: NextRequest) {
       [year],
     ),
     // Practice split comes via matter. Invoices without a matter are
-    // classified as 'unassigned'. unnest() must be a FROM/LATERAL
-    // item — Postgres rejects set-returning functions inside COALESCE
-    // so we coalesce the array to a single-element fallback array
-    // before unnesting. This keeps the shape right: one row per
-    // (invoice × practice) with 'unassigned' when the invoice has no
-    // matter or the matter has no practice_areas.
+    // classified as 'unassigned'. When a matter has N practice areas,
+    // the invoice revenue is split EQUALLY (1/N) across them — so the
+    // sum across all buckets equals total invoiced, no double-counting.
+    //
+    // Implementation: LATERAL-coalesce the array to a 1-element fallback,
+    // then divide by cardinality per row. A matter with ['tax','m_a']
+    // contributes 50% to each; a matter with no practice areas (or
+    // no matter) contributes 100% to 'unassigned'.
+    //
+    // (Stint 34 follow-up idea: support per-matter custom weights via a
+    //  new practice_area_weights JSONB column — today we assume equal
+    //  split, which is the sane default for a PE firm's cross-practice
+    //  matters. Diego confirmed 2026-04-24.)
     query<{ practice: string; total: string }>(
-      `SELECT practice, SUM(amount_incl_vat)::text AS total
+      `SELECT practice, SUM(share)::text AS total
          FROM (
-           SELECT b.amount_incl_vat,
-                  unnest(
-                    COALESCE(
+           SELECT unnest(areas.arr) AS practice,
+                  b.amount_incl_vat / CARDINALITY(areas.arr)::numeric AS share
+             FROM crm_billing_invoices b
+             LEFT JOIN crm_matters m ON m.id = b.matter_id,
+                  LATERAL (
+                    SELECT COALESCE(
                       NULLIF(m.practice_areas, '{}'::text[]),
                       ARRAY['unassigned']::text[]
-                    )
-                  ) AS practice
-             FROM crm_billing_invoices b
-             LEFT JOIN crm_matters m ON m.id = b.matter_id
+                    ) AS arr
+                  ) areas
             WHERE EXTRACT(YEAR FROM b.issue_date) = $1
          ) t
         GROUP BY practice
-        ORDER BY SUM(amount_incl_vat) DESC`,
+        ORDER BY SUM(share) DESC`,
       [year],
     ),
     query<{ bucket: string; total: string; count: string }>(
