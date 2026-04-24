@@ -13,7 +13,9 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-24 (stint 41 closed — WHT per-entity cadence switcher. Migration 055 adds wht_director_quarterly rule (now 5 cadences: Monthly/Quarterly/Semester/Annual/Ad-hoc). New /change-cadence endpoint moves an obligation within the wht_director_* family atomically, with audit log. New cadenceColumn/CadenceInlineCell surfaces a 1-click dropdown on every WHT matrix page. Filings stay attached to the obligation; old period_labels remain in the audit log but won't render in the new cadence's matrix — Diego confirmed that's fine per the "cambio de cadencia" flow he described. 678 tests green. No backlog left from stints 40/41.)
+> Last updated: 2026-04-25 (stint 42 overnight batch — 6 commits: composite index 056, print-friendly CSS, entity activity timeline with humanized audit log, iCal deadline subscription feed, global contacts book with bulk rename propagation, dedup "auto-merge exact matches" bulk action. 693 tests green. All aditivo, zero workflow disruption.)
+
+> Earlier: 2026-04-24 (stint 41 closed — WHT per-entity cadence switcher. Migration 055 adds wht_director_quarterly rule (now 5 cadences: Monthly/Quarterly/Semester/Annual/Ad-hoc). New /change-cadence endpoint moves an obligation within the wht_director_* family atomically, with audit log. New cadenceColumn/CadenceInlineCell surfaces a 1-click dropdown on every WHT matrix page. Filings stay attached to the obligation; old period_labels remain in the audit log but won't render in the new cadence's matrix — Diego confirmed that's fine per the "cambio de cadencia" flow he described. 678 tests green. No backlog left from stints 40/41.)
 
 ---
 
@@ -97,6 +99,72 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-25 (overnight)** — Stint 42: overnight feature batch (6 commits)
+
+Diego se fue a dormir y dio carta blanca para mejorar cifra durante
+la noche. 6 features self-contained, cada una commit aislado +
+rollback-safe, todas aditivas (cero riesgo de romper flujos
+existentes).
+
+- **42.F · Composite index on tax_filings** (`943f208`). Migration
+  056 adds `(obligation_id, period_label)` btree. Matrix API hot-path
+  was using only the simple obligation_id index; with the UNIQUE
+  constraint not serving query lookups, once the table grows past
+  ~2k rows the planner would shift to seq scan. Pre-empted.
+- **42.D · Print-friendly CSS** (`297044e`). New `@media print` rules
+  in globals.css hide sidebar / topbar / chat / feedback / toast /
+  row-action icons and strip the 232px left-indent so matrices
+  print full-width. Status chip colours preserved via
+  `print-color-adjust: exact`. `@page { margin: 1cm }` +
+  orphans/widows: 3 + header-row repeat on page breaks.
+- **42.A · Entity activity timeline** (`780fee0`). Closes the 40.M
+  item Diego deferred. New `/api/tax-ops/entities/[id]/timeline`
+  endpoint aggregates audit_log rows across the entity +
+  obligations + filings (3-branch UNION predicate). New
+  `src/lib/audit-humanize.ts` turns raw rows into human one-liners
+  ("Status: working → filed", "Merged 3 duplicates into this
+  entity") with emoji hints (🏷️ 🧩 🗃️ 👥 🔁 etc.). New
+  `EntityTimeline` component wires it into the entity detail page
+  under a "Activity" card. Links to `/audit?target_id=<id>` for
+  the full global view.
+- **42.C · iCal deadline feed** (`6fca16a`). Hand-rolled RFC 5545
+  serializer in `src/lib/ical.ts` (no new dependency). New GET
+  `/api/tax-ops/calendar.ics?token=<CIFRA_ICAL_TOKEN>` returns a
+  read-only calendar feed of deadlines in the next 180 days. New
+  `/tax-ops/settings/calendar` subscription page with per-client
+  instructions (Google / Apple / Outlook). Requires
+  CIFRA_ICAL_TOKEN env var — page detects if unset and shows a
+  helpful "not configured" hint. Privacy: only entity name + tax
+  type + period + deadline go out, no amounts/comments/contacts.
+- **42.B · Global contacts book** (`fd40549`). New GET
+  `/api/tax-ops/contacts` returns a reverse index over every
+  `csp_contacts` JSONB entry across entities + filings, grouped
+  by LOWER(TRIM(email)). New POST
+  `/api/tax-ops/contacts/rename?dry_run=1` propagates a name / email
+  / role change to every matching row in one transaction, with
+  dry-run preview + audit log. New `/tax-ops/contacts` UI:
+  searchable table + per-row Rename modal with preview-then-apply.
+  Settings gains a "Contacts book" card.
+- **42.E · Dedup auto-merge exact matches** (`315bf7f`).
+  `/tax-ops/settings/dedupe` now surfaces an "Auto-merge exact
+  matches (N)" button that batches clusters at confidence 1.00
+  (post-normalisation identical names — punctuation / legal-suffix
+  variants). Opens a preview modal listing each cluster's
+  canonical + sources. Apply iterates and hits the existing
+  stint-40.A merge endpoint with a progress counter. Clusters
+  below 1.00 still require manual review. Turns a 42-click chore
+  into 1 click + review.
+- **42.G · Tests + docs + close** (this commit). 17 new unit
+  tests: audit-humanize (9 cases covering iconFor / humanize /
+  groupByMonth) + ical (5 cases covering VCALENDAR structure,
+  UID stability, RFC escaping, line folding, bare-event graceful
+  path). Full suite: 693 tests across 37 files.
+
+Gate green per commit: tsc clean, typecheck + tests + build OK.
+No destructive migration (only 056 which is IF NOT EXISTS).
+
+---
 
 **2026-04-24 (late night)** — Stint 41: WHT per-entity cadence switcher
 

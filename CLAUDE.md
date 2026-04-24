@@ -173,9 +173,19 @@ clients → entities → declarations → invoices → invoice_lines
 
 ## 4 · Current state (keep this section fresh on each stint)
 
-**As of 2026-04-24, stint 41 just closed.** Status:
+**As of 2026-04-25, stint 42 just closed (overnight batch).** Status:
 
 ### Shipped — recent stints (newest first)
+- ✅ **Stint 42** (2026-04-25 overnight, 6 self-contained commits):
+  feature batch while Diego slept. Composite index 056 (matrix perf);
+  print-friendly `@media print` CSS; entity activity timeline closing
+  the deferred 40.M item with `audit-humanize` helper; iCal deadline
+  feed (RFC 5545 hand-rolled, token-guarded, Settings subscription
+  page with Google/Apple/Outlook instructions); global contacts book
+  with bulk-rename propagation (reverse index across csp_contacts
+  JSONB); dedup "Auto-merge exact matches" bulk action. 17 new tests.
+  693 tests across 37 files. Zero destructive migration; everything
+  aditivo.
 - ✅ **Stint 41** (2026-04-24 late night): WHT per-entity cadence
   switcher. Migration 055 adds wht_director_quarterly rule; new
   `/change-cadence` endpoint moves an obligation between cadences
