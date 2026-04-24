@@ -69,11 +69,44 @@ const PRIORITY_COLORS: Record<string, string> = {
   low:    'bg-surface-alt text-ink-soft',
 };
 
-const QUICK_FILTERS = [
-  { key: 'mine',      label: 'Mine',      apply: (p: URLSearchParams) => p.set('assignee', 'Diego') },
-  { key: 'overdue',   label: 'Overdue',   apply: (p: URLSearchParams) => { p.set('due_in_days', '0'); p.set('status', 'queued'); p.append('status', 'in_progress'); } },
-  { key: 'waiting',   label: 'Waiting',   apply: (p: URLSearchParams) => { p.set('status', 'waiting_on_external'); p.append('status', 'waiting_on_internal'); } },
-  { key: 'thisweek',  label: 'This week', apply: (p: URLSearchParams) => p.set('due_in_days', '7') },
+// Stint 40.I — filter labels clarified per Diego's feedback ("no entiendo
+// esto que pones aquí de mine overdue waiting on this week"). Each pill
+// gets a title (tooltip) spelling out what it filters on.
+const QUICK_FILTERS: Array<{
+  key: string; label: string; tooltip: string;
+  apply: (p: URLSearchParams) => void;
+}> = [
+  {
+    key: 'mine',
+    label: 'My tasks',
+    tooltip: 'Tasks assigned to Diego (matches assignee = "Diego").',
+    apply: (p) => p.set('assignee', 'Diego'),
+  },
+  {
+    key: 'overdue',
+    label: 'Overdue',
+    tooltip: 'Open tasks whose due_date is in the past.',
+    apply: (p) => {
+      p.set('due_in_days', '0');
+      p.set('status', 'queued');
+      p.append('status', 'in_progress');
+    },
+  },
+  {
+    key: 'waiting',
+    label: 'Blocked on others',
+    tooltip: 'Tasks waiting for someone else — CSP, client, internal teammate, or AED.',
+    apply: (p) => {
+      p.set('status', 'waiting_on_external');
+      p.append('status', 'waiting_on_internal');
+    },
+  },
+  {
+    key: 'thisweek',
+    label: 'Due this week',
+    tooltip: 'Open tasks with due_date in the next 7 days.',
+    apply: (p) => p.set('due_in_days', '7'),
+  },
 ];
 
 type ViewMode = 'list' | 'board';
@@ -193,6 +226,7 @@ export default function TasksListPage() {
             <button
               key={f.key}
               onClick={() => setPreset(preset === f.key ? '' : f.key)}
+              title={f.tooltip}
               className={`px-2 py-1 text-[11.5px] rounded-md border ${preset === f.key ? 'bg-brand-500 text-white border-brand-500' : 'border-border hover:bg-surface-alt'}`}
             >
               {f.label}

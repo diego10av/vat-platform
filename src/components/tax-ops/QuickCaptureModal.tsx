@@ -46,7 +46,9 @@ export function QuickCaptureModal() {
   const [entityId, setEntityId] = useState('');
   const [entitySearch, setEntitySearch] = useState('');
   const [taskKind, setTaskKind] = useState('action');
-  const [assignee, setAssignee] = useState('');
+  // Stint 40.I — Diego is the owner of most follow-ups he captures;
+  // default to him so he doesn't have to type it every time.
+  const [assignee, setAssignee] = useState('Diego');
 
   // Expanded
   const [description, setDescription] = useState('');
@@ -89,7 +91,7 @@ export function QuickCaptureModal() {
       // Reset everything on close
       setTitle(''); setDue(''); setPriority('medium');
       setEntityId(''); setEntitySearch(''); setTaskKind('action');
-      setAssignee(''); setDescription(''); setWaitingOnKind('');
+      setAssignee('Diego'); setDescription(''); setWaitingOnKind('');
       setWaitingOnNote(''); setFollowUpDate('');
       setShowMore(false); setBusy(false); setError(null);
     }
