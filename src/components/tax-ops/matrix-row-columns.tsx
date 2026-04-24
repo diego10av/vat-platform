@@ -102,6 +102,29 @@ export function commentsColumn(periodLabels: string[], refetch: () => void): Mat
   };
 }
 
+/**
+ * Read-only family column — first position, always visible.
+ * Editing the family happens in 37.E (inline dropdown). Today it just
+ * surfaces the group_name that already lives on the entity.
+ */
+export function familyColumn(): MatrixColumn {
+  return {
+    key: 'family',
+    label: 'Family',
+    widthClass: 'w-[130px]',
+    render: (e) => {
+      if (!e.group_name) {
+        return <span className="text-ink-faint italic text-[11px]">—</span>;
+      }
+      return (
+        <span className="text-ink-soft text-[11.5px] truncate block" title={e.group_name}>
+          {e.group_name}
+        </span>
+      );
+    },
+  };
+}
+
 export function deadlineColumn(periodLabel: string, toleranceDays = 0): MatrixColumn {
   // Pure display — deadline is auto-computed from the rule; editing
   // happens in the filing detail page. Admin tolerance (stint 37.C) makes
