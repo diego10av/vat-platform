@@ -9,10 +9,10 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { TaxTypeMatrix, type MatrixColumn, type MatrixEntity } from '@/components/tax-ops/TaxTypeMatrix';
-import { useMatrixData, applyStatusChange } from '@/components/tax-ops/useMatrixData';
+import { useMatrixData, applyStatusChange, useClientGroups } from '@/components/tax-ops/useMatrixData';
 import { VatTabs } from '@/components/tax-ops/VatTabs';
 import {
-  preparedWithColumn, commentsColumn, deadlineColumn,
+  preparedWithColumn, commentsColumn, deadlineColumn, familyColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 
@@ -22,6 +22,7 @@ type CombinedEntity = MatrixEntity & { subtype: 'standard' | 'simplified' };
 
 export default function VatAnnualPage() {
   const [year, setYear] = useState(2025);
+  const { groups, refetch: refetchGroups } = useClientGroups();
   const standard = useMatrixData({ tax_type: 'vat_annual', year, period_pattern: 'annual' });
   const simplified = useMatrixData({ tax_type: 'vat_simplified_annual', year, period_pattern: 'annual' });
 
@@ -38,6 +39,7 @@ export default function VatAnnualPage() {
   const periodLabel = String(year);
   const tolerance = standard.data?.admin_tolerance_days ?? simplified.data?.admin_tolerance_days ?? 0;
   const columns: MatrixColumn[] = [
+    familyColumn({ groups, refetch, onGroupsChanged: refetchGroups }),
     {
       key: 'subtype',
       label: 'Subtype',

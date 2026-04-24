@@ -8,11 +8,11 @@ import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 import {
-  useMatrixData, shortPeriodLabel, applyStatusChange,
+  useMatrixData, shortPeriodLabel, applyStatusChange, useClientGroups,
 } from '@/components/tax-ops/useMatrixData';
 import { BclTabs } from '@/components/tax-ops/BclTabs';
 import {
-  preparedWithColumn, commentsColumn,
+  preparedWithColumn, commentsColumn, familyColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 
@@ -20,13 +20,16 @@ const YEAR_OPTIONS = [2024, 2025, 2026, 2027];
 
 export default function Bcl216Page() {
   const [year, setYear] = useState(2026);
+  const { groups, refetch: refetchGroups } = useClientGroups();
   const { data, error, isLoading, refetch } = useMatrixData({
     tax_type: 'bcl_216_monthly',
     year,
     period_pattern: 'monthly',
   });
 
-  const columns: MatrixColumn[] = [];
+  const columns: MatrixColumn[] = [
+    familyColumn({ groups, refetch, onGroupsChanged: refetchGroups }),
+  ];
   if (data) {
     for (const label of data.period_labels) {
       columns.push({ key: label, label: shortPeriodLabel(label), widthClass: 'w-[48px]' });

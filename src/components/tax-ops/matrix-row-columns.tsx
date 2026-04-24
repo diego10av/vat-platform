@@ -103,26 +103,107 @@ export function commentsColumn(periodLabels: string[], refetch: () => void): Mat
 }
 
 /**
- * Read-only family column — first position, always visible.
- * Editing the family happens in 37.E (inline dropdown). Today it just
- * surfaces the group_name that already lives on the entity.
+ * Family column — first position, always visible. When `groups` + `refetch`
+ * provided, click-to-edit dropdown lets Diego reassign the entity to a
+ * different family or create a new one inline. When omitted, pure display.
  */
-export function familyColumn(): MatrixColumn {
+export function familyColumn(
+  options?: {
+    groups: Array<{ id: string; name: string }>;
+    refetch: () => void;
+    onGroupsChanged: () => void;
+  },
+): MatrixColumn {
+  const editable = !!options;
   return {
     key: 'family',
     label: 'Family',
-    widthClass: 'w-[130px]',
+    widthClass: 'w-[150px]',
     render: (e) => {
-      if (!e.group_name) {
-        return <span className="text-ink-faint italic text-[11px]">—</span>;
+      if (!editable) {
+        if (!e.group_name) return <span className="text-ink-faint italic text-[11px]">—</span>;
+        return (
+          <span className="text-ink-soft text-[11.5px] truncate block" title={e.group_name}>
+            {e.group_name}
+          </span>
+        );
       }
       return (
-        <span className="text-ink-soft text-[11.5px] truncate block" title={e.group_name}>
-          {e.group_name}
-        </span>
+        <FamilyInlineSelect
+          entity={e}
+          groups={options.groups}
+          onChangedFamily={options.refetch}
+          onGroupsChanged={options.onGroupsChanged}
+        />
       );
     },
   };
+}
+
+function FamilyInlineSelect({
+  entity, groups, onChangedFamily, onGroupsChanged,
+}: {
+  entity: MatrixEntity;
+  groups: Array<{ id: string; name: string }>;
+  onChangedFamily: () => void;
+  onGroupsChanged: () => void;
+}) {
+  async function handleChange(raw: string): Promise<void> {
+    if (raw === '__create__') {
+      const name = window.prompt('New family name:');
+      if (!name?.trim()) return;
+      const created = await fetch('/api/tax-ops/client-groups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (!created.ok) {
+        const b = await created.json().catch(() => ({}));
+        alert(`Create failed: ${b?.error ?? created.status}`);
+        return;
+      }
+      const { id: newGroupId } = await created.json() as { id: string };
+      // Assign the entity to the new family
+      const patched = await fetch(`/api/tax-ops/entities/${entity.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_group_id: newGroupId }),
+      });
+      if (!patched.ok) {
+        alert(`Assign failed: HTTP ${patched.status}`);
+        return;
+      }
+      onGroupsChanged();
+      onChangedFamily();
+      return;
+    }
+    // Existing group id (or empty → unassign)
+    const nextGroupId = raw === '' ? null : raw;
+    const res = await fetch(`/api/tax-ops/entities/${entity.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_group_id: nextGroupId }),
+    });
+    if (!res.ok) {
+      alert(`Save failed: HTTP ${res.status}`);
+      return;
+    }
+    onChangedFamily();
+  }
+
+  return (
+    <select
+      value={entity.group_id ?? ''}
+      onChange={(e) => void handleChange(e.target.value)}
+      className="w-full px-1.5 py-0.5 text-[11.5px] border border-border rounded bg-surface hover:bg-surface-alt"
+    >
+      <option value="">— (no family)</option>
+      {groups.map(g => (
+        <option key={g.id} value={g.id}>{g.name}</option>
+      ))}
+      <option value="__create__">+ Create new family…</option>
+    </select>
+  );
 }
 
 export function deadlineColumn(periodLabel: string, toleranceDays = 0): MatrixColumn {

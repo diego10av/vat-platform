@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { UsersIcon, ClockIcon, RefreshCwIcon, ChevronRightIcon } from 'lucide-react';
+import { UsersIcon, ClockIcon, RefreshCwIcon, LayersIcon, ChevronRightIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 // /tax-ops/settings — small index of admin surfaces.
@@ -31,6 +31,12 @@ export default function TaxOpsSettingsPage() {
           icon={ClockIcon}
           title="Deadline rules"
           description="Seeded from Luxembourg statutory + AED market practice. Edit when the practice shifts — the change propagates to every open filing of that tax type."
+        />
+        <SettingsCard
+          href="/tax-ops/settings/groups"
+          icon={LayersIcon}
+          title="Client groups (families)"
+          description="Create, rename, archive the fund families that group your entities (Peninsula, Trilantic, ...). Inline-assignable from any tax-type page."
         />
         <SettingsCard
           href="#"

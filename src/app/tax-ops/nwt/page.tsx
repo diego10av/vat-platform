@@ -7,9 +7,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
-import { useMatrixData, applyStatusChange } from '@/components/tax-ops/useMatrixData';
+import { useMatrixData, applyStatusChange, useClientGroups } from '@/components/tax-ops/useMatrixData';
 import {
-  preparedWithColumn, commentsColumn, deadlineColumn,
+  preparedWithColumn, commentsColumn, deadlineColumn, familyColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { InlineDateCell } from '@/components/tax-ops/inline-editors';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
@@ -21,6 +21,7 @@ const YEAR_OPTIONS = [2024, 2025, 2026, 2027];
 export default function NwtReviewsPage() {
   const [year, setYear] = useState(2025);
   const [showInactive, setShowInactive] = useState(false);
+  const { groups, refetch: refetchGroups } = useClientGroups();
 
   const { data, error, isLoading, refetch } = useMatrixData({
     tax_type: 'nwt_annual',
@@ -32,6 +33,7 @@ export default function NwtReviewsPage() {
 
   const periodLabel = String(year);
   const columns: MatrixColumn[] = [
+    familyColumn({ groups, refetch, onGroupsChanged: refetchGroups }),
     {
       key: 'active',
       label: 'Opted-in',

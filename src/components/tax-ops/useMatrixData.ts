@@ -77,6 +77,47 @@ const MONTH_NAMES = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
+// ─── Client groups (families) — used by familyColumn ────────────────
+
+export interface ClientGroup {
+  id: string;
+  name: string;
+  is_active: boolean;
+  entity_count: number;
+}
+
+/** Stint 37.E — list of client groups (families) for the family column
+ *  dropdown. Cached in module memory once loaded; callers can trigger
+ *  refetch when a new family is created. */
+export function useClientGroups(): {
+  groups: ClientGroup[];
+  isLoading: boolean;
+  refetch: () => void;
+} {
+  const [groups, setGroups] = useState<ClientGroup[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  const refetch = useCallback(() => setTick(t => t + 1), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    fetch('/api/tax-ops/client-groups')
+      .then(r => r.ok ? r.json() : { groups: [] })
+      .then(body => {
+        if (!cancelled) setGroups(
+          (body.groups ?? []).filter((g: ClientGroup) => g.is_active),
+        );
+      })
+      .catch(() => { /* ignore */ })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [tick]);
+
+  return { groups, isLoading, refetch };
+}
+
 /** Humanize "2025-Q1" → "Q1", "2025-03" → "Mar", "2025" → "2025". */
 export function shortPeriodLabel(label: string): string {
   const quarterMatch = label.match(/^\d{4}-(Q[1-4])$/);

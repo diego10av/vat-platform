@@ -10,7 +10,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { TaxTypeMatrix, type MatrixColumn, type MatrixEntity } from '@/components/tax-ops/TaxTypeMatrix';
-import { useMatrixData, applyStatusChange } from '@/components/tax-ops/useMatrixData';
+import { useMatrixData, applyStatusChange, useClientGroups } from '@/components/tax-ops/useMatrixData';
 import {
   preparedWithColumn, commentsColumn, deadlineColumn, familyColumn,
 } from '@/components/tax-ops/matrix-row-columns';
@@ -22,6 +22,7 @@ const YEAR_OPTIONS = [2024, 2025, 2026, 2027];
 
 export default function CitPage() {
   const [year, setYear] = useState(2025);
+  const { groups, refetch: refetchGroups } = useClientGroups();
 
   const current = useMatrixData({ tax_type: 'cit_annual', year, period_pattern: 'annual' });
   const prior = useMatrixData({ tax_type: 'cit_annual', year: year - 1, period_pattern: 'annual' });
@@ -94,7 +95,11 @@ export default function CitPage() {
   const periodLabel = String(year);
   const tolerance = current.data?.admin_tolerance_days ?? 0;
   const columns: MatrixColumn[] = [
-    familyColumn(),
+    familyColumn({
+      groups,
+      refetch: refetchAll,
+      onGroupsChanged: refetchGroups,
+    }),
     { key: periodLabel, label: `Status ${year}`, widthClass: 'w-[140px]' },
     deadlineColumn(periodLabel, tolerance),
     preparedWithColumn([periodLabel], current.refetch),
