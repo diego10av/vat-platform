@@ -338,9 +338,14 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
     const iconSize = depth === 0 ? 16 : 13;
     return (
       <li key={item.href} className="relative">
+        {/* Stint 40.K — softened active rail: 2px gray instead of 3px
+            brand-pink. Diego's feedback: the pink was too aggressive
+            and appeared ugly on every click. Brand color reserved for
+            primary CTAs; active state uses the muted gray-400 rail + a
+            subtle surface-alt background on the link itself. */}
         {active && (
           <span
-            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-brand-500"
+            className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r-full bg-gray-400"
             aria-hidden="true"
           />
         )}
@@ -352,14 +357,14 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
               'transition-colors duration-150 flex-1 min-w-0',
               indentClass(depth),
               active
-                ? 'bg-brand-50 text-brand-700 font-medium'
+                ? 'bg-surface-alt text-ink font-medium'
                 : 'text-ink-soft hover:bg-surface-alt hover:text-ink',
             ].join(' ')}
           >
             <Icon
               size={iconSize}
               strokeWidth={active ? 2.2 : 1.8}
-              className={active ? 'text-brand-500' : 'text-ink-muted'}
+              className={active ? 'text-ink' : 'text-ink-muted'}
             />
             <span className="flex-1 truncate">{item.label}</span>
             {typeof item.badge === 'number' && item.badge > 0 && (
