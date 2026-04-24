@@ -7,7 +7,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
-import { useMatrixData, applyStatusChange, useClientGroups } from '@/components/tax-ops/useMatrixData';
+import {
+  useMatrixData, applyStatusChange, useClientGroups, filterEntitiesByStatus,
+} from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import { WhtTabs } from '@/components/tax-ops/WhtTabs';
 import {
@@ -21,6 +23,7 @@ const YEAR_OPTIONS = yearOptions();
 
 export default function WhtAnnualPage() {
   const [year, setYear] = useState(2025);
+  const [statusFilter, setStatusFilter] = useState('all');
   const { groups, refetch: refetchGroups } = useClientGroups();
   const { data, error, isLoading, refetch } = useMatrixData({
     tax_type: 'wht_director_annual',
@@ -29,6 +32,9 @@ export default function WhtAnnualPage() {
   });
 
   const periodLabel = String(year);
+  const filtered = filterEntitiesByStatus(
+    data?.entities ?? [], statusFilter, [periodLabel],
+  );
   const tolerance = data?.admin_tolerance_days ?? 0;
   const columns: MatrixColumn[] = [
     familyColumn({ groups, refetch, onGroupsChanged: refetchGroups }),
@@ -50,17 +56,19 @@ export default function WhtAnnualPage() {
         year={year}
         years={YEAR_OPTIONS}
         onYearChange={setYear}
-        count={data?.entities.length ?? 0}
+        count={filtered.length}
         countLabel="entities"
         exportTaxType="wht_director_annual"
         exportPeriodPattern="annual"
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
       />
 
       {error && <CrmErrorBox message={error} onRetry={refetch} />}
       {isLoading && !data && <PageSkeleton />}
       {data && (
         <TaxTypeMatrix
-          entities={data.entities}
+          entities={filtered}
           columns={columns}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
             applyStatusChange({ entity, column, cell, nextStatus, refetch })

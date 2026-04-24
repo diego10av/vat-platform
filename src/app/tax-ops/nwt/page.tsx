@@ -7,7 +7,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
-import { useMatrixData, applyStatusChange, useClientGroups } from '@/components/tax-ops/useMatrixData';
+import {
+  useMatrixData, applyStatusChange, useClientGroups, filterEntitiesByStatus,
+} from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import {
   preparedWithColumn, commentsColumn, deadlineColumn, familyColumn,
@@ -22,6 +24,7 @@ const YEAR_OPTIONS = yearOptions();
 
 export default function NwtReviewsPage() {
   const [year, setYear] = useState(2025);
+  const [statusFilter, setStatusFilter] = useState('all');
   const [showInactive, setShowInactive] = useState(false);
   const { groups, refetch: refetchGroups } = useClientGroups();
 
@@ -34,6 +37,9 @@ export default function NwtReviewsPage() {
   });
 
   const periodLabel = String(year);
+  const filtered = filterEntitiesByStatus(
+    data?.entities ?? [], statusFilter, [periodLabel],
+  );
   const columns: MatrixColumn[] = [
     familyColumn({ groups, refetch, onGroupsChanged: refetchGroups }),
     {
@@ -116,12 +122,14 @@ export default function NwtReviewsPage() {
         year={year}
         years={YEAR_OPTIONS}
         onYearChange={setYear}
-        count={data?.entities.filter(e => e.obligation_id).length ?? 0}
+        count={filtered.filter(e => e.obligation_id).length}
         countLabel="opted-in"
         exportTaxType="nwt_annual"
         exportPeriodPattern="annual"
         exportServiceKind="review"
         exportShowInactive={showInactive}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
         extraChildren={
           <label className="inline-flex items-center gap-1.5 text-[12.5px] cursor-pointer">
             <input
@@ -140,7 +148,7 @@ export default function NwtReviewsPage() {
 
       {data && (
         <TaxTypeMatrix
-          entities={data.entities}
+          entities={filtered}
           columns={columns}
           firstColLabel="Entity"
           onStatusChange={({ entity, column, cell, nextStatus }) =>

@@ -9,7 +9,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { TaxTypeMatrix, type MatrixColumn, type MatrixEntity } from '@/components/tax-ops/TaxTypeMatrix';
-import { useMatrixData, applyStatusChange, useClientGroups } from '@/components/tax-ops/useMatrixData';
+import {
+  useMatrixData, applyStatusChange, useClientGroups, filterEntitiesByStatus,
+} from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import { VatTabs } from '@/components/tax-ops/VatTabs';
 import {
@@ -25,6 +27,7 @@ type CombinedEntity = MatrixEntity & { subtype: 'standard' | 'simplified' };
 
 export default function VatAnnualPage() {
   const [year, setYear] = useState(2025);
+  const [statusFilter, setStatusFilter] = useState('all');
   const { groups, refetch: refetchGroups } = useClientGroups();
   const standard = useMatrixData({ tax_type: 'vat_annual', year, period_pattern: 'annual' });
   const simplified = useMatrixData({ tax_type: 'vat_simplified_annual', year, period_pattern: 'annual' });
@@ -67,6 +70,7 @@ export default function VatAnnualPage() {
 
   const hasError = standard.error || simplified.error;
   const isLoading = (standard.isLoading || simplified.isLoading) && !standard.data && !simplified.data;
+  const filteredCombined = filterEntitiesByStatus(combined, statusFilter, [periodLabel]);
 
   return (
     <div className="space-y-3">
@@ -80,10 +84,12 @@ export default function VatAnnualPage() {
         year={year}
         years={YEAR_OPTIONS}
         onYearChange={setYear}
-        count={combined.length}
+        count={filteredCombined.length}
         countLabel={`filings (${standard.data?.entities.length ?? 0} standard · ${simplified.data?.entities.length ?? 0} simplified)`}
         exportTaxType="vat_annual"
         exportPeriodPattern="annual"
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
       />
 
       {hasError && <CrmErrorBox message={String(hasError)} onRetry={refetch} />}
@@ -92,7 +98,7 @@ export default function VatAnnualPage() {
 
       {(standard.data || simplified.data) && (
         <TaxTypeMatrix
-          entities={combined}
+          entities={filteredCombined}
           columns={columns}
           firstColLabel="Entity"
           onStatusChange={({ entity, column, cell, nextStatus }) =>

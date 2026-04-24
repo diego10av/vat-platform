@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { DownloadIcon } from 'lucide-react';
 import { useToast } from '@/components/Toaster';
+import { FILING_STATUSES, filingStatusLabel } from './FilingStatusBadge';
 
 interface Props {
   year: number;
@@ -23,6 +24,14 @@ interface Props {
   exportPeriodPattern?: string;
   exportServiceKind?: 'filing' | 'review';
   exportShowInactive?: boolean;
+  /**
+   * Stint 39.D — status filter. When set (non-'all'), parent page should
+   * hide rows where no period cell has that status. 'all' (default) shows
+   * every row. Required for Diego's follow-up workflow: pick
+   * "info_to_request" and see only the entities he still needs to chase.
+   */
+  statusFilter?: string;
+  onStatusFilterChange?: (next: string) => void;
 }
 
 export function MatrixToolbar({
@@ -30,6 +39,7 @@ export function MatrixToolbar({
   count, countLabel,
   extraChildren,
   exportTaxType, exportPeriodPattern, exportServiceKind, exportShowInactive,
+  statusFilter, onStatusFilterChange,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -77,6 +87,32 @@ export function MatrixToolbar({
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
       </label>
+      {onStatusFilterChange && (
+        <label className="inline-flex items-center gap-1.5 text-[12.5px]">
+          <span className="text-ink-muted">Filter by status:</span>
+          <select
+            value={statusFilter ?? 'all'}
+            onChange={(e) => onStatusFilterChange(e.target.value)}
+            className="px-2 py-1 text-[12.5px] border border-border rounded-md bg-surface"
+          >
+            <option value="all">All statuses</option>
+            {FILING_STATUSES.map(s => (
+              <option key={s} value={s}>{filingStatusLabel(s)}</option>
+            ))}
+            <option value="__empty">No status set</option>
+          </select>
+          {statusFilter && statusFilter !== 'all' && (
+            <button
+              type="button"
+              onClick={() => onStatusFilterChange('all')}
+              className="text-[11px] text-ink-muted hover:text-ink underline"
+              title="Clear status filter"
+            >
+              clear
+            </button>
+          )}
+        </label>
+      )}
       {extraChildren}
       <div className="text-[11.5px] text-ink-muted">
         {count} {countLabel}

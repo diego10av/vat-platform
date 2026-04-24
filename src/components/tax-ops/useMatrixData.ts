@@ -118,6 +118,31 @@ export function useClientGroups(): {
   return { groups, isLoading, refetch };
 }
 
+/**
+ * Stint 39.D — filter entities by status for the follow-up workflow.
+ *
+ * Returns entities whose period cells include at least one filing with the
+ * requested status. Special values:
+ *   - 'all' or empty → passthrough (no filter)
+ *   - '__empty' → rows where NO period cell has a filing (all cells null)
+ *
+ * Only period cells are considered (the keys in period_labels) — prepared_with
+ * and comments don't participate. This matches Diego's mental model: "show me
+ * the entities where I still need to request info" filters on the status chips
+ * he sees in the matrix body.
+ */
+export function filterEntitiesByStatus(
+  entities: MatrixEntity[],
+  status: string | undefined,
+  periodLabels: string[],
+): MatrixEntity[] {
+  if (!status || status === 'all') return entities;
+  if (status === '__empty') {
+    return entities.filter(e => periodLabels.every(l => !e.cells[l]));
+  }
+  return entities.filter(e => periodLabels.some(l => e.cells[l]?.status === status));
+}
+
 /** Humanize "2025-Q1" → "Q1", "2025-03" → "Mar", "2025" → "2025". */
 export function shortPeriodLabel(label: string): string {
   const quarterMatch = label.match(/^\d{4}-(Q[1-4])$/);

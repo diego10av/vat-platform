@@ -10,7 +10,9 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { TaxTypeMatrix, type MatrixColumn, type MatrixEntity } from '@/components/tax-ops/TaxTypeMatrix';
-import { useMatrixData, applyStatusChange, useClientGroups } from '@/components/tax-ops/useMatrixData';
+import {
+  useMatrixData, applyStatusChange, useClientGroups, filterEntitiesByStatus,
+} from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import {
   preparedWithColumn, commentsColumn, deadlineColumn, familyColumn,
@@ -25,6 +27,7 @@ const YEAR_OPTIONS = yearOptions();
 
 export default function CitPage() {
   const [year, setYear] = useState(2025);
+  const [statusFilter, setStatusFilter] = useState('all');
   const { groups, refetch: refetchGroups } = useClientGroups();
 
   const current = useMatrixData({ tax_type: 'cit_annual', year, period_pattern: 'annual' });
@@ -97,6 +100,9 @@ export default function CitPage() {
 
   const periodLabel = String(year);
   const tolerance = current.data?.admin_tolerance_days ?? 0;
+  const filtered = filterEntitiesByStatus(
+    current.data?.entities ?? [], statusFilter, [periodLabel],
+  );
   const columns: MatrixColumn[] = [
     familyColumn({
       groups,
@@ -193,10 +199,12 @@ export default function CitPage() {
         year={year}
         years={YEAR_OPTIONS}
         onYearChange={setYear}
-        count={current.data?.entities.length ?? 0}
+        count={filtered.length}
         countLabel={`entities · ${countFiled(current.data?.entities ?? [], periodLabel)} filed`}
         exportTaxType="cit_annual"
         exportPeriodPattern="annual"
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
       />
 
       {current.error && <CrmErrorBox message={current.error} onRetry={refetchAll} />}
@@ -205,7 +213,7 @@ export default function CitPage() {
 
       {current.data && (
         <TaxTypeMatrix
-          entities={current.data.entities}
+          entities={filtered}
           columns={columns}
           firstColLabel="Entity"
           onStatusChange={({ entity, column, cell, nextStatus }) =>
