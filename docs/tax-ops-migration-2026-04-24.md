@@ -162,6 +162,70 @@ DELETE FROM tax_client_groups
 Deadline rules (seeded by migration 045, not the importer) stay put
 — they're static reference data.
 
+## 2026-04-24 follow-up (stint 35)
+
+After Diego opened `/tax-ops` for real, two data problems surfaced
+and were corrected in stint 35:
+
+### Problem 1: NWT was modelled as a filing
+
+My importer created `nwt_annual` filing rows for every "2026 NWT check"
+column value in the CIT book. Diego clarified NWT is an internal advisory
+review (interim financials → tax-leakage check → restructuring memo)
+done for opted-in clients only — not a filing.
+
+**Fix (migration 046)**:
+- Added `service_kind TEXT NOT NULL DEFAULT 'filing'` to `tax_obligations`
+  with a partial index on `(service_kind='review', is_active)`.
+- `UPDATE tax_obligations SET service_kind='review' WHERE tax_type='nwt_annual'`
+  — 1 row affected in prod.
+- Updated `rule_nwt_annual` from `fixed_md_with_extension {month:3,day:31,
+  ext:12/31}` to `fixed_md {month:11,day:30}` with 30d tolerance.
+  Statutory / market notes rewritten to describe the review workflow.
+
+### Problem 2: Year mismatch for annual filings
+
+The Excel book is labelled "2026" because Diego works on it in 2026, but
+the annual filings (CIT, VAT annual, FATCA/CRS, WHT annual, NWT review)
+inside are actually 2025 work. The periodic filings (VAT Q/M, subscription,
+WHT monthly, BCL) are genuinely 2026 (current year).
+
+**Fix (`scripts/tax-ops-data-fix.ts`)**:
+- Targeted only `import_source='excel_import' AND period_year=2026 AND
+  tax_type IN (cit_annual, nwt_annual, vat_annual, vat_simplified_annual,
+  wht_director_annual, fatca_crs_annual)`.
+- For each: `period_year=2025`, `period_label='2025'`, `deadline_date`
+  recomputed via `computeDeadline(rule, 2025, '2025')`. Transactional
+  with post-update sanity check — if any row still at year=2026, rollback.
+- Result: **200 filings shifted** (140 cit_annual + 59 vat_annual + 1
+  nwt_annual). All deadlines recomputed:
+    - CIT 2025 → 2026-12-31 (AED extension)
+    - VAT annual 2025 → 2026-03-01
+    - NWT review 2025 → 2026-11-30 (new rule)
+
+### Verification (post-fix)
+
+```sql
+SELECT o.tax_type, f.period_year, COUNT(*) AS n, MIN(f.deadline_date) AS dl
+  FROM tax_filings f
+  JOIN tax_obligations o ON o.id = f.obligation_id
+ WHERE f.import_source='excel_import'
+ GROUP BY o.tax_type, f.period_year
+ ORDER BY o.tax_type, f.period_year;
+```
+
+Expected (and observed):
+- `cit_annual · 2024 · 31 · 2025-12-31` (historical assessments)
+- `cit_annual · 2025 · 140 · 2026-12-31` ✓
+- `nwt_annual · 2025 · 1 · 2026-11-30` ✓
+- `vat_annual · 2025 · 59 · 2026-03-01` ✓
+- `vat_quarterly · 2026 · 10 · 2026-04-15` (untouched)
+- `vat_monthly · 2026 · 6 · 2026-02-15..2026-04-15` (untouched)
+- `wht_director_monthly · 2026 · 6 · 2026-02-10` (untouched)
+- `subscription_tax_quarterly · 2026 · 1 · 2026-04-15` (untouched)
+- `bcl_sbs_quarterly · 2026 · 2` (untouched, no rule → null deadline)
+- `functional_currency_request · 2026 · 3` (ad-hoc, null deadline)
+
 ## Re-running the importer
 
 Safe to re-run. ON CONFLICT DO NOTHING guards handle duplicate

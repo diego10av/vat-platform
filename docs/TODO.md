@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-24 (stint 34 shipped in 6 commits — /tax-ops module: schema + importer + surfaces + settings + tasks + chat tools. 214 entities + 263 filings live in prod.)
+> Last updated: 2026-04-24 (stint 35 shipped in 7 commits — /tax-ops redesign based on Diego's "imposible de seguir" feedback: tax-type-first sidebar, Excel-style matrix per category, NWT reclassified as advisory review, annual filings year-shifted 2026 → 2025 in prod.)
 
 ---
 
@@ -97,6 +97,26 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-24 (evening)** — Stint 35: `/tax-ops` redesign after usage feedback (7 commits)
+
+Diego opened `/tax-ops` a week after the stint 34 ship and hit a wall: "prácticamente imposible poder seguir o entender dónde estás con cada entidad en relación con qué impuestos. Es imposible de seguir. Prefiero utilizar el Excel ahora mismo que utilizar esto." Three root causes — fixed in this stint.
+
+- **35.A · Schema + data fix** (`365b820`). Migration 046 adds `service_kind` column to `tax_obligations` (filing vs review) with partial index on active reviews. Bulk-reclassifies every `nwt_annual` obligation as `service_kind='review'` — NWT is a year-end advisory exercise (interim financials, tax-leakage check, restructuring memo), not a filing. Rewrites the deadline rule for NWT from `fixed_md_with_extension` (CIT mechanics) to `fixed_md {month:11,day:30}` with 30d tolerance. New script `scripts/tax-ops-data-fix.ts` (dry-run + commit modes) corrects the year of annual filings imported as 2026 → 2025 (Diego reused the 2025 book in 2026 and kept filling 2025 data). 200 filings shifted atomic + audit-logged. Periodic filings (VAT Q/M, WHT monthly, subscription Q, BCL) kept at 2026 — they're current-year work. Historical 2024 filings untouched.
+
+- **35.B · Sidebar refactor** (`3acef29`). `NavItem` gains optional `children?: NavItem[]` so items can host nested sub-items. Rendering adds a chevron-toggle button next to the label (click label = navigate, click chevron = expand/collapse). State persisted in localStorage (`cifra-sidebar-expanded-<href>`). Auto-expanded when the current path matches the parent or any child. Tax-Ops group restructured from a single item to 10 items + 3 VAT children: Overview · Corporate tax returns · NWT reviews · VAT (Annual / Quarterly / Monthly) · Subscription tax · Withholding tax · BCL reporting · Other (ad-hoc) · Entities · Tasks · Settings. Distinct icons per category (LandmarkIcon for CIT, SearchCheckIcon for NWT reviews, ReceiptIcon for VAT, etc.).
+
+- **35.C · TaxTypeMatrix + CIT/NWT/VAT category pages** (`d0b8b9b`). New `/api/tax-ops/matrix` endpoint returns a rectangular shape (`{year, period_labels[], entities[{id, cells:{[period]:FilingCell|null}}]}`). Two-round-trip SQL: fetch active obligations for the `(tax_type, period_pattern, service_kind)`, then all filings for those obligation × period pairs. Front-end just renders. New `<TaxTypeMatrix>` primitive (excel-dense: `text-[12px]`, py-1.5, sticky thead + sticky first column, grouped by client_group with collapsible headers, status badge cells with status+deadline+filed+comment tooltips, click → filing detail). Pages: `/tax-ops/cit` (Status {year} + Deadline + Prepared with + Assessment {year-1} + Comments), `/tax-ops/nwt` (opted-in toggle + status + target date + interim financials + recommendation sent + comments), `/tax-ops/vat` (redirects to annual), `/tax-ops/vat/annual` (combines standard + simplified with subtype chip), `/tax-ops/vat/quarterly` (Q1-Q4), `/tax-ops/vat/monthly` (12 compact columns Jan-Dec).
+
+- **35.D · WHT / Subscription tax / BCL / Other** (`2e9f809`). Completes the category nav. `/tax-ops/subscription-tax` Q1-Q4. WHT with 3 cadence tabs (`/wht/monthly` 12 cols, `/wht/semester` S1+S2, `/wht/annual` single col). BCL with 2 cadence tabs (`/bcl/sbs` quarterly, `/bcl/bcl216` monthly). `/tax-ops/other` — flat list for ad-hoc filings (VAT registration/deregistration/FCR) sorted by deadline ASC NULLS LAST, two-filter UI (type + status), reuses the legacy `/api/tax-ops/filings` endpoint since there's no period structure to pivot on. Build 142 pages (+16 from stint 34).
+
+- **35.E · Entity detail redesign** (`807bbb4`). `<EntityFilingsMatrix>` replaces the stacked-year sub-tables with a single compact matrix: tax_type rows × year columns with period sub-columns auto-sized to each row's cadence. Per-tax-type pattern detected dynamically from actual labels ("2025-01" → monthly, "2025-Q1" → quarterly, etc.). Year range spans the entity's filing history to `max(last_filing_year, current_year)` — empty entities get the trailing 4 years by default. Cells = `FilingStatusBadge` + tooltip + link to filing detail; '—' for empty; spacer cells for rows with coarser pattern than the column's widest grain. Removes the scroll-heavy stacked layout in favor of one scannable grid.
+
+- **35.F · ⌘K + home grid + filings page reframe** (`69035ff`). Added 9 new ⌘K entries (one per category page + "Open Subscription tax" + "Search all filings") so `⌘K → vat monthly` jumps straight to that matrix. Home page restructured: subtitle mentions the sidebar + `g t` + `⌘K` entry points, and a new 7-card category grid above the actionable widgets. `/tax-ops/filings` (the old flat grid) renamed "Search filings" with advanced-search framing — URL unchanged so deep-links survive. Help overlay (`?`) updated.
+
+- **35.G · Tests + docs** (this commit). 10 new unit tests for `shortPeriodLabel()` + `periodLabelsFor()` helpers covering all 4 patterns + year independence + edge cases. Docs updated: `docs/TODO.md` (this section), `docs/ROADMAP.md` shipped-row, `docs/tax-ops-migration-2026-04-24.md` gains "2026-04-24 follow-up (stint 35)" section with the data-fix + NWT reclassification audit trail.
+
+---
 
 **2026-04-24** — Stint 34: `/tax-ops` module — Excel replacement + state-of-art tasks (6 commits)
 
