@@ -21,6 +21,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import { FilingStatusBadge, filingStatusLabel } from './FilingStatusBadge';
 import { InlineStatusCell } from './inline-editors';
+import { familyChipClasses } from './familyColors';
 
 export interface MatrixCell {
   filing_id: string;
@@ -152,15 +153,34 @@ export function TaxTypeMatrix({
     );
   }
 
+  // Stint 39.B — Family column is sticky + comes BEFORE the Entity
+  // sticky column when present. We detect it by key='family' and pull
+  // it out of the normal columns[] for special rendering. The visual
+  // order becomes: [Family sticky left:0] [Entity sticky left:170] [rest…].
+  const familyCol = columns.find(c => c.key === 'family') ?? null;
+  const otherCols = columns.filter(c => c.key !== 'family');
+  const familyColWidth = 170;   // px — matches w-[170px]
+  const entityStickyLeft = familyCol ? familyColWidth : 0;
+
   return (
     <div className="rounded-md border border-border bg-surface overflow-auto relative">
       <table className="w-full text-[12px] border-collapse">
         <thead className="bg-surface-alt sticky top-0 z-10">
           <tr className="text-left text-ink-muted">
-            <th className="sticky left-0 z-20 bg-surface-alt border-b border-r border-border px-2.5 py-2 font-medium min-w-[220px]">
+            {familyCol && (
+              <th
+                className="sticky left-0 z-20 bg-surface-alt border-b border-r border-border px-2.5 py-2 font-medium w-[170px]"
+              >
+                {familyCol.label}
+              </th>
+            )}
+            <th
+              className="sticky z-20 bg-surface-alt border-b border-r border-border px-2.5 py-2 font-medium min-w-[220px]"
+              style={{ left: `${entityStickyLeft}px` }}
+            >
               {firstColLabel}
             </th>
-            {columns.map(col => (
+            {otherCols.map(col => (
               <th
                 key={col.key}
                 className={[
@@ -187,12 +207,14 @@ export function TaxTypeMatrix({
                 grouped={grouped}
                 isCollapsed={isCollapsed}
                 toggleGroup={toggleGroup}
-                columns={columns}
+                columns={otherCols}
+                familyCol={familyCol}
+                entityStickyLeft={entityStickyLeft}
                 rowAction={rowAction}
                 handleCellClick={handleCellClick}
                 onStatusChange={onStatusChange}
                 groupFooter={groupFooter}
-                totalCols={1 + columns.length + (rowAction ? 1 : 0)}
+                totalCols={(familyCol ? 1 : 0) + 1 + otherCols.length + (rowAction ? 1 : 0)}
               />
             );
           })}
@@ -204,7 +226,8 @@ export function TaxTypeMatrix({
 
 function GroupBlock({
   group, grouped, isCollapsed, toggleGroup,
-  columns, rowAction, handleCellClick, onStatusChange,
+  columns, familyCol, entityStickyLeft,
+  rowAction, handleCellClick, onStatusChange,
   groupFooter, totalCols,
 }: {
   group: { name: string; items: MatrixEntity[] };
@@ -212,6 +235,8 @@ function GroupBlock({
   isCollapsed: boolean;
   toggleGroup: (name: string) => void;
   columns: MatrixColumn[];
+  familyCol: MatrixColumn | null;
+  entityStickyLeft: number;
   rowAction?: (entity: MatrixEntity) => React.ReactNode;
   handleCellClick: (e: MatrixEntity, col: MatrixColumn, cell: MatrixCell) => void;
   onStatusChange?: Props['onStatusChange'];
@@ -244,6 +269,8 @@ function GroupBlock({
           key={e.id}
           entity={e}
           columns={columns}
+          familyCol={familyCol}
+          entityStickyLeft={entityStickyLeft}
           rowAction={rowAction}
           handleCellClick={handleCellClick}
           onStatusChange={onStatusChange}
@@ -264,17 +291,38 @@ function GroupBlock({
 }
 
 function RowRender({
-  entity, columns, rowAction, handleCellClick, onStatusChange,
+  entity, columns, familyCol, entityStickyLeft,
+  rowAction, handleCellClick, onStatusChange,
 }: {
   entity: MatrixEntity;
   columns: MatrixColumn[];
+  familyCol: MatrixColumn | null;
+  entityStickyLeft: number;
   rowAction?: (entity: MatrixEntity) => React.ReactNode;
   handleCellClick: (e: MatrixEntity, col: MatrixColumn, cell: MatrixCell) => void;
   onStatusChange?: Props['onStatusChange'];
 }) {
   return (
     <tr className="border-b border-border/70 hover:bg-surface-alt/40">
-      <td className="sticky left-0 bg-surface hover:bg-surface-alt/40 border-r border-border px-2.5 py-1.5 min-w-[220px] max-w-[320px]">
+      {familyCol && (
+        <td className="sticky left-0 z-10 bg-surface hover:bg-surface-alt/40 border-r border-border px-2 py-1.5 w-[170px]">
+          {familyCol.render
+            ? familyCol.render(entity)
+            : (entity.group_name
+                ? <span className={[
+                    'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium truncate max-w-[150px]',
+                    familyChipClasses(entity.group_name),
+                  ].join(' ')} title={entity.group_name}>
+                    {entity.group_name}
+                  </span>
+                : <span className="text-ink-faint italic text-[11px]">—</span>)
+          }
+        </td>
+      )}
+      <td
+        className="sticky z-10 bg-surface hover:bg-surface-alt/40 border-r border-border px-2.5 py-1.5 min-w-[220px] max-w-[320px]"
+        style={{ left: `${entityStickyLeft}px` }}
+      >
         <Link
           href={`/tax-ops/entities/${entity.id}`}
           className="text-ink hover:text-brand-700 font-medium block truncate"

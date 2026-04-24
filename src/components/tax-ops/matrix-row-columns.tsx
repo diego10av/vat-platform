@@ -8,6 +8,7 @@
 import type { MatrixColumn, MatrixEntity, MatrixCell } from './TaxTypeMatrix';
 import { InlineTagsCell, InlineTextCell } from './inline-editors';
 import { DeadlineWithTolerance } from './DeadlineWithTolerance';
+import { familyChipClasses } from './familyColors';
 
 // Patch helper — works off the cell's filing_id. When the cell is empty,
 // the edit is blocked (we don't create an empty filing just to attach a
@@ -118,12 +119,20 @@ export function familyColumn(
   return {
     key: 'family',
     label: 'Family',
-    widthClass: 'w-[150px]',
+    widthClass: 'w-[170px]',
     render: (e) => {
+      // Display mode: colored chip — Diego wants visual differentiation
+      // between families at a glance. Click-to-edit when options passed.
       if (!editable) {
         if (!e.group_name) return <span className="text-ink-faint italic text-[11px]">—</span>;
         return (
-          <span className="text-ink-soft text-[11.5px] truncate block" title={e.group_name}>
+          <span
+            className={[
+              'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium truncate max-w-[150px]',
+              familyChipClasses(e.group_name),
+            ].join(' ')}
+            title={e.group_name}
+          >
             {e.group_name}
           </span>
         );
@@ -191,18 +200,35 @@ function FamilyInlineSelect({
     onChangedFamily();
   }
 
+  // Color-coded display + native select stacked transparent above it.
+  // Diego wants the color differentiation; native <select> keeps the
+  // inline-editability without a custom dropdown library.
+  const chip = familyChipClasses(entity.group_name);
+  const label = entity.group_name ?? '— (no family)';
   return (
-    <select
-      value={entity.group_id ?? ''}
-      onChange={(e) => void handleChange(e.target.value)}
-      className="w-full px-1.5 py-0.5 text-[11.5px] border border-border rounded bg-surface hover:bg-surface-alt"
-    >
-      <option value="">— (no family)</option>
-      {groups.map(g => (
-        <option key={g.id} value={g.id}>{g.name}</option>
-      ))}
-      <option value="__create__">+ Create new family…</option>
-    </select>
+    <div className="relative inline-block w-full">
+      <span
+        className={[
+          'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium truncate max-w-[150px] pointer-events-none',
+          entity.group_name ? chip : 'bg-surface-alt text-ink-muted',
+        ].join(' ')}
+        title={label}
+      >
+        {label}
+      </span>
+      <select
+        value={entity.group_id ?? ''}
+        onChange={(e) => void handleChange(e.target.value)}
+        aria-label="Change family"
+        className="absolute inset-0 w-full opacity-0 cursor-pointer"
+      >
+        <option value="">— (no family)</option>
+        {groups.map(g => (
+          <option key={g.id} value={g.id}>{g.name}</option>
+        ))}
+        <option value="__create__">+ Create new family…</option>
+      </select>
+    </div>
   );
 }
 
