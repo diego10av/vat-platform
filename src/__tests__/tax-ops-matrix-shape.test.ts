@@ -9,6 +9,7 @@ import {
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions, defaultYear } from '@/components/tax-ops/yearOptions';
 import { familyPalette, familyChipClasses } from '@/components/tax-ops/familyColors';
+import { WHT_CADENCE_OPTIONS } from '@/components/tax-ops/matrix-row-columns';
 import type { MatrixEntity, MatrixCell, MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 
 describe('shortPeriodLabel', () => {
@@ -361,5 +362,27 @@ describe('familyColors', () => {
     // Basic sanity: we should see a bg- class and a text- class from our palette.
     expect(s).toMatch(/bg-/);
     expect(s).toMatch(/text-/);
+  });
+});
+
+// Stint 41 — WHT cadence switcher option set.
+describe('WHT_CADENCE_OPTIONS', () => {
+  it('exposes the 5 supported cadences in a stable order', () => {
+    expect(WHT_CADENCE_OPTIONS.map(o => o.period_pattern)).toEqual([
+      'monthly', 'quarterly', 'semester', 'annual', 'adhoc',
+    ]);
+  });
+
+  it('every option maps to a wht_director_<pattern> tax_type', () => {
+    for (const o of WHT_CADENCE_OPTIONS) {
+      expect(o.tax_type).toBe(`wht_director_${o.period_pattern}`);
+    }
+  });
+
+  it('labels are human-readable (no underscores, first letter upper)', () => {
+    for (const o of WHT_CADENCE_OPTIONS) {
+      expect(o.label).not.toContain('_');
+      expect(o.label[0]).toBe(o.label[0]!.toUpperCase());
+    }
   });
 });

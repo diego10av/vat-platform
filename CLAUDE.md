@@ -173,9 +173,15 @@ clients → entities → declarations → invoices → invoice_lines
 
 ## 4 · Current state (keep this section fresh on each stint)
 
-**As of 2026-04-24, stint 40 just closed.** Status:
+**As of 2026-04-24, stint 41 just closed.** Status:
 
 ### Shipped — recent stints (newest first)
+- ✅ **Stint 41** (2026-04-24 late night): WHT per-entity cadence
+  switcher. Migration 055 adds wht_director_quarterly rule; new
+  `/change-cadence` endpoint moves an obligation between cadences
+  within the wht_director_* family in-place with audit log; new
+  cadenceColumn + CadenceInlineCell (chip + dropdown) wired into
+  all 3 WHT matrix pages. 678 tests green. No backlog.
 - ✅ **Stint 40** (2026-04-24 night, 16 sub-commits A→P): Tax-Ops
   iteration #3 post second field-usage round. Entity dedup batch
   tool + LU-aware normalisation; family hygiene (CTR/FCR fake groups

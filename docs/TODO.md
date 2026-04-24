@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-24 (stint 40 fully landed — 16 sub-commits A→P. Iteration #3 on Tax-Ops after another field-usage round. Highlights: entity dedup tool + Levenshtein/LU-aware normalisation; family hygiene cleanup; BCL merged + FATCA placeholder; invoice price column (mig 052); contacts column + Edit-all drawer; family overview page with bulk-copy contacts; CIT assessment tri-state + NWT opt-out; deadline tolerance realigned (mig 053); WHT ad-hoc cadence (mig 054); archive-respects-current-year; back nav; red stripe softened; "Gab Andrew" scrubbed; tasks polish; Home gains "Tasks due this week" widget. 675 tests green. Deferred to stint 41: full per-entity WHT cadence switcher.)
+> Last updated: 2026-04-24 (stint 41 closed — WHT per-entity cadence switcher. Migration 055 adds wht_director_quarterly rule (now 5 cadences: Monthly/Quarterly/Semester/Annual/Ad-hoc). New /change-cadence endpoint moves an obligation within the wht_director_* family atomically, with audit log. New cadenceColumn/CadenceInlineCell surfaces a 1-click dropdown on every WHT matrix page. Filings stay attached to the obligation; old period_labels remain in the audit log but won't render in the new cadence's matrix — Diego confirmed that's fine per the "cambio de cadencia" flow he described. 678 tests green. No backlog left from stints 40/41.)
 
 ---
 
@@ -97,6 +97,45 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-24 (late night)** — Stint 41: WHT per-entity cadence switcher
+
+Closes the only item Diego had deferred from stint 40. Was: when
+WHT cadence varies per entity ("algunas empresas lo hacen quarterly,
+otras mensualmente, otras cada dos meses, según le dé a la gana"),
+Diego had to archive one WHT obligation and create another manually
+via the entity detail page — 5+ clicks per entity. Now it's 1 click.
+
+- **Migration 055** — new `wht_director_quarterly` deadline rule
+  (rule_kind `days_after_period_end`, +10 days, +5d tolerance).
+  Closes the 5-cadence grid: Monthly / Quarterly / Semester /
+  Annual / Ad-hoc. Applied on Supabase via apply_migration.
+- **POST /api/tax-ops/obligations/[id]/change-cadence** — new
+  endpoint. Body `{ new_tax_type, new_period_pattern }`. Updates
+  the obligation in-place so filings stay attached (their old
+  period_labels stay visible in the audit log). Safety rails:
+  only moves WITHIN the wht_director_* family (prefix check);
+  target (tax_type, period_pattern) must match a known rule;
+  rejects moves that would collide with another active obligation
+  on the same entity. Full audit_log entry with before + after.
+- **cadenceColumn + CadenceInlineCell** — new matrix-row-columns
+  factory. Chip shows current cadence ("Monthly"); native `<select>`
+  overlay for 1-click change. `confirm()` with "existing filings
+  remain in the audit log but won't match new cadence" warning;
+  POST + toast.
+- **Wired onto the 3 WHT matrix pages** (monthly, semester, annual),
+  positioned right after the Family column. While there, fixed two
+  pages (wht/monthly, wht/semester, wht/annual) that were missing
+  the `onEditFiling` + `periodLabelsForEdit` props — now the
+  pencil ✎ drawer trigger works on all WHT pages consistently.
+- **3 new unit tests** locking the shape of WHT_CADENCE_OPTIONS
+  (order, tax_type naming convention, label formatting). 678 tests
+  across 35 files.
+
+Gate green: tsc clean, 35 test files, 678 tests, build OK. No
+backlog items left from stints 40/41.
+
+---
 
 **2026-04-24 (night)** — Stint 40: Tax-Ops iteration #3, post-field-usage (13 commits, A→N)
 

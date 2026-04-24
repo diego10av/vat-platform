@@ -14,7 +14,8 @@ import {
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import { WhtTabs } from '@/components/tax-ops/WhtTabs';
 import {
-  preparedWithColumn, lastChasedColumn, contactsColumn, commentsColumn, priceColumn, deadlineColumn, familyColumn,
+  preparedWithColumn, lastChasedColumn, contactsColumn, commentsColumn,
+  priceColumn, deadlineColumn, familyColumn, cadenceColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 import { AddEntityRow } from '@/components/tax-ops/AddEntityRow';
@@ -42,6 +43,7 @@ export default function WhtAnnualPage() {
   const tolerance = data?.admin_tolerance_days ?? 0;
   const columns: MatrixColumn[] = [
     familyColumn({ groups, refetch, onGroupsChanged: refetchGroups }),
+    cadenceColumn({ currentTaxType: 'wht_director_annual', refetch, toast }),
     { key: periodLabel, label: `Status ${year}`, widthClass: 'w-[140px]' },
     deadlineColumn(periodLabel, tolerance),
     preparedWithColumn([periodLabel], refetch),

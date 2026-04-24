@@ -15,7 +15,8 @@ import {
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import { WhtTabs } from '@/components/tax-ops/WhtTabs';
 import {
-  preparedWithColumn, lastChasedColumn, contactsColumn, commentsColumn, priceColumn, familyColumn,
+  preparedWithColumn, lastChasedColumn, contactsColumn, commentsColumn,
+  priceColumn, familyColumn, cadenceColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 import { AddEntityRow } from '@/components/tax-ops/AddEntityRow';
@@ -41,6 +42,7 @@ export default function WhtMonthlyPage() {
 
   const columns: MatrixColumn[] = [
     familyColumn({ groups, refetch, onGroupsChanged: refetchGroups }),
+    cadenceColumn({ currentTaxType: 'wht_director_monthly', refetch, toast }),
   ];
   if (data) {
     for (const label of data.period_labels) {
@@ -79,6 +81,8 @@ export default function WhtMonthlyPage() {
         <TaxTypeMatrix
           entities={filtered}
           columns={columns}
+          onEditFiling={setEditingFilingId}
+          periodLabelsForEdit={data.period_labels}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
             applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }

@@ -126,6 +126,129 @@ export function lastChasedColumn(periodLabels: string[], refetch: () => void): M
 }
 
 /**
+ * Stint 41 — Cadence switcher column (WHT-family only).
+ *
+ * Diego's feedback: "algunas empresas lo hacen quarterly, otras
+ * mensualmente, otras semestralmente, otras cada dos meses, cada
+ * tres, según le dé a la gana". Shows each entity's current WHT
+ * cadence as a chip; click opens a dropdown with the 5 supported
+ * cadences (Monthly / Quarterly / Semester / Annual / Ad-hoc);
+ * changing dispatches a confirm + POST to the change-cadence
+ * endpoint + refetch.
+ *
+ * Declared at the Family family: obligations only move within
+ * wht_director_*. The endpoint refuses cross-family moves.
+ */
+export const WHT_CADENCE_OPTIONS: Array<{
+  tax_type: string; period_pattern: string; label: string;
+}> = [
+  { tax_type: 'wht_director_monthly',   period_pattern: 'monthly',   label: 'Monthly' },
+  { tax_type: 'wht_director_quarterly', period_pattern: 'quarterly', label: 'Quarterly' },
+  { tax_type: 'wht_director_semester',  period_pattern: 'semester',  label: 'Semester' },
+  { tax_type: 'wht_director_annual',    period_pattern: 'annual',    label: 'Annual' },
+  { tax_type: 'wht_director_adhoc',     period_pattern: 'adhoc',     label: 'Ad-hoc' },
+];
+
+export function cadenceColumn({
+  currentTaxType,
+  refetch,
+  toast,
+}: {
+  currentTaxType: string;
+  refetch: () => void;
+  toast?: {
+    success: (m: string) => void;
+    error: (m: string) => void;
+  };
+}): MatrixColumn {
+  return {
+    key: 'cadence',
+    label: 'Cadence',
+    widthClass: 'w-[110px]',
+    render: (e) => (
+      <CadenceInlineCell
+        obligationId={e.obligation_id}
+        currentTaxType={currentTaxType}
+        disabled={!e.obligation_id}
+        onChange={async (next) => {
+          if (!e.obligation_id) return;
+          const res = await fetch(
+            `/api/tax-ops/obligations/${e.obligation_id}/change-cadence`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                new_tax_type: next.tax_type,
+                new_period_pattern: next.period_pattern,
+              }),
+            },
+          );
+          if (!res.ok) {
+            const b = await res.json().catch(() => ({}));
+            toast?.error(`Cadence change failed: ${b?.error ?? res.status}`);
+            return;
+          }
+          toast?.success(`${e.legal_name} → ${next.label}`);
+          refetch();
+        }}
+      />
+    ),
+  };
+}
+
+function CadenceInlineCell({
+  obligationId, currentTaxType, onChange, disabled,
+}: {
+  obligationId: string | null;
+  currentTaxType: string;
+  onChange: (next: typeof WHT_CADENCE_OPTIONS[number]) => Promise<void>;
+  disabled?: boolean;
+}) {
+  const current = WHT_CADENCE_OPTIONS.find(o => o.tax_type === currentTaxType);
+  const label = current?.label ?? currentTaxType;
+
+  function handleChange(taxType: string) {
+    const next = WHT_CADENCE_OPTIONS.find(o => o.tax_type === taxType);
+    if (!next || !current) return;
+    if (next.tax_type === current.tax_type) return;
+    const ok = window.confirm(
+      `Change cadence from ${current.label} to ${next.label}?\n\n` +
+      'Existing filings remain in the audit log but will no longer ' +
+      'appear in matrices (their old period labels won\'t match the ' +
+      'new cadence). Future filings will use the new cadence.',
+    );
+    if (!ok) return;
+    void onChange(next);
+  }
+
+  // Compact chip + hidden native select overlay for 1-click editing.
+  return (
+    <span className="relative inline-block">
+      <span
+        className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium bg-surface-alt text-ink-soft pointer-events-none"
+        title={disabled ? 'No obligation on this entity' : 'Click to change cadence'}
+      >
+        {label}
+      </span>
+      {!disabled && (
+        <select
+          value={currentTaxType}
+          onChange={(e) => handleChange(e.target.value)}
+          aria-label="Change cadence"
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        >
+          {WHT_CADENCE_OPTIONS.map(o => (
+            <option key={o.tax_type} value={o.tax_type}>{o.label}</option>
+          ))}
+        </select>
+      )}
+      {/* keep obligationId referenced for linters */}
+      <span aria-hidden className="hidden" data-obligation-id={obligationId ?? ''} />
+    </span>
+  );
+}
+
+/**
  * Stint 40.G — Contacts row-level column.
  *
  * Diego's feedback: "estaría bien añadir en corporate tax return y
