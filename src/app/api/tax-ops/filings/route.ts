@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, execute, logAudit } from '@/lib/db';
+import { query, execute, logAudit, generateId } from '@/lib/db';
+import { computeDeadline, type DeadlineRule } from '@/lib/tax-ops-deadlines';
 
 // ════════════════════════════════════════════════════════════════════════
 // GET  /api/tax-ops/filings    — list with filters + sort + pagination
@@ -170,4 +171,105 @@ export async function PATCH(request: NextRequest) {
   });
 
   return NextResponse.json({ updated: ids.length });
+}
+
+// ════════════════════════════════════════════════════════════════════
+// POST /api/tax-ops/filings — create a single filing.
+//   Body: { obligation_id, period_label, period_year?, status?,
+//           prepared_with?, comments?, assigned_to? }
+//   Powers the inline "click an empty matrix cell and pick a status"
+//   flow from stint 36. period_year inferred from period_label when
+//   not provided (leading 4-digit year). Deadline auto-computed from
+//   the matching deadline rule — NULL when no rule exists (ad-hoc).
+// ════════════════════════════════════════════════════════════════════
+export async function POST(request: NextRequest) {
+  const body = await request.json() as {
+    obligation_id?: string;
+    period_label?: string;
+    period_year?: number;
+    status?: string;
+    prepared_with?: string[];
+    comments?: string | null;
+    assigned_to?: string | null;
+    filed_at?: string | null;
+    draft_sent_at?: string | null;
+  };
+
+  const obligation_id = body.obligation_id;
+  const period_label = body.period_label?.trim();
+  if (!obligation_id || !period_label) {
+    return NextResponse.json({ error: 'obligation_id_and_period_label_required' }, { status: 400 });
+  }
+
+  // Infer period_year from period_label if not provided ("2025-Q1" → 2025).
+  const period_year = body.period_year
+    ?? Number((period_label.match(/^(\d{4})/) ?? [])[1])
+    ?? null;
+  if (!Number.isFinite(period_year)) {
+    return NextResponse.json({ error: 'invalid_period_year' }, { status: 400 });
+  }
+
+  // Look up the obligation's (tax_type, period_pattern) so we can hit
+  // the matching deadline rule.
+  const oblRows = await query<{ tax_type: string; period_pattern: string }>(
+    `SELECT tax_type, period_pattern FROM tax_obligations WHERE id = $1`,
+    [obligation_id],
+  );
+  const obl = oblRows[0];
+  if (!obl) return NextResponse.json({ error: 'obligation_not_found' }, { status: 404 });
+
+  const ruleRows = await query<DeadlineRule>(
+    `SELECT tax_type, period_pattern, rule_kind, rule_params, admin_tolerance_days
+       FROM tax_deadline_rules
+      WHERE tax_type = $1 AND period_pattern = $2
+      LIMIT 1`,
+    [obl.tax_type, obl.period_pattern],
+  );
+  let deadline: string | null = null;
+  if (ruleRows[0]) {
+    try {
+      deadline = computeDeadline(ruleRows[0], period_year as number, period_label).effective;
+    } catch {
+      deadline = null;
+    }
+  }
+
+  const id = generateId();
+  try {
+    await execute(
+      `INSERT INTO tax_filings
+         (id, obligation_id, period_year, period_label, deadline_date,
+          status, prepared_with, comments, assigned_to,
+          filed_at, draft_sent_at, import_source)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'manual')`,
+      [
+        id, obligation_id, period_year, period_label, deadline,
+        body.status ?? 'pending_info',
+        body.prepared_with ?? [],
+        body.comments ?? null,
+        body.assigned_to ?? null,
+        body.filed_at ?? null,
+        body.draft_sent_at ?? null,
+      ],
+    );
+  } catch (e) {
+    const msg = String(e instanceof Error ? e.message : e);
+    if (/unique|duplicate/i.test(msg)) {
+      return NextResponse.json({ error: 'filing_already_exists' }, { status: 409 });
+    }
+    throw e;
+  }
+
+  await logAudit({
+    userId: 'founder',
+    action: 'tax_filing_create',
+    targetType: 'tax_filing',
+    targetId: id,
+    newValue: JSON.stringify({
+      obligation_id, period_label, period_year,
+      status: body.status ?? 'pending_info',
+    }),
+  });
+
+  return NextResponse.json({ id, deadline_date: deadline });
 }

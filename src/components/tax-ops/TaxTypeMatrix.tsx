@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import { FilingStatusBadge, filingStatusLabel } from './FilingStatusBadge';
+import { InlineStatusCell } from './inline-editors';
 
 export interface MatrixCell {
   filing_id: string;
@@ -76,6 +77,25 @@ interface Props {
   onCellClick?: (entity: MatrixEntity, column: MatrixColumn, cell: MatrixCell) => void;
   /** Empty-state copy. */
   emptyMessage?: string;
+  /**
+   * When set, enables inline status editing on period columns. Called
+   * with the updated status for an existing filing (filing_id present)
+   * or for an empty cell where a filing must be created first
+   * (filing_id=null).
+   *
+   * The hook should: PATCH the filing if filing_id, else POST a new
+   * filing for (entity.obligation_id, column.key). Reject the Promise
+   * on error — the InlineCellEditor shows the error + reverts optimistic
+   * UI.
+   *
+   * If omitted, period cells remain click-to-navigate only.
+   */
+  onStatusChange?: (args: {
+    entity: MatrixEntity;
+    column: MatrixColumn;
+    cell: MatrixCell | null;
+    nextStatus: string;
+  }) => Promise<void>;
 }
 
 export function TaxTypeMatrix({
@@ -84,6 +104,7 @@ export function TaxTypeMatrix({
   grouped = true,
   rowAction,
   onCellClick,
+  onStatusChange,
   emptyMessage = 'No entities with this obligation. Toggle "Show all entities" to activate one.',
 }: Props) {
   const router = useRouter();
@@ -163,6 +184,7 @@ export function TaxTypeMatrix({
                 columns={columns}
                 rowAction={rowAction}
                 handleCellClick={handleCellClick}
+                onStatusChange={onStatusChange}
               />
             );
           })}
@@ -174,7 +196,7 @@ export function TaxTypeMatrix({
 
 function GroupBlock({
   group, grouped, isCollapsed, toggleGroup,
-  columns, rowAction, handleCellClick,
+  columns, rowAction, handleCellClick, onStatusChange,
 }: {
   group: { name: string; items: MatrixEntity[] };
   grouped: boolean;
@@ -183,6 +205,7 @@ function GroupBlock({
   columns: MatrixColumn[];
   rowAction?: (entity: MatrixEntity) => React.ReactNode;
   handleCellClick: (e: MatrixEntity, col: MatrixColumn, cell: MatrixCell) => void;
+  onStatusChange?: Props['onStatusChange'];
 }) {
   const totalCols = 1 + columns.length + (rowAction ? 1 : 0);
 
@@ -210,6 +233,7 @@ function GroupBlock({
           columns={columns}
           rowAction={rowAction}
           handleCellClick={handleCellClick}
+          onStatusChange={onStatusChange}
         />
       ))}
     </>
@@ -217,12 +241,13 @@ function GroupBlock({
 }
 
 function RowRender({
-  entity, columns, rowAction, handleCellClick,
+  entity, columns, rowAction, handleCellClick, onStatusChange,
 }: {
   entity: MatrixEntity;
   columns: MatrixColumn[];
   rowAction?: (entity: MatrixEntity) => React.ReactNode;
   handleCellClick: (e: MatrixEntity, col: MatrixColumn, cell: MatrixCell) => void;
+  onStatusChange?: Props['onStatusChange'];
 }) {
   return (
     <tr className="border-b border-border/70 hover:bg-surface-alt/40">
@@ -241,6 +266,7 @@ function RowRender({
           entity={entity}
           column={col}
           handleCellClick={handleCellClick}
+          onStatusChange={onStatusChange}
         />
       ))}
       {rowAction && (
@@ -251,11 +277,12 @@ function RowRender({
 }
 
 function CellRender({
-  entity, column, handleCellClick,
+  entity, column, handleCellClick, onStatusChange,
 }: {
   entity: MatrixEntity;
   column: MatrixColumn;
   handleCellClick: (e: MatrixEntity, col: MatrixColumn, cell: MatrixCell) => void;
+  onStatusChange?: Props['onStatusChange'];
 }) {
   // Custom renderers win.
   if (column.render) {
@@ -274,6 +301,32 @@ function CellRender({
 
   // Default: key is a period_label; look up the cell.
   const cell = entity.cells[column.key] ?? null;
+
+  // Inline-edit enabled path (stint 36): render the status as an
+  // InlineStatusCell with onSave wired to onStatusChange. Empty cells
+  // still render the dropdown so the user can "set a status" → creates
+  // the filing on save. Disabled when the entity lacks an obligation_id
+  // (no way to place a filing without one).
+  if (onStatusChange) {
+    const disabled = !entity.obligation_id;
+    return (
+      <td
+        className={['px-1.5 py-1 align-middle', column.widthClass ?? ''].join(' ')}
+        title={cell ? buildTooltip(cell) : disabled ? 'No obligation — add one on the entity detail page' : 'Click to set a status (creates the filing)'}
+      >
+        <InlineStatusCell
+          value={cell?.status ?? 'pending_info'}
+          disabled={disabled}
+          onSave={(next) => onStatusChange({ entity, column, cell, nextStatus: next })}
+        />
+        {!cell && !disabled && (
+          <span className="ml-0.5 text-[10px] text-ink-faint" aria-hidden>·new</span>
+        )}
+      </td>
+    );
+  }
+
+  // Read-only click-through fallback (pre-stint-36 behaviour).
   if (!cell) {
     return (
       <td className={['px-2 py-1.5 align-middle text-ink-faint', column.widthClass ?? ''].join(' ')}>

@@ -5,7 +5,7 @@
 // states alongside the matrix response.
 
 import { useEffect, useState, useCallback } from 'react';
-import type { MatrixEntity } from './TaxTypeMatrix';
+import type { MatrixEntity, MatrixCell, MatrixColumn } from './TaxTypeMatrix';
 
 export interface MatrixResponse {
   year: number;
@@ -84,4 +84,57 @@ export function shortPeriodLabel(label: string): string {
     return MONTH_NAMES[mIdx] ?? monthMatch[1]!;
   }
   return label;
+}
+
+// ─── Inline-edit helpers (stint 36) ──────────────────────────────────
+// (MatrixEntity / MatrixCell / MatrixColumn types imported at the top)
+
+/**
+ * Shared onStatusChange callback used by every tax-type category page.
+ * When a cell has a filing: PATCH the status. When the cell is empty:
+ * POST a new filing (obligation must already exist on the entity).
+ *
+ * The caller provides a `refetch()` so the matrix re-pulls the updated
+ * data after save. We don't attempt optimistic mutation of the matrix
+ * rows client-side — cheap to refetch, eliminates edge cases.
+ */
+export async function applyStatusChange({
+  entity, column, cell, nextStatus, refetch,
+}: {
+  entity: MatrixEntity;
+  column: MatrixColumn;
+  cell: MatrixCell | null;
+  nextStatus: string;
+  refetch: () => void;
+}): Promise<void> {
+  if (cell?.filing_id) {
+    // Existing filing — patch it.
+    const res = await fetch(`/api/tax-ops/filings/${cell.filing_id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: nextStatus }),
+    });
+    if (!res.ok) throw new Error(`Save failed (${res.status})`);
+  } else {
+    // Empty cell — create the filing. We assume the column.key IS the
+    // period_label (annual / Q1 / Jan-Dec). onStatusChange is only wired
+    // on period columns; custom-rendered columns bypass this codepath.
+    if (!entity.obligation_id) {
+      throw new Error('No obligation on this entity');
+    }
+    const res = await fetch('/api/tax-ops/filings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        obligation_id: entity.obligation_id,
+        period_label: column.key,
+        status: nextStatus,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error ?? `Create failed (${res.status})`);
+    }
+  }
+  refetch();
 }
