@@ -46,6 +46,8 @@ const ALLOWED = [
   'parent_task_id', 'depends_on_task_id', 'recurrence_rule', 'tags',
   'related_filing_id', 'related_entity_id', 'assignee',
   'completed_at', 'completed_by',
+  // Stint 37.G
+  'entity_id', 'task_kind', 'waiting_on_kind', 'waiting_on_note', 'follow_up_date',
 ] as const;
 
 export async function GET(

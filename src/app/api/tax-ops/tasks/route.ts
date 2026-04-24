@@ -90,19 +90,29 @@ export async function GET(request: NextRequest) {
             t.parent_task_id, t.depends_on_task_id, t.recurrence_rule, t.tags,
             t.related_filing_id, t.related_entity_id,
             t.assignee, t.auto_generated,
+            t.entity_id, t.task_kind, t.waiting_on_kind,
+            t.waiting_on_note, t.follow_up_date::text,
             t.completed_at::text, t.created_at::text, t.updated_at::text,
             (SELECT COUNT(*)::int FROM tax_ops_tasks s WHERE s.parent_task_id = t.id) AS subtask_total,
             (SELECT COUNT(*)::int FROM tax_ops_tasks s WHERE s.parent_task_id = t.id AND s.status = 'done') AS subtask_done,
             (SELECT COUNT(*)::int FROM tax_ops_task_comments c WHERE c.task_id = t.id) AS comment_count,
-            e.legal_name AS related_entity_name,
+            -- Entity name via entity_id (new column) OR related_entity_id (legacy)
+            COALESCE(
+              (SELECT legal_name FROM tax_entities WHERE id = t.entity_id),
+              (SELECT legal_name FROM tax_entities WHERE id = t.related_entity_id)
+            ) AS entity_name,
+            -- Family name when entity is set
+            COALESCE(
+              (SELECT g.name FROM tax_entities e2 LEFT JOIN tax_client_groups g ON g.id = e2.client_group_id WHERE e2.id = t.entity_id),
+              (SELECT g.name FROM tax_entities e3 LEFT JOIN tax_client_groups g ON g.id = e3.client_group_id WHERE e3.id = t.related_entity_id)
+            ) AS family_name,
             CASE WHEN f.id IS NOT NULL
                  THEN (SELECT ent.legal_name FROM tax_obligations o
                         JOIN tax_entities ent ON ent.id = o.entity_id
                         WHERE o.id = f.obligation_id) || ' · ' || f.period_label
                  ELSE NULL END AS related_filing_label
        FROM tax_ops_tasks t
-       LEFT JOIN tax_entities e ON e.id = t.related_entity_id
-       LEFT JOIN tax_filings f  ON f.id = t.related_filing_id
+       LEFT JOIN tax_filings f ON f.id = t.related_filing_id
        ${whereSQL}
       ORDER BY
         CASE t.priority
@@ -132,20 +142,30 @@ export async function POST(request: NextRequest) {
     related_entity_id?: string | null;
     assignee?: string | null;
     auto_generated?: boolean;
+    // Stint 37.G
+    entity_id?: string | null;
+    task_kind?: string;
+    waiting_on_kind?: string | null;
+    waiting_on_note?: string | null;
+    follow_up_date?: string | null;
   };
   const title = body.title?.trim();
   if (!title) return NextResponse.json({ error: 'title_required' }, { status: 400 });
 
   const status = VALID_STATUSES.includes(body.status ?? '') ? body.status! : 'queued';
   const priority = VALID_PRIORITIES.includes(body.priority ?? '') ? body.priority! : 'medium';
+  const VALID_KINDS = ['action', 'follow_up', 'clarification', 'approval_request', 'review', 'other'];
+  const task_kind = VALID_KINDS.includes(body.task_kind ?? '') ? body.task_kind! : 'action';
 
   const id = generateId();
   await execute(
     `INSERT INTO tax_ops_tasks
        (id, title, description, status, priority, due_date, remind_at,
         parent_task_id, depends_on_task_id, recurrence_rule, tags,
-        related_filing_id, related_entity_id, assignee, auto_generated, created_by)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,'founder')`,
+        related_filing_id, related_entity_id, assignee, auto_generated, created_by,
+        entity_id, task_kind, waiting_on_kind, waiting_on_note, follow_up_date)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,'founder',
+             $16,$17,$18,$19,$20)`,
     [
       id, title, body.description ?? null, status, priority,
       body.due_date ?? null, body.remind_at ?? null,
@@ -154,6 +174,9 @@ export async function POST(request: NextRequest) {
       body.tags ?? [],
       body.related_filing_id ?? null, body.related_entity_id ?? null,
       body.assignee ?? null, body.auto_generated ?? false,
+      body.entity_id ?? null, task_kind,
+      body.waiting_on_kind ?? null, body.waiting_on_note ?? null,
+      body.follow_up_date ?? null,
     ],
   );
   await logAudit({
