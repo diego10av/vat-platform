@@ -173,9 +173,26 @@ clients → entities → declarations → invoices → invoice_lines
 
 ## 4 · Current state (keep this section fresh on each stint)
 
-**As of 2026-04-19, 11th stint in progress.** Status:
+**As of 2026-04-24, stint 39 just closed.** Status:
 
-### Shipped (by stint)
+### Shipped — recent stints (newest first)
+- ✅ **Stint 39** (2026-04-24 late): Tax-Ops iteration #2 post field-usage
+  (7 sub-commits A→G). Sidebar reorder + € icons; family-first sticky
+  colored palette; dynamic year range + entity archive; status-filter
+  dropdown on every matrix; family delete cascade-unassign; Undo toast
+  on status changes; "Last chased" date column + migration 051.
+  656 tests green. See `docs/TODO.md` "Done this week" for per-commit.
+- ✅ **Stints 37 + 38** (2026-04-24 eve, 13 commits): status enum rework
+  + global sidebar reorg + CIT redesign + client-groups CRUD + row CRUD
+  + tasks extended + deadline rules full CRUD + entity pills +
+  `/crm/outreach` MVP + dynamic sidebar from DB + GTM playbook.
+- ✅ **Stints 34–36** (2026-04-24): `/tax-ops` module — migration 045
+  (8 tables + 13 deadline rules seed) + Excel importer CLI + 9 category
+  matrices (CIT, NWT, VAT × 3, Subscription, WHT × 3, BCL × 2) +
+  inline-edit cells + Excel export + year-rollover + tasks state-of-art
+  + Ask-cifra tools.
+
+### Shipped (older stints)
 - ✅ Tier 1 hardening (stint 10, 2026-04-19): Sentry (custom envelope
   sender bypasses SDK bug), PostHog, classifier-accuracy dashboard,
   onboarding banner, Playwright scaffold.

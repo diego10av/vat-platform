@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-24 (stints 37 + 38 closed — 13 sub-commits total. Stint 37 UX polish: status enum rework, sidebar global reorg, tolerance-aware deadlines, CIT rediseño, family CRUD, row CRUD, tasks PM extended, deadline rules CRUD, entity pills, resilience test, /crm/outreach MVP. Stint 38: dynamic sidebar from tax_deadline_rules + GTM playbook doc.)
+> Last updated: 2026-04-24 (stint 39 closed — 7 sub-commits A→G. Iteration #2 on Tax-Ops after Diego used the post-stints-37+38 build in the field: sidebar reorder + € icons, family-first sticky + colored palettes, dynamic year range, entity archive/liquidate lifecycle, status filter dropdown on every matrix, family delete-cascade, Undo on status changes, last-chase date column + migration 051. 656 tests green.)
 
 ---
 
@@ -97,6 +97,52 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-24 (late evening)** — Stint 39: Tax-Ops iteration #2, post-field-usage (7 commits, A→G)
+
+Diego used the Tax-Ops module post-stints 37+38 and came back with a
+~10-item punch list. All landed in one stint without re-review gates.
+
+- **39.A · Sidebar reorder + € icons** (`add002b`). Home → Tax-Ops →
+  VAT → CRM → Operations. `$` icon out, `€` icon in for the VAT
+  module + filings. `%` for subscription tax. DB seed synced.
+- **39.B · Family-first sticky + colored families** (`ef00287`). Family
+  column sits at `left:0` as the first sticky column; Entity becomes
+  the second sticky column at `left:170px`. djb2-hash-derived palette
+  (10 colors) so each family is a distinct colored chip. Chip-width
+  bumped to `w-[170px]` so Azora no longer truncates.
+- **39.C · Dynamic year range + entity archive** (`42db020`). Year
+  selector now `[y-2, y-1, y, y+1]` at module-load, not hardcoded.
+  New `yearOptions.ts` helper. Entity detail gets Archive + Reactivate
+  buttons with liquidation-date capture — inactive entities are
+  already filtered out of year-rollover, so one click retires a
+  liquidated SPV from next year's matrices.
+- **39.D · Status filter dropdown** (`2b9c6bb`). Matrix toolbar
+  dropdown (all / 9 statuses / "No status set") filters rows
+  client-side on any period cell. Wired into all 11 matrix pages.
+  New `filterEntitiesByStatus()` helper.
+- **39.E · Family delete cascade + Undo toast** (`12a6480`). API
+  accepts `?unassign=1` on DELETE /client-groups/[id] to null out
+  `client_group_id` on referencing entities before deleting the
+  group — the "CTR y CSR no es familia de nada" flow. applyStatusChange
+  now accepts an optional `toast` param: success toast carries an
+  Undo button that reverts PATCH (prior status) or DELETEs the
+  newly-created filing. Wired into all 11 matrix pages.
+- **39.F · "Last chased" column + migration 051** (`2083f41`).
+  Migration 051 adds `last_info_request_sent_at DATE` to tax_filings.
+  New `lastChasedColumn()` factory shows the latest chase date
+  across the row and writes to every filing on save (same pattern
+  as prepared_with). Matrix API + export both surface the new field.
+- **39.G · Tests + docs + close** (this commit). 13 new unit tests
+  covering filterEntitiesByStatus (4), applyStatusChange undo paths
+  (2), yearOptions/defaultYear (3), familyColors (4). Total: 656
+  tests, 34 files. TODO + ROADMAP refreshed.
+
+Gate verde por commit: tsc clean, 34 test files, 656 tests, build
+OK. Migrations 050 (stint 38) + 051 (stint 39) applied to Supabase.
+Anonymization grep limpio en cada commit.
+
+---
 
 **2026-04-24 (evening)** — Stints 37 + 38: UX polish + dynamic sidebar + GTM playbook (13 commits)
 

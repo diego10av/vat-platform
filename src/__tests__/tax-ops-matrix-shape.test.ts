@@ -4,7 +4,11 @@
 // humanizer, etc.) so the assertions are deterministic.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { shortPeriodLabel, applyStatusChange } from '@/components/tax-ops/useMatrixData';
+import {
+  shortPeriodLabel, applyStatusChange, filterEntitiesByStatus,
+} from '@/components/tax-ops/useMatrixData';
+import { yearOptions, defaultYear } from '@/components/tax-ops/yearOptions';
+import { familyPalette, familyChipClasses } from '@/components/tax-ops/familyColors';
 import type { MatrixEntity, MatrixCell, MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 
 describe('shortPeriodLabel', () => {
@@ -181,5 +185,144 @@ describe('applyStatusChange', () => {
       refetch,
     })).rejects.toThrow();
     expect(refetch).not.toHaveBeenCalled();
+  });
+
+  // Stint 39.E — undo toast: existing cell → undo re-PATCHes to prior.
+  it('when a toast is supplied, emits a success with Undo that reverts the PATCH', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"ok":true}', { status: 200 })));
+    const refetch = vi.fn();
+    const toastSpy = {
+      withAction: vi.fn(),
+      error: vi.fn(),
+    };
+    await applyStatusChange({
+      entity: makeEntity(),
+      column: makeColumn(),
+      cell: makeCell({ filing_id: 'filing-7', status: 'working' }),
+      nextStatus: 'filed',
+      refetch,
+      toast: toastSpy,
+    });
+    expect(toastSpy.withAction).toHaveBeenCalledOnce();
+    const [kind, , , action] = toastSpy.withAction.mock.calls[0]!;
+    expect(kind).toBe('success');
+    // Invoke Undo
+    await action.onClick();
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    const undoCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1]!;
+    expect(undoCall[0]).toBe('/api/tax-ops/filings/filing-7');
+    expect(undoCall[1].method).toBe('PATCH');
+    expect(JSON.parse(undoCall[1].body as string)).toEqual({ status: 'working' });
+  });
+
+  // Stint 39.E — undo on create: reverts with DELETE of the just-made filing.
+  it('when POST creates a filing, Undo DELETEs it', async () => {
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/tax-ops/filings' && init?.method === 'POST') {
+        return new Response(JSON.stringify({ id: 'new-filing-123' }), { status: 200 });
+      }
+      return new Response('{"ok":true}', { status: 200 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const toastSpy = { withAction: vi.fn(), error: vi.fn() };
+    await applyStatusChange({
+      entity: makeEntity({ obligation_id: 'obl-1' }),
+      column: makeColumn('2026-Q1'),
+      cell: null,
+      nextStatus: 'working',
+      refetch: vi.fn(),
+      toast: toastSpy,
+    });
+    expect(toastSpy.withAction).toHaveBeenCalledOnce();
+    const [, , , action] = toastSpy.withAction.mock.calls[0]!;
+    await action.onClick();
+    const undoCall = fetchMock.mock.calls[fetchMock.mock.calls.length - 1]!;
+    expect(undoCall[0]).toBe('/api/tax-ops/filings/new-filing-123');
+    expect(undoCall[1]?.method).toBe('DELETE');
+  });
+});
+
+// Stint 39.D — filter helper for the status dropdown.
+describe('filterEntitiesByStatus', () => {
+  const period = ['2026'];
+  const makeRow = (st: string | null): MatrixEntity => ({
+    ...makeEntity(),
+    id: `ent-${st ?? 'empty'}`,
+    cells: st ? { '2026': makeCell({ status: st }) } : { '2026': null },
+  });
+  const rows = [
+    makeRow('info_to_request'),
+    makeRow('filed'),
+    makeRow(null),
+    makeRow('working'),
+  ];
+
+  it("returns every row when filter is 'all' or undefined", () => {
+    expect(filterEntitiesByStatus(rows, 'all', period)).toHaveLength(4);
+    expect(filterEntitiesByStatus(rows, undefined, period)).toHaveLength(4);
+    expect(filterEntitiesByStatus(rows, '', period)).toHaveLength(4);
+  });
+
+  it('matches entities whose at-least-one period cell has that status', () => {
+    const filtered = filterEntitiesByStatus(rows, 'filed', period);
+    expect(filtered.map(r => r.id)).toEqual(['ent-filed']);
+  });
+
+  it("'__empty' returns only rows where every period cell is null", () => {
+    const filtered = filterEntitiesByStatus(rows, '__empty', period);
+    expect(filtered.map(r => r.id)).toEqual(['ent-empty']);
+  });
+
+  it('returns [] when no row matches (safe for an empty state render)', () => {
+    expect(filterEntitiesByStatus(rows, 'blocked', period)).toEqual([]);
+  });
+});
+
+// Stint 39.C — dynamic year range (relative to "now").
+describe('yearOptions + defaultYear', () => {
+  it('yearOptions returns 4 consecutive years ending at currentYear+1', () => {
+    const years = yearOptions();
+    const currentYear = new Date().getFullYear();
+    expect(years).toHaveLength(4);
+    expect(years).toEqual([currentYear - 2, currentYear - 1, currentYear, currentYear + 1]);
+  });
+
+  it('defaultYear points at the current work year for quarterly/monthly', () => {
+    const y = defaultYear('quarterly');
+    expect(y).toBe(new Date().getFullYear());
+  });
+
+  it('defaultYear points at N-1 for annual + semester filings (still open in N)', () => {
+    expect(defaultYear('annual')).toBe(new Date().getFullYear() - 1);
+    expect(defaultYear('semester')).toBe(new Date().getFullYear() - 1);
+  });
+});
+
+// Stint 39.B — deterministic family colors.
+describe('familyColors', () => {
+  it('returns the same palette entry for the same name every call', () => {
+    const a = familyPalette('Peninsula Holdings');
+    const b = familyPalette('Peninsula Holdings');
+    expect(a).toBe(b);
+  });
+
+  it('normalises case + whitespace so "peninsula" and "PENINSULA " hash to the same bucket', () => {
+    expect(familyPalette('peninsula')).toBe(familyPalette('PENINSULA '));
+  });
+
+  it('returns a neutral palette for null / empty names (no random assignment)', () => {
+    const neutralA = familyPalette(null);
+    const neutralB = familyPalette('');
+    const neutralC = familyPalette('   ');
+    expect(neutralA).toBe(neutralB);
+    expect(neutralA).toBe(neutralC);
+  });
+
+  it('familyChipClasses returns a tailwind string safe to inject into className', () => {
+    const s = familyChipClasses('Trilantic');
+    expect(typeof s).toBe('string');
+    // Basic sanity: we should see a bg- class and a text- class from our palette.
+    expect(s).toMatch(/bg-/);
+    expect(s).toMatch(/text-/);
   });
 });
