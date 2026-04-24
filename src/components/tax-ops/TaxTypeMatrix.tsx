@@ -219,7 +219,7 @@ export function TaxTypeMatrix({
           <tr className="text-left text-ink-muted">
             {familyCol && (
               <th
-                className="sticky left-0 z-20 bg-surface-alt border-b border-r border-border px-2.5 py-2 font-medium w-[170px]"
+                className="sticky left-0 z-20 bg-surface-alt border-b border-r border-border px-2.5 py-2 font-medium min-w-[170px] max-w-[170px]"
               >
                 {familyCol.label}
               </th>
@@ -373,7 +373,7 @@ function RowRender({
   return (
     <tr className="border-b border-border/70 hover:bg-surface-alt/40">
       {familyCol && (
-        <td className="sticky left-0 z-10 bg-surface hover:bg-surface-alt/40 border-r border-border px-2 py-1.5 w-[170px]">
+        <td className="sticky left-0 z-10 bg-surface hover:bg-surface-alt/40 border-r border-border px-2 py-1.5 min-w-[170px] max-w-[170px]">
           {familyCol.render
             ? familyCol.render(entity)
             : (entity.group_name

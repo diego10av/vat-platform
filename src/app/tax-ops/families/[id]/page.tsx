@@ -16,7 +16,6 @@
 import { useEffect, useState, useCallback, use } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, UsersIcon, CopyIcon, XIcon } from 'lucide-react';
-import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { EmptyState } from '@/components/ui/EmptyState';
