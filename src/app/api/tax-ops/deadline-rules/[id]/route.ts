@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { tx, qTx, execTx, logAuditTx } from '@/lib/db';
+import { tx, qTx, execTx, logAuditTx, execute, query, logAudit } from '@/lib/db';
 import { computeDeadline, type DeadlineRule } from '@/lib/tax-ops-deadlines';
 
 // PATCH /api/tax-ops/deadline-rules/[id]
@@ -226,4 +226,42 @@ export async function PATCH(
   });
 
   return NextResponse.json({ ok: true, propagated });
+}
+
+// DELETE /api/tax-ops/deadline-rules/[id]
+//   Hard delete if no obligations reference this (tax_type, period_pattern).
+//   409 otherwise — Diego must archive obligations or reassign first.
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const { id } = await params;
+  const ruleRows = await query<{ tax_type: string; period_pattern: string }>(
+    `SELECT tax_type, period_pattern FROM tax_deadline_rules WHERE id = $1`,
+    [id],
+  );
+  const rule = ruleRows[0];
+  if (!rule) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+
+  const oblRefs = await query<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM tax_obligations
+      WHERE tax_type = $1 AND period_pattern = $2 AND is_active = TRUE`,
+    [rule.tax_type, rule.period_pattern],
+  );
+  const n = Number(oblRefs[0]?.n ?? 0);
+  if (n > 0) {
+    return NextResponse.json(
+      { error: 'active_obligations_exist', count: n },
+      { status: 409 },
+    );
+  }
+
+  await execute(`DELETE FROM tax_deadline_rules WHERE id = $1`, [id]);
+  await logAudit({
+    userId: 'founder',
+    action: 'tax_deadline_rule_delete',
+    targetType: 'tax_deadline_rule',
+    targetId: id,
+  });
+  return NextResponse.json({ ok: true });
 }

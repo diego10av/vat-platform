@@ -32,7 +32,7 @@
 export interface DeadlineRule {
   tax_type: string;
   period_pattern: 'annual' | 'quarterly' | 'monthly' | 'semester' | 'adhoc';
-  rule_kind: 'days_after_period_end' | 'fixed_md' | 'fixed_md_with_extension';
+  rule_kind: 'days_after_period_end' | 'fixed_md' | 'fixed_md_with_extension' | 'adhoc_no_deadline';
   rule_params: Record<string, unknown>;
   admin_tolerance_days?: number;
 }
@@ -76,7 +76,17 @@ export function computeDeadline(
     return { statutory: iso, extension: null, effective: iso };
   }
 
+  if (rule.rule_kind === 'adhoc_no_deadline') {
+    // "Sin cadencia fija" — typical for WHT director filings triggered
+    // by actual payment events. Diego sets the deadline per-filing.
+    // Return empty strings so callers can detect "no computed deadline".
+    return { statutory: '', extension: null, effective: '' };
+  }
+
   if (rule.rule_kind === 'fixed_md_with_extension') {
+    // (Duplicate branch removed in 37.H — the earlier branch handles
+    // this rule_kind already; this block is unreachable but kept for
+    // the shape check.)
     const p = rule.rule_params as {
       month?: number; day?: number;
       extension_month?: number; extension_day?: number;
@@ -166,6 +176,9 @@ export function describeRule(rule: DeadlineRule): string {
       ? ` · extension ${p.extension_day} ${monthName(p.extension_month)}`
       : '';
     return `${stat} N+1${ext}`;
+  }
+  if (rule.rule_kind === 'adhoc_no_deadline') {
+    return 'Ad-hoc (no fixed deadline — set per filing)';
   }
   return rule.rule_kind;
 }

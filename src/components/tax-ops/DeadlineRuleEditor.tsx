@@ -168,6 +168,7 @@ export function DeadlineRuleEditor({
                 <option value="days_after_period_end">Days after period end</option>
                 <option value="fixed_md">Fixed date (month/day, year N+1)</option>
                 <option value="fixed_md_with_extension">Fixed date + extension</option>
+                <option value="adhoc_no_deadline">Ad-hoc (no fixed deadline)</option>
               </select>
             </label>
 
