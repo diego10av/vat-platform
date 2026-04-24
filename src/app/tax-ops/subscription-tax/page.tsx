@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 import {
   useMatrixData, shortPeriodLabel, applyStatusChange, useClientGroups,
@@ -24,6 +25,7 @@ const YEAR_OPTIONS = yearOptions();
 export default function SubscriptionTaxPage() {
   const [year, setYear] = useState(2026);
   const [statusFilter, setStatusFilter] = useState('all');
+  const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
   const { data, error, isLoading, refetch } = useMatrixData({
     tax_type: 'subscription_tax_quarterly',
@@ -71,7 +73,7 @@ export default function SubscriptionTaxPage() {
           entities={filtered}
           columns={columns}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch })
+            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }
           rowAction={(entity) => (
             <RemoveRowButton

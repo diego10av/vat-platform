@@ -68,17 +68,34 @@ export default function ClientGroupsPage() {
   }
 
   async function remove(g: ClientGroup) {
+    // Stint 39.E — cascade-unassign delete.
+    // If the family has entities, we ask: delete and unassign those entities
+    // (keep their filings, just drop the family label)? That's Diego's
+    // "CTR y CSR no es familia de nada" flow.
+    let url = `/api/tax-ops/client-groups/${g.id}`;
     if (g.entity_count > 0) {
-      toast.error(`Can't delete "${g.name}" — ${g.entity_count} entities still reference it. Reassign them or archive first.`);
-      return;
+      const ok = confirm(
+        `Delete family "${g.name}"?\n\n` +
+        `${g.entity_count} entit${g.entity_count === 1 ? 'y' : 'ies'} will be unassigned (no family) ` +
+        `but keep all filings and obligations. Reversible via audit log.`,
+      );
+      if (!ok) return;
+      url += '?unassign=1';
+    } else {
+      if (!confirm(`Delete family "${g.name}"? Reversible via audit log.`)) return;
     }
-    if (!confirm(`Delete family "${g.name}"? Reversible via audit log.`)) return;
-    const res = await fetch(`/api/tax-ops/client-groups/${g.id}`, { method: 'DELETE' });
+    const res = await fetch(url, { method: 'DELETE' });
     if (!res.ok) {
       toast.error('Delete failed');
       return;
     }
-    toast.success('Family deleted');
+    const body = await res.json().catch(() => ({}));
+    const unassigned = Number(body?.unassigned_entities ?? 0);
+    toast.success(
+      unassigned > 0
+        ? `Family deleted · ${unassigned} entit${unassigned === 1 ? 'y' : 'ies'} unassigned`
+        : 'Family deleted',
+    );
     load();
   }
 
@@ -235,9 +252,10 @@ export default function ClientGroupsPage() {
                       <button
                         onClick={() => remove(g)}
                         aria-label="Delete family"
-                        disabled={g.entity_count > 0}
-                        title={g.entity_count > 0 ? `${g.entity_count} entities still reference this` : 'Delete'}
-                        className="inline-flex items-center p-1 text-ink-muted hover:text-danger-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title={g.entity_count > 0
+                          ? `Delete — ${g.entity_count} entity/ies will be unassigned (family label removed, filings kept)`
+                          : 'Delete'}
+                        className="inline-flex items-center p-1 text-ink-muted hover:text-danger-600"
                       >
                         <Trash2Icon size={12} />
                       </button>

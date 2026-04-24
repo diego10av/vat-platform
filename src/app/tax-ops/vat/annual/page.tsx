@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn, type MatrixEntity } from '@/components/tax-ops/TaxTypeMatrix';
 import {
   useMatrixData, applyStatusChange, useClientGroups, filterEntitiesByStatus,
@@ -28,6 +29,7 @@ type CombinedEntity = MatrixEntity & { subtype: 'standard' | 'simplified' };
 export default function VatAnnualPage() {
   const [year, setYear] = useState(2025);
   const [statusFilter, setStatusFilter] = useState('all');
+  const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
   const standard = useMatrixData({ tax_type: 'vat_annual', year, period_pattern: 'annual' });
   const simplified = useMatrixData({ tax_type: 'vat_simplified_annual', year, period_pattern: 'annual' });
@@ -102,7 +104,7 @@ export default function VatAnnualPage() {
           columns={columns}
           firstColLabel="Entity"
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch })
+            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }
           rowAction={(entity) => (
             <RemoveRowButton

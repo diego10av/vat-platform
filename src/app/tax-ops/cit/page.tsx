@@ -9,6 +9,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn, type MatrixEntity } from '@/components/tax-ops/TaxTypeMatrix';
 import {
   useMatrixData, applyStatusChange, useClientGroups, filterEntitiesByStatus,
@@ -28,6 +29,7 @@ const YEAR_OPTIONS = yearOptions();
 export default function CitPage() {
   const [year, setYear] = useState(2025);
   const [statusFilter, setStatusFilter] = useState('all');
+  const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
 
   const current = useMatrixData({ tax_type: 'cit_annual', year, period_pattern: 'annual' });
@@ -217,7 +219,7 @@ export default function CitPage() {
           columns={columns}
           firstColLabel="Entity"
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch: current.refetch })
+            applyStatusChange({ entity, column, cell, nextStatus, refetch: current.refetch, toast })
           }
           rowAction={(entity) => (
             <RemoveRowButton

@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query, execute, logAudit, buildUpdate } from '@/lib/db';
 
 // PATCH  /api/tax-ops/client-groups/[id] — rename / archive / edit notes
-// DELETE /api/tax-ops/client-groups/[id] — hard delete (blocked if entities
-//                                           still reference it; caller must
-//                                           archive first, or reassign
-//                                           entities, then delete).
+// DELETE /api/tax-ops/client-groups/[id] — hard delete.
+//        By default blocked when entities still reference the group.
+//        With ?unassign=1 the endpoint first nulls out `client_group_id`
+//        on every referencing entity, then deletes the group. Entities
+//        and their filings/obligations are untouched — they just lose
+//        the family label. (Stint 39.E: Diego wanted "CTR y CSR no es
+//        familia de nada" — delete family without losing entities.)
 
 const ALLOWED = ['name', 'is_active', 'notes'] as const;
 
@@ -39,21 +42,27 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
-  // Block hard-delete when entities still reference this group — force the
-  // user to reassign or archive first.
+  const unassign = request.nextUrl.searchParams.get('unassign') === '1';
+
   const refs = await query<{ n: string }>(
     `SELECT COUNT(*)::text AS n FROM tax_entities WHERE client_group_id = $1`,
     [id],
   );
   const refCount = Number(refs[0]?.n ?? 0);
-  if (refCount > 0) {
+  if (refCount > 0 && !unassign) {
     return NextResponse.json(
       { error: 'has_entities', entity_count: refCount },
       { status: 409 },
+    );
+  }
+  if (refCount > 0 && unassign) {
+    await execute(
+      `UPDATE tax_entities SET client_group_id = NULL, updated_at = NOW() WHERE client_group_id = $1`,
+      [id],
     );
   }
   await execute(`DELETE FROM tax_client_groups WHERE id = $1`, [id]);
@@ -62,6 +71,7 @@ export async function DELETE(
     action: 'tax_client_group_delete',
     targetType: 'tax_client_group',
     targetId: id,
+    newValue: JSON.stringify({ unassigned_entities: refCount }),
   });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, unassigned_entities: refCount });
 }

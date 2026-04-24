@@ -166,44 +166,109 @@ export function shortPeriodLabel(label: string): string {
  * The caller provides a `refetch()` so the matrix re-pulls the updated
  * data after save. We don't attempt optimistic mutation of the matrix
  * rows client-side — cheap to refetch, eliminates edge cases.
+ *
+ * Stint 39.E — when a `toast` is supplied, a success-toast with an
+ * "Undo" action is shown. Undo reverses the mutation:
+ *   - PATCH case → patches back to the previous status
+ *   - POST case (new filing) → DELETEs the freshly-created filing
+ * Without a toast the function still works (legacy call sites don't get
+ * undo, but nothing breaks).
  */
+interface ToastLikeForUndo {
+  withAction: (
+    kind: 'success' | 'error' | 'info',
+    message: string,
+    hint: string | undefined,
+    action: { label: string; onClick: () => void | Promise<void> },
+  ) => void;
+  error: (message: string) => void;
+}
+
 export async function applyStatusChange({
-  entity, column, cell, nextStatus, refetch,
+  entity, column, cell, nextStatus, refetch, toast,
 }: {
   entity: MatrixEntity;
   column: MatrixColumn;
   cell: MatrixCell | null;
   nextStatus: string;
   refetch: () => void;
+  toast?: ToastLikeForUndo;
 }): Promise<void> {
+  const entityLabel = entity.legal_name;
+  const colLabel = column.label;
+
   if (cell?.filing_id) {
-    // Existing filing — patch it.
-    const res = await fetch(`/api/tax-ops/filings/${cell.filing_id}`, {
+    // Existing filing — patch it, capture previous status for undo.
+    const priorStatus = cell.status;
+    const filingId = cell.filing_id;
+    const res = await fetch(`/api/tax-ops/filings/${filingId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: nextStatus }),
     });
     if (!res.ok) throw new Error(`Save failed (${res.status})`);
-  } else {
-    // Empty cell — create the filing. We assume the column.key IS the
-    // period_label (annual / Q1 / Jan-Dec). onStatusChange is only wired
-    // on period columns; custom-rendered columns bypass this codepath.
-    if (!entity.obligation_id) {
-      throw new Error('No obligation on this entity');
+    refetch();
+
+    if (toast) {
+      toast.withAction(
+        'success',
+        `${entityLabel} · ${colLabel}`,
+        `${priorStatus} → ${nextStatus}`,
+        {
+          label: 'Undo',
+          onClick: async () => {
+            const r = await fetch(`/api/tax-ops/filings/${filingId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: priorStatus }),
+            });
+            if (!r.ok) toast.error('Undo failed');
+            refetch();
+          },
+        },
+      );
     }
-    const res = await fetch('/api/tax-ops/filings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        obligation_id: entity.obligation_id,
-        period_label: column.key,
-        status: nextStatus,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body?.error ?? `Create failed (${res.status})`);
-    }
+    return;
   }
+
+  // Empty cell — create the filing. We assume the column.key IS the
+  // period_label (annual / Q1 / Jan-Dec). onStatusChange is only wired
+  // on period columns; custom-rendered columns bypass this codepath.
+  if (!entity.obligation_id) {
+    throw new Error('No obligation on this entity');
+  }
+  const res = await fetch('/api/tax-ops/filings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      obligation_id: entity.obligation_id,
+      period_label: column.key,
+      status: nextStatus,
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.error ?? `Create failed (${res.status})`);
+  }
+  const created = await res.json().catch(() => ({})) as { id?: string };
   refetch();
+
+  if (toast && created?.id) {
+    const newFilingId = created.id;
+    toast.withAction(
+      'success',
+      `${entityLabel} · ${colLabel}`,
+      `filing created · ${nextStatus}`,
+      {
+        label: 'Undo',
+        onClick: async () => {
+          const r = await fetch(`/api/tax-ops/filings/${newFilingId}`, {
+            method: 'DELETE',
+          });
+          if (!r.ok) toast.error('Undo failed');
+          refetch();
+        },
+      },
+    );
+  }
 }

@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 import {
   useMatrixData, applyStatusChange, useClientGroups, filterEntitiesByStatus,
@@ -26,6 +27,7 @@ export default function NwtReviewsPage() {
   const [year, setYear] = useState(2025);
   const [statusFilter, setStatusFilter] = useState('all');
   const [showInactive, setShowInactive] = useState(false);
+  const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
 
   const { data, error, isLoading, refetch } = useMatrixData({
@@ -152,7 +154,7 @@ export default function NwtReviewsPage() {
           columns={columns}
           firstColLabel="Entity"
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch })
+            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }
           rowAction={(entity) => (
             <RemoveRowButton

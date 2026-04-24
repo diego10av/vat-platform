@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 import {
   useMatrixData, applyStatusChange, useClientGroups, filterEntitiesByStatus,
@@ -24,6 +25,7 @@ const YEAR_OPTIONS = yearOptions();
 export default function WhtAnnualPage() {
   const [year, setYear] = useState(2025);
   const [statusFilter, setStatusFilter] = useState('all');
+  const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
   const { data, error, isLoading, refetch } = useMatrixData({
     tax_type: 'wht_director_annual',
@@ -71,7 +73,7 @@ export default function WhtAnnualPage() {
           entities={filtered}
           columns={columns}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch })
+            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }
           rowAction={(entity) => (
             <RemoveRowButton
