@@ -3,8 +3,9 @@
 // drive the response shape (period labels per pattern, period-label
 // humanizer, etc.) so the assertions are deterministic.
 
-import { describe, it, expect } from 'vitest';
-import { shortPeriodLabel } from '@/components/tax-ops/useMatrixData';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { shortPeriodLabel, applyStatusChange } from '@/components/tax-ops/useMatrixData';
+import type { MatrixEntity, MatrixCell, MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 
 describe('shortPeriodLabel', () => {
   it('keeps the annual label as-is', () => {
@@ -75,5 +76,109 @@ describe('period labels per pattern', () => {
   it('stays in sync across years', () => {
     expect(periodLabelsFor('quarterly', 2024)).toEqual(['2024-Q1', '2024-Q2', '2024-Q3', '2024-Q4']);
     expect(periodLabelsFor('monthly', 2025).slice(0, 3)).toEqual(['2025-01', '2025-02', '2025-03']);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════
+// applyStatusChange — routes existing/empty cells to PATCH vs POST.
+// Stint 36 introduced this helper; the tests below lock its contract.
+// ═════════════════════════════════════════════════════════════════════
+
+const makeEntity = (overrides: Partial<MatrixEntity> = {}): MatrixEntity => ({
+  id: 'ent-1',
+  legal_name: 'Test Entity SARL',
+  group_id: 'grp-1',
+  group_name: 'TEST GROUP',
+  obligation_id: 'obl-1',
+  cells: {},
+  ...overrides,
+});
+
+const makeCell = (overrides: Partial<MatrixCell> = {}): MatrixCell => ({
+  filing_id: 'filing-1',
+  status: 'pending_info',
+  deadline_date: null,
+  assigned_to: null,
+  comments: null,
+  filed_at: null,
+  draft_sent_at: null,
+  tax_assessment_received_at: null,
+  amount_due: null,
+  amount_paid: null,
+  prepared_with: [],
+  ...overrides,
+});
+
+const makeColumn = (key = '2025'): MatrixColumn => ({ key, label: key });
+
+describe('applyStatusChange', () => {
+  beforeEach(() => {
+    // Reset the global fetch mock before every test.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })));
+  });
+
+  it('existing cell → PATCH /api/tax-ops/filings/<id> with the new status', async () => {
+    const refetch = vi.fn();
+    await applyStatusChange({
+      entity: makeEntity(),
+      column: makeColumn(),
+      cell: makeCell({ filing_id: 'filing-42', status: 'pending_info' }),
+      nextStatus: 'filed',
+      refetch,
+    });
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/tax-ops/filings/filing-42');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({ status: 'filed' });
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it('empty cell with obligation → POST /api/tax-ops/filings with obligation_id + period_label', async () => {
+    const refetch = vi.fn();
+    await applyStatusChange({
+      entity: makeEntity({ obligation_id: 'obl-999' }),
+      column: makeColumn('2026-Q2'),
+      cell: null,
+      nextStatus: 'working',
+      refetch,
+    });
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe('/api/tax-ops/filings');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({
+      obligation_id: 'obl-999',
+      period_label: '2026-Q2',
+      status: 'working',
+    });
+    expect(refetch).toHaveBeenCalledOnce();
+  });
+
+  it('empty cell without obligation → rejects with a human-readable error (refetch not called)', async () => {
+    const refetch = vi.fn();
+    await expect(applyStatusChange({
+      entity: makeEntity({ obligation_id: null }),
+      column: makeColumn('2026'),
+      cell: null,
+      nextStatus: 'working',
+      refetch,
+    })).rejects.toThrow(/no obligation/i);
+    expect(refetch).not.toHaveBeenCalled();
+  });
+
+  it('propagates a non-200 HTTP status into a thrown Error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"error":"nope"}', { status: 409 })));
+    const refetch = vi.fn();
+    await expect(applyStatusChange({
+      entity: makeEntity(),
+      column: makeColumn(),
+      cell: makeCell({ filing_id: 'x' }),
+      nextStatus: 'filed',
+      refetch,
+    })).rejects.toThrow();
+    expect(refetch).not.toHaveBeenCalled();
   });
 });

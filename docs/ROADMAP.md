@@ -5,15 +5,15 @@
 > conversation. When something ships, move it to the "Shipped" section
 > at the bottom with the commit hash.
 >
-> Last updated: 2026-04-24 (evening) — Stint 35 closed (7 commits).
-> `/tax-ops` redesigned after Diego's "imposible de seguir" feedback:
-> tax-type-first sidebar with expandable VAT (Annual/Quarterly/Monthly),
-> Excel-style matrix per category (CIT · NWT · VAT × 3 · Subscription ·
-> WHT × 3 · BCL × 2 · Other), NWT reclassified as advisory review (not
-> filing), 200 annual filings year-shifted 2026 → 2025 in prod, entity
-> detail now a compact period × tax_type matrix. Previously: stint 34
-> shipped the initial `/tax-ops` module; CRM Fases 1-5 shipped stints
-> 26-31.
+> Last updated: 2026-04-24 (night) — Stint 36 closed. Matrix cells
+> are now inline-editable: click a status cell to change it, click
+> prepared-with or comments to edit in place. Empty cells auto-create
+> the filing on first status pick. Excel export added per category
+> ("Download as xlsx"). Previously: stint 35 redesigned `/tax-ops`
+> from flat filings grid → tax-type-first sidebar + Excel-style
+> matrix per category (NWT reclassified as advisory review; 200
+> annual filings year-shifted 2026 → 2025). Stint 34 shipped the
+> initial `/tax-ops` module.
 
 Priority legend:
 - **P0** — blocks selling / shows unprofessionalism in a demo
@@ -215,6 +215,7 @@ Recent milestones landed on `main` — see `docs/TODO.md` "Done this week" secti
 
 | Date | Commit | What |
 |------|--------|------|
+| 2026-04-24 (night) | a1655a3 + this commit | **Stint 36: inline-edit matrix cells + Excel export.** `InlineCellEditor` state machine + 4 concrete cells (Status, Text, Tags, Date) + `matrix-row-columns.tsx` shared column factories + `MatrixToolbar` shared toolbar strip. `applyStatusChange` helper: PATCH existing filing or POST new one (backend gets new POST /api/tax-ops/filings that auto-computes deadline and infers period_year from period_label). New `GET /api/tax-ops/matrix/export` streams an xlsx via exceljs with bold header + frozen first 2 cols. Wired inline edit on all 9 category pages (CIT, NWT, VAT annual/Q/M, WHT monthly/semester/annual, Subscription, BCL SBS/2.16). 4 new unit tests for applyStatusChange covering existing-cell PATCH, empty-cell POST, no-obligation rejection, non-200 error propagation. Gate green: tsc, 626 tests, build 143 pages. |
 | 2026-04-24 (evening) | 365b820 → 69035ff (7 commits) | **Stint 35: `/tax-ops` redesign after usage feedback.** Migration 046 adds `service_kind` (filing vs review) to tax_obligations; NWT reclassified as year-end advisory review with its own rule (`fixed_md {month:11,day:30}`). Data-fix script shifted 200 annual filings 2026 → 2025 (Diego reused 2025 book in 2026). Sidebar extends NavItem with `children[]`, new Tax-Ops tree has 10 items + 3 VAT sub-items with localStorage-persisted expand state. `TaxTypeMatrix` primitive (sticky thead + sticky left column + grouped-by-client_group + status-badge cells with tooltip + click-to-filing-detail) powers 9 new category pages: CIT, NWT reviews, VAT annual/quarterly/monthly, Subscription tax, WHT monthly/semester/annual, BCL SBS/2.16, Other (ad-hoc flat list). `/api/tax-ops/matrix` endpoint returns rectangular `entities × periods` shape. `EntityFilingsMatrix` replaces stacked-year sub-tables on `/tax-ops/entities/[id]` with a compact period × tax_type grid auto-sized per row's cadence. Home page gains 7-card category grid + updated subtitle. `⌘K` gets 9 new entries. Old `/tax-ops/filings` renamed "Search filings" (advanced). 10 new unit tests. Gate green: tsc, 622 tests, build 142 pages. |
 | 2026-04-24 | d741740 → 4cfec45 (6 commits) | **Stint 34: `/tax-ops` module — live DB replacement for the annual Excels + Notion DB.** 34.A migration 045 (8 tables + 13 deadline rules seed + computeDeadline helper + 18 unit tests). 34.B Excel importer CLI (dry-run + commit, atomic tx, 19 groups · 214 entities · 233 obligations · 263 filings imported from Diego's two books). 34.C home (4 actionable widgets) + filings list/detail (8-dim filters, 5-date timeline, CSP editor, deadline-rule context) + entities master/detail (YTD filed % color-coded, multi-year filings matrix) + year-rollover modal (two-phase preview→commit, idempotent). 34.D settings (team CRUD + editable deadline rules with 3-step editor modal and propagation to open filings, excluding filed/paid/waived/assessment_received). 34.E tasks state-of-art (List ⟷ Kanban toggle with drag-drop, subtasks with inline +Add, dependencies blocked_by + blocking panel, 5-type RecurrenceEditor, linear comments thread, QuickCaptureModal on 'N' shortcut) + daily recurrence-expand cron. 34.F Ask-cifra tax-ops tools (4 read-only) + daily deadline-alerts cron with 14d→7d→3d→overdue escalation + chat-context tax-ops mode. Two crons registered via scheduled-tasks MCP. Docs: PROTOCOLS §9 updated, TODO "Done this week", ROADMAP shipped-row + deferred items. |
 | 2026-04-23 | stints 26-31 (30+ commits) | **CRM professional rebuild — Fases 1-5 complete.** Replaces Notion for clients/pipeline/matters/billing. Highlights: full CRUD + audit for 7 entities, soft-delete trash with 30-day purge cron + undo toasts, ⌘K global search, drag-drop kanban + billing dashboards + Excel export + saved-view-by-URL, matter intake wizard (4-step: parties/scope/team/conflict) + time tracker with 75/90/100% budget alerts + disbursements + closing checklist + 7-step gate on status=closed, invoice PDF (pdf-lib) + retainer ledger + credit notes + ECB FX snapshot + approval threshold + payment-reminder cron, engagement-recompute cron + Haiku lead scoring cron + Next Best Action widget + automation rules engine (3 pre-seeded rules) + task templates + Opus meeting-prep briefs + anniversary cron + forecast/WIP home widgets. 5 crons registered via scheduled-tasks MCP. Migrations 028-043. See "Deferred CRM items" above for the 5 consciously deferred follow-ups. |

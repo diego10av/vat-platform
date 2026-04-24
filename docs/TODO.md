@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-24 (stint 35 shipped in 7 commits — /tax-ops redesign based on Diego's "imposible de seguir" feedback: tax-type-first sidebar, Excel-style matrix per category, NWT reclassified as advisory review, annual filings year-shifted 2026 → 2025 in prod.)
+> Last updated: 2026-04-24 (stint 36 shipped — matrix cells now edit inline like Excel: click cell → pick status / edit prepared-with / edit comments, plus Excel export per category).
 
 ---
 
@@ -97,6 +97,27 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-24 (night)** — Stint 36: inline-edit matrix cells + Excel export (1 commit, big)
+
+Diego's stint-35 matrix shipped scannable but read-only. Stint 36 makes it feel like Excel: click a cell, pick a value, done. No more navigating to a detail page for every status change.
+
+- **36.A · Inline-edit infrastructure + Excel export** (`a1655a3`). Five new primitives + one backend route:
+  - `InlineCellEditor` — generic click-display-→-edit state machine with ESC/click-outside/blur handling + optimistic UI + error surface.
+  - `inline-editors.tsx` — 4 concrete cells (Status, Text, Tags, Date) wrapping the primitive. Auto-focus + Enter-commit + ⌘+Enter for multiline.
+  - `matrix-row-columns.tsx` — shared column factories so prepared-with / comments / deadline behave identically across all 9 category pages. prepared-with edits patch ALL filings in the row in parallel (Q1-Q4 / Jan-Dec usually share a team).
+  - `MatrixToolbar` — shared year-selector + count + "Export Excel" button. Replaces ~100 LOC of per-page boilerplate.
+  - `useMatrixData.ts :: applyStatusChange` — single codepath for "cell changed status": PATCH if filing exists, POST a new filing if cell was empty. `refetch()` after success.
+  - Backend: new `POST /api/tax-ops/filings` creates a filing on-demand with auto-computed deadline + auto-inferred period_year from the period_label. Used by the inline flow when Diego picks a status on an empty cell.
+  - Backend: new `GET /api/tax-ops/matrix/export` streams an xlsx of the current view. Bold header, frozen top row + first 2 cols. Exceljs.
+  
+  Wired onto all 9 category pages: CIT, NWT (with inline date cells for interim received + recommendation sent), VAT annual / quarterly / monthly, WHT monthly / semester / annual, Subscription, BCL SBS / 2.16. `/tax-ops/other` (ad-hoc list) unchanged by design.
+
+- **36.C · Tests + docs** (this commit). 4 new tests for `applyStatusChange` covering existing-cell PATCH, empty-cell POST, no-obligation rejection, non-200 error propagation. Total matrix-shape suite: 14 tests. Docs: TODO + ROADMAP refreshed.
+
+Gate green: tsc, 32 test files, 626 tests, build 143 pages. Anonymization grep clean.
+
+---
 
 **2026-04-24 (evening)** — Stint 35: `/tax-ops` redesign after usage feedback (7 commits)
 
