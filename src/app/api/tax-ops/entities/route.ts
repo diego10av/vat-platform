@@ -18,6 +18,7 @@ interface EntityListRow {
   matricule: string | null;
   rcs_number: string | null;
   is_active: boolean;
+  liquidation_date: string | null;
   group_id: string | null;
   group_name: string | null;
   csp_count: number;
@@ -52,6 +53,7 @@ export async function GET(request: NextRequest) {
 
   const entities = await query<EntityListRow>(
     `SELECT e.id, e.legal_name, e.vat_number, e.matricule, e.rcs_number, e.is_active,
+            e.liquidation_date::text AS liquidation_date,
             g.id AS group_id, g.name AS group_name,
             JSONB_ARRAY_LENGTH(e.csp_contacts) AS csp_count,
             (SELECT COUNT(*)::int FROM tax_obligations o
