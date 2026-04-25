@@ -278,7 +278,7 @@ describe('filterEntitiesByStatus', () => {
   });
 
   it('returns [] when no row matches (safe for an empty state render)', () => {
-    expect(filterEntitiesByStatus(rows, 'blocked', period)).toEqual([]);
+    expect(filterEntitiesByStatus(rows, 'partially_approved', period)).toEqual([]);
   });
 });
 

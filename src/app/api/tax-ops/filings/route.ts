@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
   if (entityId) { where.push(`e.id = $${pi}`); params.push(entityId); pi += 1; }
   if (assignedTo) { where.push(`f.assigned_to = $${pi}`); params.push(assignedTo); pi += 1; }
   if (preparedWith) { where.push(`$${pi} = ANY(f.prepared_with)`); params.push(preparedWith); pi += 1; }
-  if (overdue) { where.push(`f.deadline_date < CURRENT_DATE AND f.status NOT IN ('filed','paid','waived')`); }
+  if (overdue) { where.push(`f.deadline_date < CURRENT_DATE AND f.status <> 'filed'`); }
   if (q) {
     where.push(`(e.legal_name ILIKE $${pi} OR g.name ILIKE $${pi} OR f.period_label ILIKE $${pi})`);
     params.push(`%${q}%`); pi += 1;

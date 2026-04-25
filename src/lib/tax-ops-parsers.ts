@@ -14,10 +14,14 @@
 //      the same entity. We collapse whitespace + strip for dedup.
 // ════════════════════════════════════════════════════════════════════════
 
+// Stint 43 status enum v3. The Excel parser still has to accept text
+// from Diego's old spreadsheets that mention the deprecated states
+// ("blocked", "waived", "assessment received") — we just remap to the
+// nearest valid v3 status when we see them.
 export type FilingStatus =
-  | 'info_to_request' | 'info_received' | 'working'
+  | 'info_to_request' | 'working'
   | 'awaiting_client_clarification' | 'draft_sent'
-  | 'filed' | 'assessment_received' | 'waived' | 'blocked';
+  | 'partially_approved' | 'client_approved' | 'filed';
 
 export interface ParsedStatus {
   status: FilingStatus;
@@ -53,12 +57,16 @@ export function parseStatusCell(raw: string | null | undefined): ParsedStatus {
     return { status: 'draft_sent', residual_comment: draftMatch[1] };
   }
 
-  // Waiting for client approval of a draft → merged into draft_sent
+  // Waiting for client approval of a draft → maps to draft_sent
+  // (Diego will move to partially_approved / client_approved manually
+  // once specific approver signals come in.)
   if (/^waiting\s+for\s+.*(approval|confirmation|sign)/i.test(text)) {
     return { status: 'draft_sent', residual_comment: text };
   }
+  // Generic "waiting for X" → keep as info_to_request with the comment;
+  // Diego decides if it's working / awaiting_clarification on review.
   if (/^waiting\s+for/i.test(text)) {
-    return { status: 'blocked', residual_comment: text };
+    return { status: 'info_to_request', residual_comment: text };
   }
 
   // Requested info / financials requested
@@ -69,19 +77,22 @@ export function parseStatusCell(raw: string | null | undefined): ParsedStatus {
     return { status: 'info_to_request', residual_comment: text };
   }
 
-  // Tax assessment received
+  // Tax assessment received → in v3 we treat this as filed; the date
+  // lives separately in tax_assessment_received_at.
   if (/assessment\s+received/i.test(text) || /^yes$/i.test(text)) {
-    return { status: 'assessment_received', residual_comment: text === 'Yes' ? undefined : text };
+    return { status: 'filed', residual_comment: text === 'Yes' ? undefined : text };
   }
 
-  // Accepted / approved
+  // Accepted / approved → client_approved (closer to the new semantic)
   if (/^accepted$/i.test(text) || /^approved$/i.test(text)) {
-    return { status: 'filed', residual_comment: text };
+    return { status: 'client_approved', residual_comment: text };
   }
 
-  // Cancelled / not applicable / waived
+  // Cancelled / not applicable / waived → in v3 we treat as filed
+  // (the obligation is closed; Diego marks the obligation inactive
+  // separately if the entity is being de-registered).
   if (/^(cancelled|n\/a|na|not applicable|waived|skip)$/i.test(text)) {
-    return { status: 'waived', residual_comment: text };
+    return { status: 'filed', residual_comment: text };
   }
 
   // Default: treat as "working" and keep the text as a comment. Safer

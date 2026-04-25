@@ -3,44 +3,74 @@
 // Small status chip for tax filings. Colors chosen to be legible at a
 // glance in grid rows — not decorative.
 //
-// Status enum rework (stint 37.A):
-//   - pending_info → info_to_request (we ask first, not wait passively)
-//   - pending_client_approval merged into draft_sent
-//   - awaiting_client_clarification: new — we emailed client for a
-//     specific clarification, waiting on their reply
-//   - paid removed from enum — paid_at / amount_paid live as separate
-//     optional fields on the filing, not as workflow state
+// Status enum v3 (stint 43):
+//   - info_received fused into working (Diego: si tengo info, ya estoy trabajando)
+//   - new partially_approved (some approvers signed off, others pending)
+//   - new client_approved (all approvals received, pending to file)
+//   - assessment_received removed (Diego doesn't track assessment as a status;
+//       the date lives on tax_assessment_received_at + the CIT Assessment chip)
+//   - blocked + waived removed (Diego: irrelevant in his workflow)
+//
+// Final order = workflow progression. The first option is the default for
+// brand-new filings (still need to ask the client/CSP for info).
 
-const STATUS_META: Record<string, { label: string; tone: string }> = {
-  info_to_request:              { label: 'Info to request',         tone: 'bg-surface-alt text-ink-muted' },
-  info_received:                { label: 'Info received',           tone: 'bg-blue-100 text-blue-800' },
-  working:                      { label: 'Working',                 tone: 'bg-amber-100 text-amber-800' },
-  awaiting_client_clarification:{ label: 'Awaiting client clarif.', tone: 'bg-amber-100 text-amber-900' },
-  draft_sent:                   { label: 'Draft sent',              tone: 'bg-brand-100 text-brand-800' },
-  filed:                        { label: 'Filed',                   tone: 'bg-green-100 text-green-800' },
-  assessment_received:          { label: 'Assessment received',     tone: 'bg-green-200 text-green-900' },
-  waived:                       { label: 'Waived',                  tone: 'bg-surface-alt text-ink-muted' },
-  blocked:                      { label: 'Blocked',                 tone: 'bg-danger-100 text-danger-800' },
+const STATUS_META: Record<string, { label: string; tone: string; description: string }> = {
+  info_to_request: {
+    label: 'Info to request',
+    tone: 'bg-surface-alt text-ink-muted',
+    description: 'Aún no hemos pedido la información al CSP / cliente. Próximo paso: mandarles email pidiendo lo que falta.',
+  },
+  working: {
+    label: 'Working',
+    tone: 'bg-amber-100 text-amber-800',
+    description: 'Tenemos la información y estamos preparando la declaración (incluye recepción + trabajo activo).',
+  },
+  awaiting_client_clarification: {
+    label: 'Awaiting clarification',
+    tone: 'bg-amber-100 text-amber-900',
+    description: 'Hemos pedido al cliente una aclaración por email y estamos esperando su respuesta.',
+  },
+  draft_sent: {
+    label: 'Draft sent',
+    tone: 'bg-brand-100 text-brand-800',
+    description: 'Borrador enviado al cliente para aprobación.',
+  },
+  partially_approved: {
+    label: 'Partially approved',
+    tone: 'bg-blue-100 text-blue-800',
+    description: 'Uno o más aprobadores ya firmaron, pero faltan otros (típicamente directores que firman conjuntos).',
+  },
+  client_approved: {
+    label: 'Client approved',
+    tone: 'bg-blue-200 text-blue-900',
+    description: 'Todas las aprobaciones recibidas. Pendiente de depositar la declaración con la AED.',
+  },
+  filed: {
+    label: 'Filed',
+    tone: 'bg-green-100 text-green-800',
+    description: 'Depositada con la AED + cliente notificado con justificante.',
+  },
 };
 
-/** Order reflects workflow progression — used by list selectors so the
- *  most-common next-step status appears first in the dropdown. */
+/** Order reflects the real workflow progression. The status filter
+ *  dropdown + edit selects render in this order. */
 export const FILING_STATUSES = [
   'info_to_request',
-  'info_received',
   'working',
   'awaiting_client_clarification',
   'draft_sent',
+  'partially_approved',
+  'client_approved',
   'filed',
-  'assessment_received',
-  'blocked',
-  'waived',
 ];
 
 export function FilingStatusBadge({ status }: { status: string }) {
-  const meta = STATUS_META[status] ?? { label: status, tone: 'bg-surface-alt text-ink-muted' };
+  const meta = STATUS_META[status] ?? { label: status, tone: 'bg-surface-alt text-ink-muted', description: '' };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${meta.tone}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium ${meta.tone}`}
+      title={meta.description ? `${meta.label} — ${meta.description}` : meta.label}
+    >
       {meta.label}
     </span>
   );
@@ -48,4 +78,8 @@ export function FilingStatusBadge({ status }: { status: string }) {
 
 export function filingStatusLabel(status: string): string {
   return STATUS_META[status]?.label ?? status;
+}
+
+export function filingStatusDescription(status: string): string {
+  return STATUS_META[status]?.description ?? '';
 }

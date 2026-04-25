@@ -73,7 +73,7 @@ export async function POST() {
        JOIN tax_obligations o ON o.id = f.obligation_id
        JOIN tax_entities e    ON e.id = o.entity_id
       WHERE f.deadline_date IS NOT NULL
-        AND f.status NOT IN ('filed','paid','waived','assessment_received')
+        AND f.status <> 'filed'
         AND e.is_active = TRUE
         AND o.is_active = TRUE
         AND (f.deadline_date - CURRENT_DATE)::int <= 14`,

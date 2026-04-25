@@ -95,34 +95,22 @@ export function AssessmentInlineEditor({
   }
 
   // Stint 40.F — Diego wanted a pragmatic tri-state: "Not yet / Yes /
-  // No" instead of the 9-value status dropdown for the Assessment
-  // column specifically. We map:
-  //   - status = assessment_received  → "✅ Received {date}" green
-  //   - status = waived               → "🚫 No assessment expected" grey
-  //   - anything else + no date       → "📭 Not yet" amber
-  // The dropdown in the popover still exposes the full enum so edge
-  // cases are reachable.
-  const triStateChip = (() => {
-    if (assessmentDate || currentStatus === 'assessment_received') {
-      return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-green-100 text-green-800">
-          ✓ Received{assessmentDate ? ` ${assessmentDate}` : ''}
-        </span>
-      );
-    }
-    if (currentStatus === 'waived') {
-      return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-surface-alt text-ink-muted">
-          ✕ No assessment expected
-        </span>
-      );
-    }
-    return (
-      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-amber-100 text-amber-800">
-        Not yet
-      </span>
-    );
-  })();
+  // Stint 43 — simplified to a 2-state chip after the status rework:
+  // assessment_received and waived are no longer valid statuses.
+  // The signal is the date itself in tax_assessment_received_at.
+  //   - assessmentDate set → "✓ Received {date}" green chip
+  //   - assessmentDate null → "Not yet" amber chip
+  // The popover dropdown still exposes the full FILING_STATUSES so
+  // Diego can flip the prior-year filing status if needed.
+  const triStateChip = assessmentDate ? (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-green-100 text-green-800">
+      ✓ Received {assessmentDate}
+    </span>
+  ) : (
+    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-amber-100 text-amber-800">
+      Not yet
+    </span>
+  );
 
   const displayNode = triStateChip;
 

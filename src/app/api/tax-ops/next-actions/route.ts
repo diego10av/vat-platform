@@ -52,7 +52,7 @@ export async function GET() {
          JOIN tax_obligations o ON o.id = f.obligation_id
          JOIN tax_entities e    ON e.id = o.entity_id
          LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
-        WHERE f.status NOT IN ('filed','paid','waived')
+        WHERE f.status <> 'filed'
           AND f.deadline_date IS NOT NULL
           AND f.deadline_date <= CURRENT_DATE + INTERVAL '30 days'
           AND e.is_active = TRUE

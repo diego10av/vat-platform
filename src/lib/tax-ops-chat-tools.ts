@@ -42,10 +42,9 @@ export const TAX_OPS_TOOLS: Anthropic.Tool[] = [
         year: { type: 'number', description: 'Filing period year, e.g. 2026.' },
         status: {
           type: 'string',
-          enum: ['info_to_request', 'info_received', 'working',
+          enum: ['info_to_request', 'working',
                  'awaiting_client_clarification', 'draft_sent',
-                 'filed', 'assessment_received',
-                 'paid', 'waived', 'blocked'],
+                 'partially_approved', 'client_approved', 'filed'],
           description: 'Exact status match. Omit for any status.',
         },
         group_name_contains: {
@@ -177,11 +176,11 @@ async function queryFilings(input: ToolInput) {
   if (typeof input.deadline_in_days === 'number') {
     conds.push(`f.deadline_date IS NOT NULL
                 AND f.deadline_date <= CURRENT_DATE + (${add(String(input.deadline_in_days))} || ' days')::interval
-                AND f.status NOT IN ('filed','paid','waived')`);
+                AND f.status <> 'filed'`);
   }
   if (typeof input.assigned_to === 'string') conds.push(`f.assigned_to = ${add(input.assigned_to)}`);
   if (input.overdue === true) {
-    conds.push(`f.deadline_date < CURRENT_DATE AND f.status NOT IN ('filed','paid','waived')`);
+    conds.push(`f.deadline_date < CURRENT_DATE AND f.status <> 'filed'`);
   }
 
   const rows = await query(

@@ -168,7 +168,11 @@ async function parseCit(filePath: string): Promise<Row[]> {
             source_file: 'cit', source_sheet: sheetName, source_row: r,
             client_group_name: groupName, legal_name: companyRaw.trim(),
             periodicity_raw: 'Annual', tax_type: 'cit_annual',
-            status: isYes ? 'assessment_received' : 'filed',
+            // Stint 43 enum v3: assessment_received was retired; the
+            // date lives separately in tax_assessment_received_at. We
+            // tag both rows as 'filed'; the actual assessment date is
+            // captured by other columns of the import script.
+            status: 'filed',
             status_residual: isYes ? null : cell2024,
             filed_at: null, draft_sent_at: null,
             prepared_with: prepared, comment: cell2024,

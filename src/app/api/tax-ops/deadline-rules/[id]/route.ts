@@ -8,9 +8,9 @@ import { computeDeadline, type DeadlineRule } from '@/lib/tax-ops-deadlines';
 //           propagate?: boolean }
 //
 // When `propagate=true`, after the rule UPDATE we recompute the deadline
-// of every open filing of the same (tax_type, period_pattern) — i.e.
-// status NOT IN (filed, paid, waived, assessment_received). The historic
-// ones keep their deadline so the audit trail stays intact.
+// of every OPEN filing of the same (tax_type, period_pattern) — anything
+// not yet filed. The historic ones keep their deadline so the audit
+// trail stays intact.
 //
 // Response: { ok: true, propagated: N, preview?: [...] }
 //
@@ -35,8 +35,9 @@ interface AffectedFiling {
 }
 
 const OPEN_STATUSES = [
-  'info_to_request', 'info_received', 'working',
-  'awaiting_client_clarification', 'draft_sent', 'blocked',
+  'info_to_request', 'working',
+  'awaiting_client_clarification', 'draft_sent',
+  'partially_approved', 'client_approved',
 ];
 
 async function fetchRule(id: string): Promise<RuleRow | null> {

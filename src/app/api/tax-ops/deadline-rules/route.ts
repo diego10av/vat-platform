@@ -31,7 +31,7 @@ export async function GET() {
                JOIN tax_obligations o ON o.id = f.obligation_id
               WHERE o.tax_type = r.tax_type
                 AND o.period_pattern = r.period_pattern
-                AND f.status NOT IN ('filed','paid','waived','assessment_received')
+                AND f.status <> 'filed'
             ) AS open_filings_count
        FROM tax_deadline_rules r
       ORDER BY r.tax_type, r.period_pattern`,

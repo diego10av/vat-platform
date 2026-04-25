@@ -10,7 +10,7 @@ import { buildICal, type ICalEvent } from '@/lib/ical';
 //
 // Scope: filings with a computed deadline in the window
 //   [CURRENT_DATE - 30d, CURRENT_DATE + 180d]
-// whose status is NOT one of filed / waived / assessment_received.
+// whose status is not yet filed.
 //
 // Auth: a static token query param matched against CIFRA_ICAL_TOKEN.
 // This is a low-sensitivity signal (entity names + tax types + dates,
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest): Promise<Response> {
      WHERE f.deadline_date IS NOT NULL
        AND f.deadline_date >= CURRENT_DATE - INTERVAL '30 days'
        AND f.deadline_date <= CURRENT_DATE + INTERVAL '180 days'
-       AND f.status NOT IN ('filed', 'waived', 'assessment_received')
+       AND f.status <> 'filed'
        AND e.is_active = TRUE
      ORDER BY f.deadline_date ASC
   `);

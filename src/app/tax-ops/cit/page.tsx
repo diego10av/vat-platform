@@ -276,6 +276,6 @@ function getCell(e: MatrixEntity, period: string) {
 function countFiled(entities: MatrixEntity[], period: string): number {
   return entities.filter(e => {
     const c = getCell(e, period);
-    return c && (c.status === 'filed' || c.status === 'assessment_received');
+    return c && c.status === 'filed';
   }).length;
 }

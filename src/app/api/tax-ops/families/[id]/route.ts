@@ -66,7 +66,7 @@ export async function GET(
            (SELECT COUNT(*)::int FROM tax_filings f
               JOIN tax_obligations o ON o.id = f.obligation_id
              WHERE o.entity_id = e.id
-               AND f.status IN ('filed','assessment_received')) AS filings_filed,
+               AND f.status = 'filed') AS filings_filed,
            (SELECT GREATEST(MAX(f.updated_at), MAX(o.updated_at), e.updated_at)::text
               FROM tax_obligations o
               LEFT JOIN tax_filings f ON f.obligation_id = o.id
