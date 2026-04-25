@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import {
   UsersIcon, ClockIcon, RefreshCwIcon, LayersIcon, MergeIcon,
-  CalendarIcon, BookUserIcon, ChevronRightIcon,
+  CalendarIcon, BookUserIcon, DatabaseIcon, ChevronRightIcon,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 
@@ -58,6 +58,12 @@ export default function TaxOpsSettingsPage() {
           icon={CalendarIcon}
           title="Calendar subscription"
           description="Subscribe all upcoming deadlines to Google / Apple / Outlook Calendar via a read-only iCal feed."
+        />
+        <SettingsCard
+          href="/tax-ops/settings/backup"
+          icon={DatabaseIcon}
+          title="Backup snapshot"
+          description="Download a point-in-time JSON of every Tax-Ops table. Cheap insurance to take before risky operations."
         />
         <SettingsCard
           href="#"
