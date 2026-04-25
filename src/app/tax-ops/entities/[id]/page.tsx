@@ -136,17 +136,37 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
       {/* Stint 40.H — back button uses router.back() so Diego returns
           to the page he came from (VAT quarterly, CIT, Tasks, etc.),
           not always /tax-ops/entities. Fallback link if there's no
-          history (direct URL open). */}
-      <button
-        type="button"
-        onClick={() => {
-          if (window.history.length > 1) router.back();
-          else router.push('/tax-ops/entities');
-        }}
-        className="inline-flex items-center gap-1 text-[12px] text-ink-muted hover:text-ink"
-      >
-        <ArrowLeftIcon size={12} /> Back
-      </button>
+          history (direct URL open).
+          Stint 43.D13 — breadcrumb shows Family › Entity so the parent
+          context stays visible from any deep link. */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <button
+          type="button"
+          onClick={() => {
+            if (window.history.length > 1) router.back();
+            else router.push('/tax-ops/entities');
+          }}
+          className="inline-flex items-center gap-1 text-[12px] text-ink-muted hover:text-ink"
+        >
+          <ArrowLeftIcon size={12} /> Back
+        </button>
+        <nav aria-label="Breadcrumb" className="inline-flex items-center gap-1 text-[12px] text-ink-muted">
+          <Link href="/tax-ops/families" className="hover:text-brand-700 hover:underline">Families</Link>
+          <span aria-hidden="true" className="text-ink-faint">›</span>
+          {data.entity.group_id ? (
+            <Link
+              href={`/tax-ops/families/${data.entity.group_id}`}
+              className="hover:text-brand-700 hover:underline"
+            >
+              {data.entity.group_name ?? '— (no family)'}
+            </Link>
+          ) : (
+            <span className="italic text-ink-faint">— (no family)</span>
+          )}
+          <span aria-hidden="true" className="text-ink-faint">›</span>
+          <span className="text-ink">{data.entity.legal_name}</span>
+        </nav>
+      </div>
 
       {/* Identity header */}
       <div className="rounded-md border border-border bg-surface px-4 py-3">

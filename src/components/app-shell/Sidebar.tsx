@@ -190,6 +190,7 @@ function buildGroups(badges: SidebarBadges, taxCategories: TaxCategory[]): NavGr
             ...buildTaxCategoryNavItems(taxCategories),
             { href: '/tax-ops/other',            label: 'Other (ad-hoc)',       icon: FolderIcon },
             { href: '/tax-ops/entities',         label: 'Entities',             icon: Building2Icon },
+            { href: '/tax-ops/families',         label: 'Families',             icon: Building2Icon },
             { href: '/tax-ops/settings',         label: 'Settings',             icon: SettingsIcon },
           ],
         },
