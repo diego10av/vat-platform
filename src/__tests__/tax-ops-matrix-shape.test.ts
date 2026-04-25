@@ -10,6 +10,9 @@ import {
 import { yearOptions, defaultYear } from '@/components/tax-ops/yearOptions';
 import { familyPalette, familyChipClasses } from '@/components/tax-ops/familyColors';
 import { WHT_CADENCE_OPTIONS } from '@/components/tax-ops/matrix-row-columns';
+import {
+  periodWindow, isFinalReturnPeriod,
+} from '@/components/tax-ops/liquidationPeriods';
 import type { MatrixEntity, MatrixCell, MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 
 describe('shortPeriodLabel', () => {
@@ -422,6 +425,65 @@ describe('filterEntities (combined)', () => {
       entities: rows, status: 'filed', partner: 'Gab', periodLabels: period,
     });
     expect(out).toEqual([]);
+  });
+});
+
+// Stint 43.D15 — liquidation date drives the "final return" border on
+// the status chip whose period contains the date. periodWindow needs
+// to handle annual / quarterly / monthly labels correctly (incl. leap
+// years + 30/31 day months).
+describe('periodWindow + isFinalReturnPeriod (stint 43.D15)', () => {
+  it('annual labels span Jan-1 to Dec-31', () => {
+    expect(periodWindow('2025')).toEqual({ start: '2025-01-01', end: '2025-12-31' });
+    expect(periodWindow('2024')).toEqual({ start: '2024-01-01', end: '2024-12-31' });
+  });
+
+  it('quarterly labels handle 30/31 day months correctly', () => {
+    // Q1: Jan-Mar (Mar = 31), Q2: Apr-Jun (Jun = 30),
+    // Q3: Jul-Sep (Sep = 30), Q4: Oct-Dec (Dec = 31)
+    expect(periodWindow('2025-Q1')).toEqual({ start: '2025-01-01', end: '2025-03-31' });
+    expect(periodWindow('2025-Q2')).toEqual({ start: '2025-04-01', end: '2025-06-30' });
+    expect(periodWindow('2025-Q3')).toEqual({ start: '2025-07-01', end: '2025-09-30' });
+    expect(periodWindow('2025-Q4')).toEqual({ start: '2025-10-01', end: '2025-12-31' });
+  });
+
+  it('monthly labels handle leap years (Feb 29 vs 28)', () => {
+    expect(periodWindow('2024-02')).toEqual({ start: '2024-02-01', end: '2024-02-29' });
+    expect(periodWindow('2025-02')).toEqual({ start: '2025-02-01', end: '2025-02-28' });
+    expect(periodWindow('2025-04')).toEqual({ start: '2025-04-01', end: '2025-04-30' });
+    expect(periodWindow('2025-12')).toEqual({ start: '2025-12-01', end: '2025-12-31' });
+  });
+
+  it('unknown labels (semester / ad-hoc) → null', () => {
+    expect(periodWindow('2025-S2')).toBeNull();
+    expect(periodWindow('2025-ADHOC-99')).toBeNull();
+  });
+
+  it('isFinalReturnPeriod matches the period containing the liquidation date', () => {
+    // CIT 2025 + liquidation 2025-09-15 → final on the annual cell.
+    expect(isFinalReturnPeriod('2025-09-15', '2025')).toBe(true);
+    expect(isFinalReturnPeriod('2025-09-15', '2024')).toBe(false);
+
+    // VAT quarterly: liquidation in Q3 → only Q3 marked.
+    expect(isFinalReturnPeriod('2025-09-15', '2025-Q3')).toBe(true);
+    expect(isFinalReturnPeriod('2025-09-15', '2025-Q2')).toBe(false);
+    expect(isFinalReturnPeriod('2025-09-15', '2025-Q4')).toBe(false);
+
+    // VAT monthly: liquidation Sep 15 → only 2025-09 marked.
+    expect(isFinalReturnPeriod('2025-09-15', '2025-09')).toBe(true);
+    expect(isFinalReturnPeriod('2025-09-15', '2025-08')).toBe(false);
+    expect(isFinalReturnPeriod('2025-09-15', '2025-10')).toBe(false);
+  });
+
+  it('null liquidation_date → never a final return', () => {
+    expect(isFinalReturnPeriod(null, '2025')).toBe(false);
+    expect(isFinalReturnPeriod(null, '2025-Q1')).toBe(false);
+  });
+
+  it('boundary dates (last day of period) still match', () => {
+    expect(isFinalReturnPeriod('2025-12-31', '2025-Q4')).toBe(true);
+    expect(isFinalReturnPeriod('2025-12-31', '2025-12')).toBe(true);
+    expect(isFinalReturnPeriod('2025-01-01', '2025-Q1')).toBe(true);
   });
 });
 

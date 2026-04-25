@@ -95,6 +95,9 @@ interface EntityRow {
   obligation_id: string | null;
   /** Stint 43.D4 — per-obligation tax form id (CIT: 500/205/200). NULL when unset. */
   form_code: string | null;
+  /** Stint 43.D15 — date the entity was/will be liquidated. Drives the
+   *  liquidation chip + row tinting + final-return border. NULL = active. */
+  liquidation_date: string | null;
   cells: Record<string, MatrixCell | null>;
 }
 
@@ -138,7 +141,7 @@ export async function GET(request: NextRequest) {
   // the liquidation_date predates those years' start.
   const entityQuery = showInactive
     ? `
-      SELECT e.id, e.legal_name,
+      SELECT e.id, e.legal_name, e.liquidation_date::text AS liquidation_date,
              g.id AS group_id, g.name AS group_name,
              (SELECT o.id
                 FROM tax_obligations o
@@ -163,7 +166,7 @@ export async function GET(request: NextRequest) {
        ORDER BY g.name ASC NULLS LAST, e.legal_name ASC
       `
     : `
-      SELECT e.id, e.legal_name,
+      SELECT e.id, e.legal_name, e.liquidation_date::text AS liquidation_date,
              g.id AS group_id, g.name AS group_name,
              o.id AS obligation_id,
              o.form_code
@@ -181,6 +184,7 @@ export async function GET(request: NextRequest) {
 
   const entities = await query<{
     id: string; legal_name: string;
+    liquidation_date: string | null;
     group_id: string | null; group_name: string | null;
     obligation_id: string | null;
     form_code: string | null;
@@ -268,6 +272,7 @@ export async function GET(request: NextRequest) {
       group_name: e.group_name,
       obligation_id: e.obligation_id,
       form_code: e.form_code ?? null,
+      liquidation_date: e.liquidation_date ?? null,
       cells,
     };
   });

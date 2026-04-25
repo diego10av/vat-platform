@@ -260,6 +260,8 @@ export default function CitPage() {
           firstColLabel="Entity"
           onEditFiling={setEditingFilingId}
           periodLabelsForEdit={[periodLabel]}
+          liquidationVisuals
+          onLiquidationChanged={refetchAll}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
             applyStatusChange({ entity, column, cell, nextStatus, refetch: current.refetch, toast })
           }

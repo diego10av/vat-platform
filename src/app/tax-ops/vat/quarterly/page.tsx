@@ -95,6 +95,8 @@ export default function VatQuarterlyPage() {
           firstColLabel="Entity"
           onEditFiling={setEditingFilingId}
           periodLabelsForEdit={data.period_labels}
+          liquidationVisuals
+          onLiquidationChanged={refetch}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
             applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }

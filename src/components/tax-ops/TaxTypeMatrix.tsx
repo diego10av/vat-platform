@@ -22,6 +22,7 @@ import { ChevronDownIcon, ChevronRightIcon, PencilIcon } from 'lucide-react';
 import { FilingStatusBadge, filingStatusLabel } from './FilingStatusBadge';
 import { InlineStatusCell } from './inline-editors';
 import { familyChipClasses } from './familyColors';
+import { LiquidationChip, isFinalReturnPeriod } from './LiquidationChip';
 
 export interface MatrixCell {
   filing_id: string;
@@ -61,6 +62,10 @@ export interface MatrixEntity {
   obligation_id: string | null;
   /** Stint 43.D4 — per-obligation tax form id (CIT: 500/205/200). */
   form_code?: string | null;
+  /** Stint 43.D15 — date the entity was/will be liquidated.
+   *  When set + matrix opted into liquidationVisuals, drives the
+   *  liquidation chip + row tinting + final-return border. */
+  liquidation_date?: string | null;
   cells: Record<string, MatrixCell | null>;
 }
 
@@ -131,6 +136,26 @@ interface Props {
     cell: MatrixCell | null;
     nextStatus: string;
   }) => Promise<void>;
+  /**
+   * Stint 43.D15 — when true, surfaces liquidation status visually:
+   *   • LiquidationChip rendered next to the entity name (amber when
+   *     in-progress, gray-faint when past).
+   *   • Subtle amber row tinting on entities with liquidation_date set.
+   *   • Amber border ring on the status chip whose period contains
+   *     the liquidation date — marks the "final return".
+   *   • "+ liquidate" ghost button rendered for entities without a
+   *     date set, so Diego can mark one without leaving the matrix.
+   *
+   * Opted in on /tax-ops/cit and /tax-ops/vat/{annual,quarterly,monthly}
+   * — the tax types where a liquidation cycle has fiscal weight.
+   * Other matrices ignore the flag.
+   */
+  liquidationVisuals?: boolean;
+  /** Required when `liquidationVisuals` is true: called after the
+   *  liquidation date is changed via the chip popover so the matrix
+   *  refetches. Reuses the same callback shape as the other inline
+   *  edits. */
+  onLiquidationChanged?: () => void;
 }
 
 export function TaxTypeMatrix({
@@ -144,6 +169,8 @@ export function TaxTypeMatrix({
   groupFooter,
   onEditFiling,
   periodLabelsForEdit,
+  liquidationVisuals,
+  onLiquidationChanged,
 }: Props) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -283,6 +310,8 @@ export function TaxTypeMatrix({
                 handleCellClick={handleCellClick}
                 onStatusChange={onStatusChange}
                 groupFooter={groupFooter}
+                liquidationVisuals={liquidationVisuals}
+                onLiquidationChanged={onLiquidationChanged}
                 totalCols={(familyCol ? 1 : 0) + 1 + otherCols.length + (effectiveRowAction ? 1 : 0)}
               />
             );
@@ -298,6 +327,7 @@ function GroupBlock({
   columns, familyCol, entityStickyLeft,
   rowAction, handleCellClick, onStatusChange,
   groupFooter, totalCols,
+  liquidationVisuals, onLiquidationChanged,
 }: {
   group: { name: string; items: MatrixEntity[] };
   grouped: boolean;
@@ -311,6 +341,8 @@ function GroupBlock({
   onStatusChange?: Props['onStatusChange'];
   groupFooter?: Props['groupFooter'];
   totalCols: number;
+  liquidationVisuals?: boolean;
+  onLiquidationChanged?: () => void;
 }) {
   // First entity's group_id is the canonical id for this group — use it
   // when calling groupFooter so "+Add" knows where to attach new entities.
@@ -361,6 +393,8 @@ function GroupBlock({
           rowAction={rowAction}
           handleCellClick={handleCellClick}
           onStatusChange={onStatusChange}
+          liquidationVisuals={liquidationVisuals}
+          onLiquidationChanged={onLiquidationChanged}
         />
       ))}
       {!isCollapsed && groupFooter && (
@@ -380,6 +414,7 @@ function GroupBlock({
 function RowRender({
   entity, columns, familyCol, entityStickyLeft,
   rowAction, handleCellClick, onStatusChange,
+  liquidationVisuals, onLiquidationChanged,
 }: {
   entity: MatrixEntity;
   columns: MatrixColumn[];
@@ -388,11 +423,28 @@ function RowRender({
   rowAction?: (entity: MatrixEntity) => React.ReactNode;
   handleCellClick: (e: MatrixEntity, col: MatrixColumn, cell: MatrixCell) => void;
   onStatusChange?: Props['onStatusChange'];
+  liquidationVisuals?: boolean;
+  onLiquidationChanged?: () => void;
 }) {
+  // Stint 43.D15 — row tinting + sticky-cell tinting must match. The
+  // sticky cells (family + entity) live on `bg-surface` to override the
+  // tr's bg, so when we tint the row we have to tint those cells too,
+  // otherwise they paint a clean white strip on top of the amber row.
+  const tinted = liquidationVisuals && !!entity.liquidation_date;
+  const trClass = tinted
+    ? 'border-b border-border/70 bg-amber-50/40 hover:bg-amber-50/70'
+    : 'border-b border-border/70 hover:bg-surface-alt/40';
+  const stickyBgClass = tinted
+    ? 'bg-amber-50/60 hover:bg-amber-50/80'
+    : 'bg-surface hover:bg-surface-alt/40';
+
   return (
-    <tr className="border-b border-border/70 hover:bg-surface-alt/40">
+    <tr className={trClass}>
       {familyCol && (
-        <td className="sticky left-0 z-10 bg-surface hover:bg-surface-alt/40 border-r border-border px-2 py-1.5 min-w-[170px] max-w-[170px]">
+        <td className={[
+          'sticky left-0 z-10 border-r border-border px-2 py-1.5 min-w-[170px] max-w-[170px]',
+          stickyBgClass,
+        ].join(' ')}>
           {familyCol.render
             ? familyCol.render(entity)
             : (entity.group_name
@@ -407,16 +459,30 @@ function RowRender({
         </td>
       )}
       <td
-        className="sticky z-10 bg-surface hover:bg-surface-alt/40 border-r border-border px-2.5 py-1.5 min-w-[220px] max-w-[320px]"
+        className={[
+          'sticky z-10 border-r border-border px-2.5 py-1.5 min-w-[220px] max-w-[320px]',
+          stickyBgClass,
+        ].join(' ')}
         style={{ left: `${entityStickyLeft}px` }}
       >
-        <Link
-          href={`/tax-ops/entities/${entity.id}`}
-          className="text-ink hover:text-brand-700 font-medium block truncate"
-          title={entity.legal_name}
-        >
-          {entity.legal_name}
-        </Link>
+        <div className="flex items-center min-w-0">
+          <Link
+            href={`/tax-ops/entities/${entity.id}`}
+            className="text-ink hover:text-brand-700 font-medium truncate"
+            title={entity.legal_name}
+          >
+            {entity.legal_name}
+          </Link>
+          {liquidationVisuals && (
+            <LiquidationChip
+              entityId={entity.id}
+              entityName={entity.legal_name}
+              liquidationDate={entity.liquidation_date ?? null}
+              onChanged={onLiquidationChanged ?? (() => {})}
+              alwaysVisible={!entity.liquidation_date}
+            />
+          )}
+        </div>
       </td>
       {columns.map(col => (
         <CellRender
@@ -425,6 +491,7 @@ function RowRender({
           column={col}
           handleCellClick={handleCellClick}
           onStatusChange={onStatusChange}
+          liquidationVisuals={liquidationVisuals}
         />
       ))}
       {rowAction && (
@@ -436,12 +503,23 @@ function RowRender({
 
 function CellRender({
   entity, column, handleCellClick, onStatusChange,
+  liquidationVisuals,
 }: {
   entity: MatrixEntity;
   column: MatrixColumn;
   handleCellClick: (e: MatrixEntity, col: MatrixColumn, cell: MatrixCell) => void;
   onStatusChange?: Props['onStatusChange'];
+  liquidationVisuals?: boolean;
 }) {
+  // Stint 43.D15 — flag the status chip whose period contains the
+  // liquidation date as the "final return". Wraps the cell in an
+  // amber ring + tooltip suffix so Diego sees at a glance which
+  // filing closes out this entity. Cheap; no impact on cells whose
+  // column.key isn't a parseable period_label.
+  const isFinalReturn =
+    !!liquidationVisuals
+    && !!entity.liquidation_date
+    && isFinalReturnPeriod(entity.liquidation_date, column.key);
   // Custom renderers win.
   if (column.render) {
     return (
@@ -460,6 +538,16 @@ function CellRender({
   // Default: key is a period_label; look up the cell.
   const cell = entity.cells[column.key] ?? null;
 
+  // Stint 43.D15 — when this period contains the liquidation date,
+  // surround the cell with an amber inset ring so it pops as the
+  // "final return". Tooltip gains a clarifying suffix.
+  const finalReturnRing = isFinalReturn
+    ? 'shadow-[inset_0_0_0_2px_theme(colors.amber.400)]'
+    : '';
+  const finalReturnTooltipSuffix = isFinalReturn
+    ? `\n⚑ Final return (liquidation date ${entity.liquidation_date})`
+    : '';
+
   // Inline-edit enabled path (stint 36): render the status as an
   // InlineStatusCell with onSave wired to onStatusChange. Empty cells
   // still render the dropdown so the user can "set a status" → creates
@@ -469,8 +557,8 @@ function CellRender({
     const disabled = !entity.obligation_id;
     return (
       <td
-        className={['px-1.5 py-1 align-middle', column.widthClass ?? ''].join(' ')}
-        title={cell ? buildTooltip(cell) : disabled ? 'No obligation — add one on the entity detail page' : 'Click to set a status (creates the filing)'}
+        className={['px-1.5 py-1 align-middle', column.widthClass ?? '', finalReturnRing].join(' ')}
+        title={(cell ? buildTooltip(cell) : disabled ? 'No obligation — add one on the entity detail page' : 'Click to set a status (creates the filing)') + finalReturnTooltipSuffix}
       >
         <InlineStatusCell
           value={cell?.status ?? 'info_to_request'}
@@ -487,15 +575,18 @@ function CellRender({
   // Read-only click-through fallback (pre-stint-36 behaviour).
   if (!cell) {
     return (
-      <td className={['px-2 py-1.5 align-middle text-ink-faint', column.widthClass ?? ''].join(' ')}>
+      <td
+        className={['px-2 py-1.5 align-middle text-ink-faint', column.widthClass ?? '', finalReturnRing].join(' ')}
+        title={finalReturnTooltipSuffix.trim() || undefined}
+      >
         —
       </td>
     );
   }
-  const tooltip = buildTooltip(cell);
+  const tooltip = buildTooltip(cell) + finalReturnTooltipSuffix;
   return (
     <td
-      className={['px-2 py-1.5 align-middle cursor-pointer', column.widthClass ?? ''].join(' ')}
+      className={['px-2 py-1.5 align-middle cursor-pointer', column.widthClass ?? '', finalReturnRing].join(' ')}
       onClick={() => handleCellClick(entity, column, cell)}
       title={tooltip}
     >

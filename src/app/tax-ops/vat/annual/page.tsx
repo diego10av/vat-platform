@@ -123,6 +123,8 @@ export default function VatAnnualPage() {
           firstColLabel="Entity"
           onEditFiling={setEditingFilingId}
           periodLabelsForEdit={[periodLabel]}
+          liquidationVisuals
+          onLiquidationChanged={refetch}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
             applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }
