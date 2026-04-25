@@ -173,9 +173,26 @@ clients → entities → declarations → invoices → invoice_lines
 
 ## 4 · Current state (keep this section fresh on each stint)
 
-**As of 2026-04-25, stint 42 just closed (overnight batch).** Status:
+**As of 2026-04-25, stint 43 just closed (CIT redesign + filtros expandidos).** Status:
 
 ### Shipped — recent stints (newest first)
+- ✅ **Stint 43** (2026-04-25 afternoon, 14 sub-commits): CIT redesign
+  + filtros expandidos. Diego en uso real de /tax-ops/cit pasó 13
+  puntos de feedback; ejecutado todo en una pasada larga. Bug status
+  dropdown (race condition fix); status enum v3 (fuse info_received +
+  working, add partially_approved + client_approved, drop
+  assessment_received / blocked / waived, migración 200 rows); año
+  N-2 fuera del selector; nueva columna Form (500/205/200)
+  per-obligation en CIT; last_action_at auto-stamped + rename de
+  "Last chased" → "Last action" + reorder Status→LastAction→Deadline;
+  split prepared_with en Partner in charge + Associates working
+  (mig 060, 200 rows backfilled); 3 filtros AND-combinables
+  (status × partner × associate) en MatrixToolbar; nuevo
+  SearchableSelect combobox (familias + partner + associate); NWT
+  review fechas visibles + 1-click "today" buttons; viewport-cap en
+  TaxTypeMatrix para que la barra horizontal viva en pantalla;
+  Families index nuevo + entity breadcrumb. 5 migrations aplicadas
+  (057/058/059/060/061). 700 tests green. Plan completo ejecutado.
 - ✅ **Stint 42** (2026-04-25 overnight, 6 self-contained commits):
   feature batch while Diego slept. Composite index 056 (matrix perf);
   print-friendly `@media print` CSS; entity activity timeline closing

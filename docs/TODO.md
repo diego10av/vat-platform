@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-25 (morning batch — bulk ops on /tax-ops/entities (change family / archive / reactivate, sticky toolbar with sane safety rails); JSON backup snapshot endpoint + Settings page; cleanup of orphan /tax-ops/nwt route. Plus the overnight stint 42 batch: composite index, print-friendly CSS, entity timeline, iCal feed, contacts book, dedup auto-merge. 693 tests green.)
+> Last updated: 2026-04-25 (stint 43 closed — CIT redesign + filtros expandidos. 14 sub-commits ejecutados sobre el feedback de Diego en sesión de uso real: bug status dropdown (race condition fix), status enum v3 (fuse + add + drop + 4 migrations 057/058/060/061), año -2 fuera del selector, Form column en CIT (per-obligation 500/205/200), last_action_at auto-stamped + columna renombrada, Partner in charge + Associates working como columnas separadas, 3 filtros AND-combinados en MatrixToolbar, SearchableSelect combobox component, NWT review fechas visibles + 1-click "today" buttons, viewport-cap para que la barra horizontal viva en pantalla, Families index + entity breadcrumb. 700 tests green.)
 
 > Earlier: 2026-04-24 (stint 41 closed — WHT per-entity cadence switcher. Migration 055 adds wht_director_quarterly rule (now 5 cadences: Monthly/Quarterly/Semester/Annual/Ad-hoc). New /change-cadence endpoint moves an obligation within the wht_director_* family atomically, with audit log. New cadenceColumn/CadenceInlineCell surfaces a 1-click dropdown on every WHT matrix page. Filings stay attached to the obligation; old period_labels remain in the audit log but won't render in the new cadence's matrix — Diego confirmed that's fine per the "cambio de cadencia" flow he described. 678 tests green. No backlog left from stints 40/41.)
 
@@ -99,6 +99,64 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-25 (afternoon)** — Stint 43: CIT redesign + filtros expandidos (14 sub-commits)
+
+Diego review sesión real de `/tax-ops/cit`: 13 puntos concretos. Todo
+ejecutado en una pasada larga. Cero features especulativas; cada
+commit responde a un item de su feedback.
+
+- **D9 · Bug status dropdown** (`c130ad0`). Click en chip de status no
+  cambiaba. Race condition: `setDraft(next) → setTimeout(commit, 0)`
+  leía el draft viejo. Fix: `commit` acepta `nextValue?: T` opcional
+  para esquivar React batching. Reproducido en Chrome DevTools, fix
+  end-to-end.
+- **D2 · Status enum v3** (`9bd911c`, mig 057). 7 estados finales con
+  fusión + 2 nuevos + remap legacy → v3. Aplicado a TODOS los tax
+  types; data preservada (200 rows migradas sin pérdida).
+- **D3 · Status tooltips** + **D1 · year -2 fuera** (incluidos en D2).
+- **D4 · Form column en CIT** (`d8c3898`, mig 058). Per-obligation,
+  dropdown 500/205/200, sólo visible en /tax-ops/cit.
+- **D5 · CIT deadline 31 dic N+1** (`11d2135`, mig 061). Revierte
+  053. Recompute en filings open.
+- **D6 · last_action_at + rename + reorder** (`67380ed`, mig 059).
+  Auto-stamp server-side en cada PATCH que toca un campo "actionable".
+  Rename "Last chased" → "Last action". Reorder: Status → Last action
+  → Deadline en pages anuales; period_labels → Last action → Partner
+  en multi-period. 10 matrix pages tocadas.
+- **D11 · Partner in charge + Associates working** (`3ad25b5`, mig
+  060). Split de prepared_with. partner_in_charge backfilled (200
+  rows). associates_working empieza vacío. FilingEditDrawer + Excel
+  export + filing detail surface ambos. matrix-row-columns rename
+  preparedWithColumn → partnerInChargeColumn + associatesWorkingColumn.
+  10 matrix pages updated.
+- **D7 · 3 filtros toolbar** (`8dcf975`). Status × Partner × Associate
+  AND-combinable. Helper filterEntities({...}) en useMatrixData.
+  '__unassigned' surface rows sin owner. useTaxTeamMembers hook.
+  Lazy-loaded en MatrixToolbar.
+- **D8 · SearchableSelect** (`6ec9221`). Combobox con type-to-filter,
+  ARIA, keyboard nav (arrows + Enter + ESC), click-outside. Aplicado
+  a Family selector (chip + popup) + Partner/Associate filters de D7.
+- **D12 · Viewport-cap** (`edb1259`). max-height: calc(100vh - 220px)
+  en TaxTypeMatrix wrapper. Una línea, 10 pages benefician. Barra
+  horizontal vive dentro del viewport.
+- **D10 · NWT review fechas + 1-click** (`fee0bdf`). IF/RS chips bumped
+  a 10px + muestran fecha inline (no sólo ✓). Botones dashed "+ IF" /
+  "+ RS" cuando faltan: 1 click → PATCH today's date. Last action chip
+  micro (auto-stamp desde D6). flex-wrap para layout estrecho.
+- **D13 · Discovery family/entity** (`820fa2e`). Nueva /tax-ops/families
+  index page. Sidebar gana "Families" link. Entity detail page gana
+  breadcrumb "Families › <family> › <entity>".
+- **D14 · Tests + docs + close** (este commit). 7 nuevos tests para
+  filterEntities (combined). 693 → 700 tests green. tsc clean.
+
+Migrations applied: 057 (status enum), 058 (form_code), 059 (last_action_at),
+060 (filings ownership), 061 (CIT deadline revert). Todas idempotentes.
+
+Files: 5 migrations + 24 unique source files touched. ~10h de trabajo
+en el plan original, ejecutado sin pausas.
+
+---
 
 **2026-04-25 (morning)** — Cleanup-batch: bulk ops + backup + nwt cleanup (3 commits)
 

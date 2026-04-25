@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
-  shortPeriodLabel, applyStatusChange, filterEntitiesByStatus,
+  shortPeriodLabel, applyStatusChange, filterEntitiesByStatus, filterEntities,
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions, defaultYear } from '@/components/tax-ops/yearOptions';
 import { familyPalette, familyChipClasses } from '@/components/tax-ops/familyColors';
@@ -336,6 +336,92 @@ describe('stint 40 field additions', () => {
     const ent: MatrixEntity = { ...makeEntity(), cells: { '2026': rich } };
     const [kept] = filterEntitiesByStatus([ent], 'filed', ['2026']);
     expect(kept).toBe(ent);
+  });
+});
+
+// Stint 43.D7 — combined filter helper. AND across status/partner/associate.
+describe('filterEntities (combined)', () => {
+  const period = ['2026'];
+  const makeOwned = (
+    id: string,
+    st: string,
+    partner: string[],
+    assoc: string[],
+  ): MatrixEntity => ({
+    ...makeEntity(),
+    id,
+    cells: {
+      '2026': makeCell({
+        status: st,
+        partner_in_charge: partner,
+        associates_working: assoc,
+      }),
+    },
+  });
+  const rows = [
+    makeOwned('a', 'info_to_request', ['Diego'], ['Vale']),
+    makeOwned('b', 'working', ['Gab'], ['Andrew']),
+    makeOwned('c', 'filed', ['Diego'], []),
+    makeOwned('d', 'info_to_request', [], []),
+  ];
+
+  it("'all' on every filter is a passthrough", () => {
+    const out = filterEntities({
+      entities: rows, status: 'all', partner: 'all', associate: 'all',
+      periodLabels: period,
+    });
+    expect(out).toHaveLength(4);
+  });
+
+  it('filters by partner alone — case-sensitive exact match on short_name', () => {
+    const out = filterEntities({
+      entities: rows, partner: 'Diego', periodLabels: period,
+    });
+    expect(out.map(r => r.id)).toEqual(['a', 'c']);
+  });
+
+  it('filters by associate alone', () => {
+    const out = filterEntities({
+      entities: rows, associate: 'Vale', periodLabels: period,
+    });
+    expect(out.map(r => r.id)).toEqual(['a']);
+  });
+
+  it("'__unassigned' on partner returns rows with empty partner_in_charge on every cell", () => {
+    const out = filterEntities({
+      entities: rows, partner: '__unassigned', periodLabels: period,
+    });
+    expect(out.map(r => r.id)).toEqual(['d']);
+  });
+
+  it("'__unassigned' on associate returns rows with no associate everywhere", () => {
+    const out = filterEntities({
+      entities: rows, associate: '__unassigned', periodLabels: period,
+    });
+    expect(out.map(r => r.id).sort()).toEqual(['c', 'd']);
+  });
+
+  it('AND-combines status + partner + associate', () => {
+    // status='info_to_request' → a, d
+    // partner='Diego' → a, c
+    // associate='Vale' → a
+    // intersection → a only
+    const out = filterEntities({
+      entities: rows,
+      status: 'info_to_request',
+      partner: 'Diego',
+      associate: 'Vale',
+      periodLabels: period,
+    });
+    expect(out.map(r => r.id)).toEqual(['a']);
+  });
+
+  it('returns [] when filters do not intersect', () => {
+    // status='filed' AND partner='Gab' → no row matches both.
+    const out = filterEntities({
+      entities: rows, status: 'filed', partner: 'Gab', periodLabels: period,
+    });
+    expect(out).toEqual([]);
   });
 });
 
