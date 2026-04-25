@@ -18,7 +18,15 @@ import type { ReactNode } from 'react';
 export interface InlineEditorRenderArgs<T> {
   value: T;
   setValue: (v: T) => void;
-  commit: () => void;      // trigger save + exit edit mode
+  /**
+   * Trigger save + exit edit mode. Optionally accepts an explicit
+   * `nextValue` so callers that mutate state right before committing
+   * (e.g. native <select> onChange + setTimeout(commit, 0)) don't fall
+   * victim to React's async batching — we save the value the caller
+   * just produced, not whatever setDraft has flushed by the time the
+   * timer fires.
+   */
+  commit: (nextValue?: T) => void;
   cancel: () => void;      // exit without save
 }
 
@@ -54,16 +62,20 @@ export function InlineCellEditor<T>({
   // Reset draft whenever incoming value changes (e.g. after refetch).
   useEffect(() => { if (!isEditing) setDraft(value); }, [value, isEditing]);
 
-  const commit = useCallback(async () => {
-    // Avoid unnecessary save if draft equals current value.
-    if (draft === value || JSON.stringify(draft) === JSON.stringify(value)) {
+  const commit = useCallback(async (nextValue?: T) => {
+    // Use the explicit `nextValue` when provided (sidesteps React's async
+    // batching when editors call setValue + commit back-to-back). Falls
+    // back to the latest `draft` for callers that just want a "save now".
+    const candidate = nextValue !== undefined ? nextValue : draft;
+    // Avoid unnecessary save if the candidate equals the current value.
+    if (candidate === value || JSON.stringify(candidate) === JSON.stringify(value)) {
       setIsEditing(false);
       return;
     }
     setBusy(true);
     setError(null);
     try {
-      await onSave(draft);
+      await onSave(candidate);
       setIsEditing(false);
     } catch (e) {
       setError(String(e instanceof Error ? e.message : e));

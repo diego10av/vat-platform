@@ -40,8 +40,11 @@ export function InlineStatusCell({
           value={value}
           onChange={(next) => {
             setValue(next);
-            // fire save immediately on selection — matches Linear's pattern
-            setTimeout(() => commit(), 0);
+            // Fire save immediately on selection. Pass `next` explicitly
+            // so commit isn't racing React's async setDraft batching
+            // (caught a real bug here: pre-fix commit() read stale draft
+            // and silently no-op'd because draft === value).
+            setTimeout(() => commit(next), 0);
           }}
         >
           {FILING_STATUSES.map(s => (
@@ -268,7 +271,7 @@ export function InlinePriceCell({
               </button>
               <button
                 type="button"
-                onClick={commit}
+                onClick={() => commit()}
                 className="px-2 py-0.5 text-[11px] rounded bg-brand-500 text-white hover:bg-brand-600"
               >
                 Save
