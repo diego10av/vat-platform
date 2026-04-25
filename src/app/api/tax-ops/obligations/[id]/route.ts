@@ -7,7 +7,9 @@ import { execute, logAudit, buildUpdate } from '@/lib/db';
 //                                        historical filings are preserved. Reversible
 //                                        via PATCH is_active=true.
 
-const ALLOWED = ['is_active', 'default_assignee', 'notes'] as const;
+// Stint 43.D4 — form_code added (CIT forms 500 / 205 / 200).
+const ALLOWED = ['is_active', 'default_assignee', 'notes', 'form_code'] as const;
+const VALID_FORM_CODES = ['500', '205', '200'] as const;
 
 export async function PATCH(
   request: NextRequest,
@@ -15,6 +17,15 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const { id } = await params;
   const body = await request.json() as Record<string, unknown>;
+  // form_code is whitelisted but only the 3 CIT codes are valid.
+  if (body.form_code !== undefined && body.form_code !== null) {
+    if (typeof body.form_code !== 'string' || !VALID_FORM_CODES.includes(body.form_code as typeof VALID_FORM_CODES[number])) {
+      return NextResponse.json(
+        { error: `form_code must be one of ${VALID_FORM_CODES.join(' / ')} or null` },
+        { status: 400 },
+      );
+    }
+  }
   const { sql, values, changes } = buildUpdate(
     'tax_obligations', ALLOWED, body, 'id', id, ['updated_at = NOW()'],
   );

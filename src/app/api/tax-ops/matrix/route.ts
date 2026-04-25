@@ -85,6 +85,8 @@ interface EntityRow {
   group_id: string | null;
   group_name: string | null;
   obligation_id: string | null;
+  /** Stint 43.D4 — per-obligation tax form id (CIT: 500/205/200). NULL when unset. */
+  form_code: string | null;
   cells: Record<string, MatrixCell | null>;
 }
 
@@ -137,7 +139,15 @@ export async function GET(request: NextRequest) {
                  AND o.period_pattern = $2
                  AND o.service_kind = $3
                  AND o.is_active = TRUE
-               LIMIT 1) AS obligation_id
+               LIMIT 1) AS obligation_id,
+             (SELECT o.form_code
+                FROM tax_obligations o
+               WHERE o.entity_id = e.id
+                 AND o.tax_type = $1
+                 AND o.period_pattern = $2
+                 AND o.service_kind = $3
+                 AND o.is_active = TRUE
+               LIMIT 1) AS form_code
         FROM tax_entities e
         LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
        WHERE (e.is_active = TRUE
@@ -147,7 +157,8 @@ export async function GET(request: NextRequest) {
     : `
       SELECT e.id, e.legal_name,
              g.id AS group_id, g.name AS group_name,
-             o.id AS obligation_id
+             o.id AS obligation_id,
+             o.form_code
         FROM tax_obligations o
         JOIN tax_entities e ON e.id = o.entity_id
         LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
@@ -164,6 +175,7 @@ export async function GET(request: NextRequest) {
     id: string; legal_name: string;
     group_id: string | null; group_name: string | null;
     obligation_id: string | null;
+    form_code: string | null;
   }>(entityQuery, [tax_type, period_pattern, service_kind, year]);
 
   // Load every filing for these (obligation, period_label) pairs in one round-trip.
@@ -238,6 +250,7 @@ export async function GET(request: NextRequest) {
       group_id: e.group_id,
       group_name: e.group_name,
       obligation_id: e.obligation_id,
+      form_code: e.form_code ?? null,
       cells,
     };
   });

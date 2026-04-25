@@ -50,6 +50,8 @@ export interface MatrixEntity {
   group_id: string | null;
   group_name: string | null;
   obligation_id: string | null;
+  /** Stint 43.D4 — per-obligation tax form id (CIT: 500/205/200). */
+  form_code?: string | null;
   cells: Record<string, MatrixCell | null>;
 }
 

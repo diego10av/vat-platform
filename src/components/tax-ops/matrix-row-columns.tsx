@@ -126,6 +126,111 @@ export function lastChasedColumn(periodLabels: string[], refetch: () => void): M
 }
 
 /**
+ * Stint 43.D4 — Form column for CIT (and other tax types where it
+ * makes sense). Per-obligation field: per-entity stable, only
+ * changes when the entity goes through a société conversion.
+ *
+ * Diego's spec: "para algunas declaraciones hago el formulario 500,
+ * para otras el 205 y muy a veces el 200." Three valid codes; null
+ * = unset.
+ *
+ * Click the chip → small dropdown overlays with the 3 options.
+ * Save patches the obligation in place (not the filing).
+ */
+export const CIT_FORM_OPTIONS = [
+  { code: '500', label: '500', description: 'Standard CIT return (default for most companies)' },
+  { code: '205', label: '205', description: 'Abbreviated return for small entities' },
+  { code: '200', label: '200', description: 'Special-case form (rare)' },
+];
+
+export function formColumn({ refetch, toast }: {
+  refetch: () => void;
+  toast?: { success: (m: string) => void; error: (m: string) => void };
+}): MatrixColumn {
+  return {
+    key: 'form',
+    label: 'Form',
+    widthClass: 'w-[80px]',
+    render: (e) => (
+      <FormInlineCell
+        obligationId={e.obligation_id}
+        currentForm={e.form_code ?? null}
+        disabled={!e.obligation_id}
+        onChange={async (next) => {
+          if (!e.obligation_id) return;
+          const res = await fetch(`/api/tax-ops/obligations/${e.obligation_id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ form_code: next }),
+          });
+          if (!res.ok) {
+            const b = await res.json().catch(() => ({}));
+            toast?.error(`Form update failed: ${b?.error ?? res.status}`);
+            return;
+          }
+          toast?.success(`${e.legal_name} → Form ${next ?? '(none)'}`);
+          refetch();
+        }}
+      />
+    ),
+  };
+}
+
+function FormInlineCell({
+  obligationId, currentForm, onChange, disabled,
+}: {
+  obligationId: string | null;
+  currentForm: string | null;
+  onChange: (next: string | null) => Promise<void>;
+  disabled?: boolean;
+}) {
+  const label = currentForm ?? '—';
+  const tone = currentForm
+    ? 'bg-surface-alt text-ink font-mono'
+    : 'text-ink-muted italic';
+
+  function handleChange(raw: string) {
+    const next = raw === '__none__' ? null : raw;
+    if (next === currentForm) return;
+    void onChange(next);
+  }
+
+  return (
+    <span className="relative inline-block">
+      <span
+        className={[
+          'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] pointer-events-none',
+          tone,
+        ].join(' ')}
+        title={
+          disabled
+            ? 'No obligation on this entity'
+            : currentForm
+              ? `Form ${currentForm} — click to change`
+              : 'Click to set the CIT form (500 / 205 / 200)'
+        }
+      >
+        {label}
+      </span>
+      {!disabled && (
+        <select
+          value={currentForm ?? ''}
+          onChange={(e) => handleChange(e.target.value)}
+          aria-label="Change tax form"
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        >
+          <option value="__none__">— (clear)</option>
+          {CIT_FORM_OPTIONS.map(o => (
+            <option key={o.code} value={o.code}>{o.label}</option>
+          ))}
+        </select>
+      )}
+      <span aria-hidden className="hidden" data-obligation-id={obligationId ?? ''} />
+    </span>
+  );
+}
+
+/**
  * Stint 41 — Cadence switcher column (WHT-family only).
  *
  * Diego's feedback: "algunas empresas lo hacen quarterly, otras
