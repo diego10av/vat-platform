@@ -223,8 +223,16 @@ export function TaxTypeMatrix({
       }
     : rowAction;
 
+  // Stint 43.D12 — viewport-cap so the horizontal scrollbar lives inside
+  // the visible window instead of at the bottom of the (potentially very
+  // long) page. Diego: "no veo bien la barra horizontal porque me obliga
+  // a hacer scroll al fondo de la página". The 220px subtract leaves room
+  // for the page header + toolbar + a small breathing strip; tweakable.
   return (
-    <div className="rounded-md border border-border bg-surface overflow-auto relative">
+    <div
+      className="rounded-md border border-border bg-surface overflow-auto relative"
+      style={{ maxHeight: 'calc(100vh - 220px)' }}
+    >
       <table className="w-full text-[12px] border-collapse">
         <thead className="bg-surface-alt sticky top-0 z-10">
           <tr className="text-left text-ink-muted">
