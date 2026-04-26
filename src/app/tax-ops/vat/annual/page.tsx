@@ -110,6 +110,7 @@ export default function VatAnnualPage() {
         onPartnerFilterChange={setPartnerFilter}
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
+        entitiesForFilters={combined}
       />
 
       {hasError && <CrmErrorBox message={String(hasError)} onRetry={refetch} />}

@@ -12,7 +12,8 @@ import { useState, useMemo } from 'react';
 import { DownloadIcon } from 'lucide-react';
 import { useToast } from '@/components/Toaster';
 import { FILING_STATUSES, filingStatusLabel } from './FilingStatusBadge';
-import { useTaxTeamMembers } from './useMatrixData';
+import { useTaxTeamMembers, ownershipNamesInCells } from './useMatrixData';
+import type { MatrixEntity } from './TaxTypeMatrix';
 import { SearchableSelect, type SearchableOption } from '@/components/ui/SearchableSelect';
 
 interface Props {
@@ -43,6 +44,14 @@ interface Props {
   /** Stint 43.D7 — associate filter, mirrors partnerFilter. */
   associateFilter?: string;
   onAssociateFilterChange?: (next: string) => void;
+  /**
+   * Stint 44.F2 — pages pass the *unfiltered* entity list (data.entities,
+   * not the post-filter slice) so the dropdown can offer the union of:
+   * names that actually appear in the matrix cells (free-text, may not
+   * exist in tax_team_members) ∪ team members from the team endpoint.
+   * "What you see in the matrix is what you can filter on."
+   */
+  entitiesForFilters?: MatrixEntity[];
 }
 
 export function MatrixToolbar({
@@ -53,6 +62,7 @@ export function MatrixToolbar({
   statusFilter, onStatusFilterChange,
   partnerFilter, onPartnerFilterChange,
   associateFilter, onAssociateFilterChange,
+  entitiesForFilters,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -60,19 +70,30 @@ export function MatrixToolbar({
   // so pages that don't use them don't pay the fetch cost.
   const ownershipFiltersWired = !!(onPartnerFilterChange || onAssociateFilterChange);
   const { members } = useTaxTeamMembers();
-  // Build SearchableSelect options once. "All" + "Unassigned" sit on top
-  // of the team list so Diego can clear the filter without scrolling.
-  const ownershipOptions = useMemo<SearchableOption[]>(() => {
-    if (!ownershipFiltersWired) return [];
-    return [
-      { value: 'all', label: 'All' },
-      { value: '__unassigned', label: 'Unassigned' },
-      ...members.map(m => ({
-        value: m.short_name,
-        label: m.full_name ? `${m.short_name} · ${m.full_name}` : m.short_name,
-      })),
-    ];
-  }, [ownershipFiltersWired, members]);
+
+  // Stint 44.F2 — partner and associate dropdowns are built independently
+  // so each only offers names actually present in its respective field
+  // (Diego: "los nombres que se han ido incluyendo, los exactos"). We
+  // union team members + names found in the cells, dedupe, sort, then
+  // pin "All" + "Unassigned" on top.
+  const partnerOptions = useMemo<SearchableOption[]>(
+    () => buildOwnershipOptions(
+      ownershipFiltersWired,
+      members,
+      entitiesForFilters ?? [],
+      'partner_in_charge',
+    ),
+    [ownershipFiltersWired, members, entitiesForFilters],
+  );
+  const associateOptions = useMemo<SearchableOption[]>(
+    () => buildOwnershipOptions(
+      ownershipFiltersWired,
+      members,
+      entitiesForFilters ?? [],
+      'associates_working',
+    ),
+    [ownershipFiltersWired, members, entitiesForFilters],
+  );
 
   async function downloadExcel() {
     setBusy(true);
@@ -137,7 +158,7 @@ export function MatrixToolbar({
         <label className="inline-flex items-center gap-1.5 text-[12.5px]">
           <span className="text-ink-muted">Partner:</span>
           <SearchableSelect
-            options={ownershipOptions}
+            options={partnerOptions}
             value={partnerFilter ?? 'all'}
             onChange={onPartnerFilterChange}
             ariaLabel="Filter by partner in charge"
@@ -148,7 +169,7 @@ export function MatrixToolbar({
         <label className="inline-flex items-center gap-1.5 text-[12.5px]">
           <span className="text-ink-muted">Associate:</span>
           <SearchableSelect
-            options={ownershipOptions}
+            options={associateOptions}
             value={associateFilter ?? 'all'}
             onChange={onAssociateFilterChange}
             ariaLabel="Filter by associate working"
@@ -188,4 +209,36 @@ export function MatrixToolbar({
       </div>
     </div>
   );
+}
+
+/**
+ * Stint 44.F2 — union team members + names in the cells, dedupe, sort,
+ * pin "All" + "Unassigned" on top. Member entries get the "short · full"
+ * label so Diego can disambiguate when two people share a short name.
+ * Names not in the team table render as plain short names.
+ */
+function buildOwnershipOptions(
+  wired: boolean,
+  members: Array<{ short_name: string; full_name: string | null }>,
+  entities: MatrixEntity[],
+  field: 'partner_in_charge' | 'associates_working',
+): SearchableOption[] {
+  if (!wired) return [];
+  const inCells = ownershipNamesInCells(entities, field);
+  const memberByShort = new Map(members.map(m => [m.short_name, m] as const));
+  const merged = new Set<string>();
+  for (const m of members) merged.add(m.short_name);
+  for (const n of inCells) merged.add(n);
+  const sorted = Array.from(merged).sort((a, b) => a.localeCompare(b));
+  return [
+    { value: 'all', label: 'All' },
+    { value: '__unassigned', label: 'Unassigned' },
+    ...sorted.map(name => {
+      const m = memberByShort.get(name);
+      return {
+        value: name,
+        label: m?.full_name ? `${name} · ${m.full_name}` : name,
+      };
+    }),
+  ];
 }

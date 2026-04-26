@@ -247,6 +247,7 @@ export default function CitPage() {
         onPartnerFilterChange={setPartnerFilter}
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
+        entitiesForFilters={current.data?.entities ?? []}
       />
 
       {current.error && <CrmErrorBox message={current.error} onRetry={refetchAll} />}

@@ -80,6 +80,7 @@ export default function SubscriptionTaxPage() {
         onPartnerFilterChange={setPartnerFilter}
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
+        entitiesForFilters={data?.entities ?? []}
       />
 
       {error && <CrmErrorBox message={error} onRetry={refetch} />}

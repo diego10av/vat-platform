@@ -83,6 +83,7 @@ export default function VatMonthlyPage() {
         onPartnerFilterChange={setPartnerFilter}
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
+        entitiesForFilters={data?.entities ?? []}
       />
 
       {error && <CrmErrorBox message={error} onRetry={refetch} />}

@@ -82,6 +82,7 @@ export default function Bcl216Page() {
         onPartnerFilterChange={setPartnerFilter}
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
+        entitiesForFilters={data?.entities ?? []}
       />
 
       {error && <CrmErrorBox message={error} onRetry={refetch} />}

@@ -193,6 +193,32 @@ function matchesOwnership(
   });
 }
 
+/**
+ * Stint 44.F2 — collect the unique short_names that actually appear in the
+ * matrix's cells for the given ownership field. Diego adds names directly
+ * via the inline tags cell (free text), bypassing the team endpoint, so
+ * the filter dropdown has to read what's in the data — not just from
+ * tax_team_members. Returns sorted ASCII names with no duplicates.
+ */
+export function ownershipNamesInCells(
+  entities: MatrixEntity[],
+  field: 'partner_in_charge' | 'associates_working',
+): string[] {
+  const set = new Set<string>();
+  for (const e of entities) {
+    for (const cell of Object.values(e.cells)) {
+      if (!cell) continue;
+      const list = cell[field];
+      if (!list) continue;
+      for (const name of list) {
+        const t = name.trim();
+        if (t) set.add(t);
+      }
+    }
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b));
+}
+
 // ─── Tax team members (stint 43.D7) ──────────────────────────────────
 
 export interface TaxTeamMember {

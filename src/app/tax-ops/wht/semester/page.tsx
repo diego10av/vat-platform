@@ -81,6 +81,7 @@ export default function WhtSemesterPage() {
         onPartnerFilterChange={setPartnerFilter}
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
+        entitiesForFilters={data?.entities ?? []}
       />
 
       {error && <CrmErrorBox message={error} onRetry={refetch} />}

@@ -87,7 +87,7 @@ export function partnerInChargeColumn(periodLabels: string[], refetch: () => voi
         <InlineTagsCell
           value={value}
           disabled={allFilingIds.length === 0}
-          placeholder=""
+          placeholder="+ partner"
           onSave={async (next) => {
             await patchAllFilings(allFilingIds, { partner_in_charge: next });
             refetch();
@@ -102,6 +102,10 @@ export function partnerInChargeColumn(periodLabels: string[], refetch: () => voi
  * Stint 43.D11 — "Associates working" column. Mirror of partnerInChargeColumn
  * but for the associate(s) doing the prep work. New field, starts empty
  * for all rows; Diego fills as engagements progress.
+ *
+ * Stint 44.F1 — was rendering a blank cell when no associates were assigned
+ * (placeholder=""), so Diego had no clue where to click. Visible "+ associate"
+ * placeholder makes the affordance obvious.
  */
 export function associatesWorkingColumn(periodLabels: string[], refetch: () => void): MatrixColumn {
   return {
@@ -118,7 +122,7 @@ export function associatesWorkingColumn(periodLabels: string[], refetch: () => v
         <InlineTagsCell
           value={value}
           disabled={allFilingIds.length === 0}
-          placeholder=""
+          placeholder="+ associate"
           onSave={async (next) => {
             await patchAllFilings(allFilingIds, { associates_working: next });
             refetch();
