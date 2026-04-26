@@ -33,6 +33,9 @@ export interface MatrixCell {
   filed_at: string | null;
   draft_sent_at: string | null;
   tax_assessment_received_at: string | null;
+  /** Stint 44.F3 — outcome category for the assessment.
+   *  'aligned' / 'under_audit' / null. Independent of the date field. */
+  tax_assessment_outcome?: string | null;
   amount_due: string | null;
   amount_paid: string | null;
   prepared_with: string[];

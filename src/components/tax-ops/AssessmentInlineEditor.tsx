@@ -20,19 +20,30 @@
 import { useState, useRef, useEffect } from 'react';
 import { filingStatusLabel, FILING_STATUSES } from './FilingStatusBadge';
 
+/** Stint 44.F3 — three explicit outcome categories. */
+export type AssessmentOutcome = 'aligned' | 'under_audit' | null;
+
 interface Props {
   filingId: string | null;
   currentStatus: string | null;
   assessmentDate: string | null;
-  onSave: (args: { status: string; assessmentDate: string | null }) => Promise<void>;
+  /** Stint 44.F3 — outcome category once received. NULL = not yet
+   *  categorised (legacy rows). */
+  assessmentOutcome?: AssessmentOutcome;
+  onSave: (args: {
+    status: string;
+    assessmentDate: string | null;
+    assessmentOutcome: AssessmentOutcome;
+  }) => Promise<void>;
 }
 
 export function AssessmentInlineEditor({
-  filingId, currentStatus, assessmentDate, onSave,
+  filingId, currentStatus, assessmentDate, assessmentOutcome, onSave,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [draftStatus, setDraftStatus] = useState(currentStatus ?? 'info_to_request');
   const [draftDate, setDraftDate] = useState(assessmentDate ?? '');
+  const [draftOutcome, setDraftOutcome] = useState<AssessmentOutcome>(assessmentOutcome ?? null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const popRef = useRef<HTMLDivElement | null>(null);
@@ -41,9 +52,10 @@ export function AssessmentInlineEditor({
     if (open) {
       setDraftStatus(currentStatus ?? 'info_to_request');
       setDraftDate(assessmentDate ?? '');
+      setDraftOutcome(assessmentOutcome ?? null);
       setError(null);
     }
-  }, [open, currentStatus, assessmentDate]);
+  }, [open, currentStatus, assessmentDate, assessmentOutcome]);
 
   // Click-outside = save + close
   useEffect(() => {
@@ -69,8 +81,15 @@ export function AssessmentInlineEditor({
 
   async function commit() {
     if (busy) return;
+    // Auto-clear outcome if the date is being cleared (outcome only
+    // makes sense when there's a received date).
+    const effectiveOutcome: AssessmentOutcome = draftDate === '' ? null : draftOutcome;
     // No-op if nothing changed
-    if (draftStatus === (currentStatus ?? '') && draftDate === (assessmentDate ?? '')) {
+    if (
+      draftStatus === (currentStatus ?? '')
+      && draftDate === (assessmentDate ?? '')
+      && effectiveOutcome === (assessmentOutcome ?? null)
+    ) {
       setOpen(false);
       return;
     }
@@ -80,6 +99,7 @@ export function AssessmentInlineEditor({
       await onSave({
         status: draftStatus,
         assessmentDate: draftDate === '' ? null : draftDate,
+        assessmentOutcome: effectiveOutcome,
       });
       setOpen(false);
     } catch (e) {
@@ -94,23 +114,45 @@ export function AssessmentInlineEditor({
     return <span className="text-ink-faint italic text-[11px]">No prior filing</span>;
   }
 
-  // Stint 40.F — Diego wanted a pragmatic tri-state: "Not yet / Yes /
-  // Stint 43 — simplified to a 2-state chip after the status rework:
-  // assessment_received and waived are no longer valid statuses.
-  // The signal is the date itself in tax_assessment_received_at.
-  //   - assessmentDate set → "✓ Received {date}" green chip
-  //   - assessmentDate null → "Not yet" amber chip
-  // The popover dropdown still exposes the full FILING_STATUSES so
-  // Diego can flip the prior-year filing status if needed.
-  const triStateChip = assessmentDate ? (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-green-100 text-green-800">
-      ✓ Received {assessmentDate}
-    </span>
-  ) : (
-    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-amber-100 text-amber-800">
-      Not yet
-    </span>
-  );
+  // Stint 44.F3 — pragmatic tri-state restored, this time with a real
+  // outcome category instead of overloading the status enum. Three chips:
+  //   - no date              → "Not yet" amber
+  //   - date + aligned       → "✓ Aligned · DATE" green
+  //   - date + under_audit   → "⚠ Under audit · DATE" orange
+  //   - date + null outcome  → legacy "✓ Received · DATE" gray-green
+  //                            (entries created before mig 062 don't have
+  //                            an outcome; preserved verbatim)
+  let triStateChip: React.ReactNode;
+  if (!assessmentDate) {
+    triStateChip = (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-amber-100 text-amber-800">
+        Not yet
+      </span>
+    );
+  } else if (assessmentOutcome === 'aligned') {
+    triStateChip = (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-green-100 text-green-800">
+        ✓ Aligned · {assessmentDate}
+      </span>
+    );
+  } else if (assessmentOutcome === 'under_audit') {
+    triStateChip = (
+      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-orange-100 text-orange-800">
+        ⚠ Under audit · {assessmentDate}
+      </span>
+    );
+  } else {
+    // Legacy row: date set, outcome NULL. Soft "received" chip nudges
+    // Diego to categorise on next click without screaming.
+    triStateChip = (
+      <span
+        className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10.5px] bg-emerald-50 text-emerald-700 border border-emerald-200"
+        title="Received but outcome not categorised — click to mark Aligned or Under audit"
+      >
+        ✓ Received · {assessmentDate}
+      </span>
+    );
+  }
 
   const displayNode = triStateChip;
 
@@ -152,6 +194,40 @@ export function AssessmentInlineEditor({
           onChange={(e) => setDraftDate(e.target.value)}
           className="w-full px-1.5 py-0.5 text-[11.5px] border border-border rounded bg-surface tabular-nums"
         />
+        {draftDate && (
+          <>
+            <label className="block text-[10.5px] text-ink-muted mt-1">Outcome</label>
+            <div className="flex flex-col gap-0.5">
+              <label className="inline-flex items-center gap-1.5 text-[11.5px] cursor-pointer">
+                <input
+                  type="radio"
+                  name="assessment-outcome"
+                  checked={draftOutcome === 'aligned'}
+                  onChange={() => setDraftOutcome('aligned')}
+                />
+                <span>✓ Aligned (matches our return)</span>
+              </label>
+              <label className="inline-flex items-center gap-1.5 text-[11.5px] cursor-pointer">
+                <input
+                  type="radio"
+                  name="assessment-outcome"
+                  checked={draftOutcome === 'under_audit'}
+                  onChange={() => setDraftOutcome('under_audit')}
+                />
+                <span>⚠ Under audit / clarifications</span>
+              </label>
+              <label className="inline-flex items-center gap-1.5 text-[11px] cursor-pointer text-ink-muted">
+                <input
+                  type="radio"
+                  name="assessment-outcome"
+                  checked={draftOutcome === null}
+                  onChange={() => setDraftOutcome(null)}
+                />
+                <span>Not categorised yet</span>
+              </label>
+            </div>
+          </>
+        )}
         <div className="flex gap-1 pt-1">
           <button
             type="button"

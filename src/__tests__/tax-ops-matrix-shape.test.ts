@@ -111,6 +111,7 @@ const makeCell = (overrides: Partial<MatrixCell> = {}): MatrixCell => ({
   filed_at: null,
   draft_sent_at: null,
   tax_assessment_received_at: null,
+  tax_assessment_outcome: null,
   amount_due: null,
   amount_paid: null,
   prepared_with: [],

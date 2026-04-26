@@ -66,6 +66,8 @@ interface MatrixCell {
   filed_at: string | null;
   draft_sent_at: string | null;
   tax_assessment_received_at: string | null;
+  /** Stint 44.F3 — outcome category ('aligned' / 'under_audit' / null). */
+  tax_assessment_outcome: string | null;
   amount_due: string | null;
   amount_paid: string | null;
   prepared_with: string[];
@@ -198,6 +200,7 @@ export async function GET(request: NextRequest) {
     assigned_to: string | null; comments: string | null;
     filed_at: string | null; draft_sent_at: string | null;
     tax_assessment_received_at: string | null;
+    tax_assessment_outcome: string | null;
     amount_due: string | null; amount_paid: string | null;
     prepared_with: string[];
     partner_in_charge: string[];
@@ -216,6 +219,7 @@ export async function GET(request: NextRequest) {
               f.assigned_to, f.comments,
               f.filed_at::text, f.draft_sent_at::text,
               f.tax_assessment_received_at::text,
+              f.tax_assessment_outcome,
               f.amount_due::text, f.amount_paid::text,
               f.prepared_with,
               f.partner_in_charge,
@@ -244,6 +248,7 @@ export async function GET(request: NextRequest) {
       filed_at: f.filed_at,
       draft_sent_at: f.draft_sent_at,
       tax_assessment_received_at: f.tax_assessment_received_at,
+      tax_assessment_outcome: f.tax_assessment_outcome,
       amount_due: f.amount_due,
       amount_paid: f.amount_paid,
       prepared_with: f.prepared_with ?? [],

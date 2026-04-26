@@ -138,11 +138,13 @@ export default function CitPage() {
             filingId={priorCell?.filing_id ?? null}
             currentStatus={priorCell?.status ?? null}
             assessmentDate={priorCell?.tax_assessment_received_at ?? null}
-            onSave={async ({ status, assessmentDate }) => {
+            assessmentOutcome={(priorCell?.tax_assessment_outcome ?? null) as 'aligned' | 'under_audit' | null}
+            onSave={async ({ status, assessmentDate, assessmentOutcome }) => {
               if (!priorCell?.filing_id) return;
               await patchFiling(priorCell.filing_id, {
                 status,
                 tax_assessment_received_at: assessmentDate,
+                tax_assessment_outcome: assessmentOutcome,
               });
               refetchAll();
             }}

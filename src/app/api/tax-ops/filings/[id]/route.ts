@@ -24,6 +24,8 @@ interface FilingDetail {
   partner_in_charge: string[];
   /** Stint 43.D11 — associate(s) doing the prep work. */
   associates_working: string[];
+  /** Stint 44.F3 — assessment outcome category. */
+  tax_assessment_outcome: string | null;
   draft_sent_at: string | null;
   client_approved_at: string | null;
   filed_at: string | null;
@@ -67,6 +69,7 @@ export async function GET(
             f.client_approved_at::text AS client_approved_at,
             f.filed_at::text AS filed_at,
             f.tax_assessment_received_at::text AS tax_assessment_received_at,
+            f.tax_assessment_outcome,
             f.tax_assessment_url,
             f.amount_due::text, f.amount_paid::text, f.paid_at::text,
             f.csp_contacts, e.csp_contacts AS entity_csp_contacts,
@@ -96,6 +99,8 @@ const ALLOWED_FIELDS = [
   'status', 'assigned_to', 'deadline_date', 'prepared_with',
   'draft_sent_at', 'client_approved_at', 'filed_at',
   'tax_assessment_received_at', 'tax_assessment_url',
+  // Stint 44.F3 — assessment outcome category ('aligned' / 'under_audit' / null).
+  'tax_assessment_outcome',
   'amount_due', 'amount_paid', 'paid_at',
   'csp_contacts', 'comments', 'internal_matter_code',
   // Stint 39.F — last chase date for info requests to client/CSP.
