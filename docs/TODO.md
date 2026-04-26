@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-25 (stint 43 closed — CIT redesign + filtros expandidos. 14 sub-commits ejecutados sobre el feedback de Diego en sesión de uso real: bug status dropdown (race condition fix), status enum v3 (fuse + add + drop + 4 migrations 057/058/060/061), año -2 fuera del selector, Form column en CIT (per-obligation 500/205/200), last_action_at auto-stamped + columna renombrada, Partner in charge + Associates working como columnas separadas, 3 filtros AND-combinados en MatrixToolbar, SearchableSelect combobox component, NWT review fechas visibles + 1-click "today" buttons, viewport-cap para que la barra horizontal viva en pantalla, Families index + entity breadcrumb. 700 tests green.)
+> Last updated: 2026-04-26 (stints 44-47 closed — post-CIT polish + design-system audit en 3 fases. Stint 44: associate placeholder visible, filter dropdowns con nombres en celdas, assessment tri-state Aligned/Under-audit + mig 062, kebab actions menu reemplaza chip permanente de liquidación. Stints 45-47 (Phases 1-3): tokens de tipografía + radii + spacing en @theme, PageHeader variants + PageContainer, DataTable + Field + Drawer + Popover primitives, 155-file bulk text-scale migration, focus-state unification, hex purge, docs/DESIGN_SYSTEM.md source-of-truth, npm run lint:design CI guard (0 violations across 469 files). CLAUDE.md gana Hard Rule §13 — design uniformity across all modules. 707 tests green.)
 
 > Earlier: 2026-04-24 (stint 41 closed — WHT per-entity cadence switcher. Migration 055 adds wht_director_quarterly rule (now 5 cadences: Monthly/Quarterly/Semester/Annual/Ad-hoc). New /change-cadence endpoint moves an obligation within the wht_director_* family atomically, with audit log. New cadenceColumn/CadenceInlineCell surfaces a 1-click dropdown on every WHT matrix page. Filings stay attached to the obligation; old period_labels remain in the audit log but won't render in the new cadence's matrix — Diego confirmed that's fine per the "cambio de cadencia" flow he described. 678 tests green. No backlog left from stints 40/41.)
 
@@ -99,6 +99,63 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-26** — Stints 45-47: design-system audit, 3 phases (3 commits)
+
+Diego: "el diseño tiene que estar alineado en todo cifra. En todos los
+distintos módulos." Two parallel Explore audits cataloged the gaps;
+one execution sweep landed tokens + primitives + canon + lint guard.
+
+- **45.F1 · Tokens + headers** (`fbdc19b`). Type scale tokens
+  (`text-2xs` → `text-3xl`) defined in globals.css `@theme inline`.
+  PageHeader gains `variant="default|hero|compact"`. New PageContainer
+  primitive (`width="wide|medium|narrow|full"`). Hover-row canon
+  `hover:bg-surface-alt/50`. Hex purge: `border-[#1a1a2e]` →
+  `border-brand-700`; Toast palette → success/danger/info tokens;
+  Badge custom tones → Tailwind stock palette.
+- **46.F2 · Primitives + bulk** (`cc6658e`). New `<DataTable>`
+  (vanilla list tables) + `<Field>` (form-field wrapper). Button
+  standardized on home + tax-ops. 155 files migrated text-[Xpx] →
+  tokens codebase-wide. Focus-state unification: globals.css owns the
+  halo, stripped 49 redundant `focus:ring-1 focus:ring-brand-500`.
+- **47.F3 · Long tail + doc** (`77d8b97`). New `<Drawer>` (right-side
+  slide-in, focus trap, scroll lock) + `<Popover>` (anchor +
+  click-outside + ESC). Radii + spacing tokens exposed via @theme.
+  `docs/DESIGN_SYSTEM.md` source-of-truth doc. CI lint guard at
+  `npm run lint:design` (0 violations across 469 files). Pattern
+  fixes caught + applied: hover divergences `/30/40/60/70/80` →
+  `/50` codebase-wide; `border-[#1a1a2e]` in registrations/[id].
+  CLAUDE.md gains Hard Rule §13 — design uniformity across all
+  modules.
+
+Gate: 707 tests green, tsc clean, design-lint 0 violations. Three
+commits, ~250 files net touched.
+
+---
+
+**2026-04-26** — Stint 44: post-CIT-redesign polish (4 commits)
+
+Diego pasada de feedback sobre lo desplegado en stint 43. Cuatro
+fixes priorizados; las preguntas sobre familias parqueadas para una
+sesión separada.
+
+- **44.F1+F2 · Filter dropdowns + placeholder** (`c0c285b`). Partner +
+  Associate filter dropdowns ahora union team-table con nombres
+  exactos en celdas (Diego añadía partners free-text que el filtro
+  no veía). Placeholder visible "+ partner" / "+ associate" cuando
+  celdas vacías (antes era span en blanco).
+- **44.F3 · Assessment tri-state** (`d629782`). Migration 062
+  `tax_assessment_outcome TEXT CHECK ('aligned'|'under_audit')`. Tres
+  chips: "Not yet" amber · "✓ Aligned · DATE" verde · "⚠ Under
+  audit · DATE" naranja. Radio outcome aparece en popover cuando
+  date está set.
+- **44.F4 · Kebab actions menu** (`77b1ad1`). Nuevo
+  `<EntityActionsMenu>` (kebab `⋯` discreto al lado del nombre con
+  popover Active/Liquidating/Liquidated). LiquidationChip
+  simplificado a signal-only (sin ghost "+ liquidate" en cada fila
+  activa, que era "demasiado evidente").
+
+---
 
 **2026-04-25 (afternoon)** — Stint 43: CIT redesign + filtros expandidos (14 sub-commits)
 

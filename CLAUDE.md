@@ -100,6 +100,44 @@ customer calls, strategic decisions, domain-expert VAT judgements,
 and the two things only a founder can do: talking to customers +
 deciding what to build next.
 
+### Rule §13 — **Design uniformity across modules** (2026-04-26)
+
+> *"El diseño tiene que ser uniforme a través de cifra. En todos
+> los distintos módulos."*
+
+cifra is one product. Tax-Ops, VAT, CRM, Settings, Marketing, future
+Peppol/ViDA — they share one look. A user navigating from
+`/declarations` → `/crm/companies` → `/tax-ops/cit` should feel zero
+style shift: same h1 size, same card padding, same hover opacity,
+same button height, same focus halo.
+
+**`docs/DESIGN_SYSTEM.md` is the source of truth.** Read it before
+adding a new page, primitive, or pattern. The tokens cover every
+reasonable need; ad-hoc literals fragment the look across modules.
+
+The non-negotiables (CI-enforced via `npm run lint:design`):
+
+- **Type scale**: `text-{2xs|xs|sm|base|lg|xl|2xl|3xl}`. Never `text-[Xpx]`.
+- **Colour**: only tokens (`text-ink-muted`, `bg-surface`, `border-success-50`).
+  Never `border-[#hex]` or `bg-[#hex]`.
+- **Hover canon**: `hover:bg-surface-alt/50` everywhere. No `/40` or `/60`.
+- **Focus**: `globals.css` owns it. Never re-add `focus:ring-1 focus:ring-brand-*`.
+- **Pages**: every page wraps `<PageContainer>` and opens with `<PageHeader>`.
+- **Tables**: `<DataTable>` for vanilla lists, `<TaxTypeMatrix>` for
+  matrices. No third pattern.
+- **Forms**: every field wraps `<Field>` around `<Input>` / `<Select>` /
+  `<Textarea>` / `<SearchableSelect>`. CTAs use `<Button>`.
+- **Drawers/Popovers/Modals**: use the primitives in `src/components/ui/`.
+  Never roll a custom right-panel or floating menu.
+
+If a primitive doesn't fit, the answer is **extend the primitive, not
+escape it**. Add a variant, document in `docs/DESIGN_SYSTEM.md`, then
+use it.
+
+When working in any new module (e.g. future Peppol, FATCA/CRS,
+direct-tax), the per-page checklist in `docs/DESIGN_SYSTEM.md §7`
+runs through every conformance point.
+
 ### Rule — **Next.js 16 breaking changes**
 
 <!-- BEGIN:nextjs-agent-rules -->
@@ -173,9 +211,34 @@ clients → entities → declarations → invoices → invoice_lines
 
 ## 4 · Current state (keep this section fresh on each stint)
 
-**As of 2026-04-25, stint 43 just closed (CIT redesign + filtros expandidos).** Status:
+**As of 2026-04-26, stints 44-47 just closed (CIT polish + design-system audit, Phases 1-3).** Status:
 
 ### Shipped — recent stints (newest first)
+- ✅ **Stints 45-47** (2026-04-26, design-system audit in 3 phases):
+  Diego: "el diseño tiene que estar alineado en todo cifra. En todos
+  los distintos módulos." Three-phase sweep that lands tokens +
+  primitives + canon + lint guard. **Phase 1 (45.F1)**: type-scale
+  tokens (`text-2xs` … `text-3xl`), `<PageHeader variant="default|hero|
+  compact">`, new `<PageContainer width="wide|medium|narrow|full">`,
+  hover-row canon `/50`, hardcoded-hex purge (Toast palette →
+  success/danger/info tokens, Badge custom tones → Tailwind stock
+  palette). 25 files. **Phase 2 (46.F2)**: new `<DataTable>` (vanilla
+  lists), new `<Field>` (form-field wrapper), `<Button>` standardized
+  on home + tax-ops, 155-file bulk text-scale migration codebase-wide,
+  focus-state unification (globals.css owns the halo, stripped 49
+  redundant `focus:ring-1 focus:ring-brand-500` instances). **Phase 3
+  (47.F3)**: new `<Drawer>` + `<Popover>` primitives, radii + spacing
+  tokens exposed in `@theme inline`, `docs/DESIGN_SYSTEM.md` source-
+  of-truth doc, `npm run lint:design` CI guard (0 violations across
+  469 files). **Hard rule §13** added to CLAUDE.md: design uniformity
+  across all modules.
+- ✅ **Stint 44** (2026-04-26): post-CIT-redesign polish (4 sub-commits).
+  F1 placeholder visible on Partner/Associate cells (was rendering
+  blank); F2 partner/associate filter dropdowns now union team-table +
+  names actually in cells; F3 assessment tri-state (Not yet / ✓ Aligned
+  / ⚠ Under audit + mig 062 `tax_assessment_outcome`); F4 entity
+  actions kebab `⋯` + LiquidationChip simplified to signal-only chip
+  (removes ghost "+ liquidate" from every active row). 707 tests green.
 - ✅ **Stint 43** (2026-04-25 afternoon, 14 sub-commits): CIT redesign
   + filtros expandidos. Diego en uso real de /tax-ops/cit pasó 13
   puntos de feedback; ejecutado todo en una pasada larga. Bug status
@@ -494,6 +557,10 @@ Every doc in `docs/` is actively maintained. Read as needed:
 - **`docs/VIDA.md`** — ViDA / Peppol strategic briefing.
 - **`docs/PERFORMANCE.md`** — perf profile + N+1 hotspots.
 - **`docs/A11Y.md`** — accessibility checklist + deferred items.
+- **`docs/DESIGN_SYSTEM.md`** — tokens, primitives, cross-module rules,
+  per-page checklist, forbidden patterns. **Read before adding any new
+  page or primitive.** CI lint guard (`npm run lint:design`) enforces
+  the non-negotiables.
 - **`docs/TESTING.md`** — 120-step manual test plan (partner-ready).
 - **`docs/legal-watch.md`** + `docs/legal-watch-triage.md` —
   legal-sources maintenance process.
