@@ -17,7 +17,7 @@ import { useEffect, useState } from 'react';
 import {
   HomeIcon, Building2Icon, FileTextIcon, CalendarIcon,
   BookOpenIcon, BriefcaseIcon, FileStackIcon,
-  LandmarkIcon, SearchCheckIcon, EuroIcon, ReceiptIcon,
+  LandmarkIcon, SearchCheckIcon, ReceiptIcon,
   WalletIcon, CoinsIcon, LibraryBigIcon, FolderIcon, CheckSquareIcon,
   BarChart3Icon, ShieldCheckIcon, SettingsIcon, ChevronRightIcon,
   TargetIcon, CircleIcon, PercentIcon, CalculatorIcon, ScrollTextIcon,
@@ -26,13 +26,15 @@ import {
 
 // Icon name → component (stint 38.A). Sidebar_icon column stores the
 // lucide icon name; this map decodes. Anything not here falls back
-// to CircleIcon.
+// to CircleIcon. Stint 52-followup — EuroIcon dropped (Diego: "queda
+// cutrísimo"); replaced everywhere VAT renders by CalculatorIcon.
+// Old `sidebar_icon = 'EuroIcon'` rows in tax_deadline_rules now fall
+// back to CircleIcon, but the seed migration 067 already swapped them.
 const ICON_MAP: Record<string, LucideIcon> = {
-  LandmarkIcon, SearchCheckIcon, EuroIcon, ReceiptIcon, WalletIcon,
+  LandmarkIcon, SearchCheckIcon, ReceiptIcon, WalletIcon,
   CoinsIcon, LibraryBigIcon, FolderIcon, FileStackIcon,
   FileTextIcon, Building2Icon, CalendarIcon, BriefcaseIcon,
   TargetIcon, CircleIcon, PercentIcon,
-  // Stint 51.F — Diego: "el símbolo del euro queda cutrísimo".
   CalculatorIcon, ScrollTextIcon,
 };
 function iconFor(name: string | null | undefined): LucideIcon {

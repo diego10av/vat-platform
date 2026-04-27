@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import {
-  CalendarPlusIcon, LandmarkIcon, EuroIcon, PercentIcon,
+  CalendarPlusIcon, LandmarkIcon, CalculatorIcon, PercentIcon,
   WalletIcon, LibraryBigIcon, FolderIcon,
 } from 'lucide-react';
 import { TaxOpsHomeWidgets } from '@/components/tax-ops/HomeWidgets';
@@ -46,7 +46,7 @@ const CATEGORIES = [
   },
   {
     href: '/tax-ops/vat/annual',
-    icon: EuroIcon,
+    icon: CalculatorIcon,
     title: 'VAT',
     description: 'Annual · Quarterly · Monthly (tabs inside)',
   },
