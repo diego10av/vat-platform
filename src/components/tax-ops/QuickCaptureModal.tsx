@@ -85,7 +85,20 @@ export function QuickCaptureModal() {
       setTimeout(() => inputRef.current?.focus(), 50);
       fetch('/api/tax-ops/entities')
         .then(r => r.ok ? r.json() : { entities: [] })
-        .then((body: { entities: EntityOption[] }) => setEntities(body.entities ?? []))
+        .then((body: { entities: EntityOption[] }) => {
+          setEntities(body.entities ?? []);
+          // Stint 51.A — auto-fill entityId when launched from
+          // /tax-ops/entities/[id]. Saves Diego from re-typing it.
+          const entityMatch = pathname.match(/^\/tax-ops\/entities\/([^/]+)/);
+          if (entityMatch) {
+            const presetId = entityMatch[1]!;
+            const found = (body.entities ?? []).find((e: EntityOption) => e.id === presetId);
+            if (found) {
+              setEntityId(presetId);
+              setEntitySearch(found.legal_name);
+            }
+          }
+        })
         .catch(() => setEntities([]));
     } else {
       // Reset everything on close
@@ -95,7 +108,7 @@ export function QuickCaptureModal() {
       setWaitingOnNote(''); setFollowUpDate('');
       setShowMore(false); setBusy(false); setError(null);
     }
-  }, [open]);
+  }, [open, pathname]);
 
   const filteredEntities = entities.filter(e => {
     const q = entitySearch.toLowerCase();

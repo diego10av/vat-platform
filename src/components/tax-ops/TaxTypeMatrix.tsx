@@ -21,7 +21,8 @@ import { useRouter } from 'next/navigation';
 import { ChevronDownIcon, ChevronRightIcon, PencilIcon } from 'lucide-react';
 import { FilingStatusBadge, filingStatusLabel } from './FilingStatusBadge';
 import { InlineStatusCell } from './inline-editors';
-import { familyChipClasses } from './familyColors';
+import { familyChipClasses, buildFamilyColorMap } from './familyColors';
+import { FamilyColorProvider } from './FamilyColorContext';
 import { LiquidationChip, isFinalReturnPeriod } from './LiquidationChip';
 import { EntityActionsMenu } from './EntityActionsMenu';
 
@@ -165,6 +166,16 @@ interface Props {
    *  refetches. Reuses the same callback shape as the other inline
    *  edits. */
   onLiquidationChanged?: () => void;
+  /**
+   * Stint 51.D — when set, every entity row gets a drag handle and can
+   * be reordered within its family by drag-and-drop. The callback
+   * receives the new sequential ordered list of entity ids for the
+   * affected family; the page is responsible for POSTing them to
+   * /api/tax-ops/entities/reorder and refetching.
+   *
+   * Drops across family boundaries are rejected client-side.
+   */
+  onReorderWithinFamily?: (args: { groupName: string; orderedIds: string[] }) => void;
 }
 
 export function TaxTypeMatrix({
@@ -180,21 +191,77 @@ export function TaxTypeMatrix({
   periodLabelsForEdit,
   liquidationVisuals,
   onLiquidationChanged,
+  onReorderWithinFamily,
 }: Props) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
+  // Stint 51.D — optimistic local override for drag-and-drop reorder.
+  // When the user drops a row, we re-order the local copy immediately so
+  // the matrix doesn't flicker while waiting for the server PATCH +
+  // refetch round-trip. Cleared whenever the parent passes a fresh
+  // `entities` prop (fresh data from the refetch).
+  const [optimistic, setOptimistic] = useState<MatrixEntity[] | null>(null);
+  // Track the entity currently being dragged + its source group so we
+  // can block cross-family drops.
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragGroup, setDragGroup] = useState<string | null>(null);
+  // Reset optimistic state when fresh data arrives.
+  useMemo(() => { setOptimistic(null); }, [entities]);
+  const effective = optimistic ?? entities;
+
   const groups = useMemo(() => {
-    if (!grouped) return [{ name: '', items: entities }];
+    if (!grouped) return [{ name: '', items: effective }];
     const m = new Map<string, MatrixEntity[]>();
-    for (const e of entities) {
+    for (const e of effective) {
       const key = e.group_name ?? '(no group)';
       if (!m.has(key)) m.set(key, []);
       m.get(key)!.push(e);
     }
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]))
       .map(([name, items]) => ({ name, items }));
-  }, [entities, grouped]);
+  }, [effective, grouped]);
+
+  // Drag-drop helpers — only active when onReorderWithinFamily is set.
+  const handleDragStart = useCallback((entity: MatrixEntity) => {
+    setDragId(entity.id);
+    setDragGroup(entity.group_name ?? '(no group)');
+  }, []);
+  const handleDragOver = useCallback((e: React.DragEvent, entity: MatrixEntity) => {
+    if (!dragId || !onReorderWithinFamily) return;
+    const targetGroup = entity.group_name ?? '(no group)';
+    if (targetGroup !== dragGroup) return;  // block cross-family drops
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  }, [dragId, dragGroup, onReorderWithinFamily]);
+  const handleDrop = useCallback((e: React.DragEvent, target: MatrixEntity) => {
+    if (!dragId || !onReorderWithinFamily) return;
+    const targetGroup = target.group_name ?? '(no group)';
+    if (targetGroup !== dragGroup) return;
+    if (target.id === dragId) return;
+    e.preventDefault();
+    // Compute new order: take effective[], remove the source, insert
+    // it before the target (drop ABOVE target).
+    const next = [...effective];
+    const sourceIdx = next.findIndex(e2 => e2.id === dragId);
+    if (sourceIdx === -1) return;
+    const [moved] = next.splice(sourceIdx, 1);
+    const targetIdx = next.findIndex(e2 => e2.id === target.id);
+    if (targetIdx === -1) return;
+    next.splice(targetIdx, 0, moved!);
+    setOptimistic(next);
+    setDragId(null);
+    setDragGroup(null);
+    // Compute the new ordered ids for the affected family + dispatch.
+    const familyIds = next
+      .filter(e2 => (e2.group_name ?? '(no group)') === targetGroup)
+      .map(e2 => e2.id);
+    onReorderWithinFamily({ groupName: targetGroup, orderedIds: familyIds });
+  }, [dragId, dragGroup, effective, onReorderWithinFamily]);
+  const handleDragEnd = useCallback(() => {
+    setDragId(null);
+    setDragGroup(null);
+  }, []);
 
   const toggleGroup = useCallback((name: string) => {
     setCollapsed(prev => {
@@ -228,6 +295,16 @@ export function TaxTypeMatrix({
   const otherCols = columns.filter(c => c.key !== 'family');
   const familyColWidth = 170;   // px — matches w-[170px]
   const entityStickyLeft = familyCol ? familyColWidth : 0;
+
+  // Stint 51.C — render-context palette assignment. Walk the entities in
+  // their visual order and produce a Map<family-name, palette-index> that
+  // never lets two adjacent rows share a colour. Memoized on the entity
+  // list so the assignment is stable across re-renders that don't change
+  // the order.
+  const familyColorMap = useMemo(
+    () => buildFamilyColorMap(entities.map(e => e.group_name)),
+    [entities],
+  );
 
   // Stint 40.G.2 — compose a row action that prepends a pencil ✎
   // when onEditFiling is set. Pencil is disabled (but visible) when
@@ -271,6 +348,7 @@ export function TaxTypeMatrix({
   // expand the table when they exceed the wrapper width, giving the
   // sticky cells a horizontal scroll context to anchor against.
   return (
+   <FamilyColorProvider value={familyColorMap}>
     <div
       className="rounded-md border border-border bg-surface overflow-auto relative"
       style={{ maxHeight: 'calc(100vh - 220px)' }}
@@ -328,12 +406,19 @@ export function TaxTypeMatrix({
                 liquidationVisuals={liquidationVisuals}
                 onLiquidationChanged={onLiquidationChanged}
                 totalCols={(familyCol ? 1 : 0) + 1 + otherCols.length + (effectiveRowAction ? 1 : 0)}
+                draggable={!!onReorderWithinFamily}
+                dragId={dragId}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
               />
             );
           })}
         </tbody>
       </table>
     </div>
+   </FamilyColorProvider>
   );
 }
 
@@ -343,6 +428,7 @@ function GroupBlock({
   rowAction, handleCellClick, onStatusChange,
   groupFooter, totalCols,
   liquidationVisuals, onLiquidationChanged,
+  draggable, dragId, onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
   group: { name: string; items: MatrixEntity[] };
   grouped: boolean;
@@ -358,6 +444,13 @@ function GroupBlock({
   totalCols: number;
   liquidationVisuals?: boolean;
   onLiquidationChanged?: () => void;
+  // Stint 51.D — drag-drop reorder hooks
+  draggable?: boolean;
+  dragId?: string | null;
+  onDragStart?: (entity: MatrixEntity) => void;
+  onDragOver?: (e: React.DragEvent, entity: MatrixEntity) => void;
+  onDrop?: (e: React.DragEvent, entity: MatrixEntity) => void;
+  onDragEnd?: () => void;
 }) {
   // First entity's group_id is the canonical id for this group — use it
   // when calling groupFooter so "+Add" knows where to attach new entities.
@@ -410,6 +503,12 @@ function GroupBlock({
           onStatusChange={onStatusChange}
           liquidationVisuals={liquidationVisuals}
           onLiquidationChanged={onLiquidationChanged}
+          draggable={draggable}
+          isDragging={dragId === e.id}
+          onDragStart={onDragStart}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+          onDragEnd={onDragEnd}
         />
       ))}
       {!isCollapsed && groupFooter && (
@@ -430,6 +529,7 @@ function RowRender({
   entity, columns, familyCol, entityStickyLeft,
   rowAction, handleCellClick, onStatusChange,
   liquidationVisuals, onLiquidationChanged,
+  draggable, isDragging, onDragStart, onDragOver, onDrop, onDragEnd,
 }: {
   entity: MatrixEntity;
   columns: MatrixColumn[];
@@ -440,26 +540,46 @@ function RowRender({
   onStatusChange?: Props['onStatusChange'];
   liquidationVisuals?: boolean;
   onLiquidationChanged?: () => void;
+  // Stint 51.D — drag-drop reorder
+  draggable?: boolean;
+  isDragging?: boolean;
+  onDragStart?: (entity: MatrixEntity) => void;
+  onDragOver?: (e: React.DragEvent, entity: MatrixEntity) => void;
+  onDrop?: (e: React.DragEvent, entity: MatrixEntity) => void;
+  onDragEnd?: () => void;
 }) {
   // Stint 43.D15 — row tinting + sticky-cell tinting must match. The
   // sticky cells (family + entity) live on `bg-surface` to override the
   // tr's bg, so when we tint the row we have to tint those cells too,
   // otherwise they paint a clean white strip on top of the amber row.
   const tinted = liquidationVisuals && !!entity.liquidation_date;
-  const trClass = tinted
-    ? 'border-b border-border/70 bg-amber-50/40 hover:bg-amber-50/70'
-    : 'border-b border-border/70 hover:bg-surface-alt/50';
+  const trClass = [
+    tinted
+      ? 'border-b border-border/70 bg-amber-50/40 hover:bg-amber-50/70'
+      : 'border-b border-border/70 hover:bg-surface-alt/50',
+    isDragging ? 'opacity-40' : '',
+  ].join(' ');
   const stickyBgClass = tinted
     ? 'bg-amber-50/60 hover:bg-amber-50/80'
     : 'bg-surface hover:bg-surface-alt/50';
 
   return (
-    <tr className={trClass}>
+    <tr
+      className={trClass}
+      draggable={draggable}
+      onDragStart={draggable ? () => onDragStart?.(entity) : undefined}
+      onDragOver={draggable ? (e) => onDragOver?.(e, entity) : undefined}
+      onDrop={draggable ? (e) => onDrop?.(e, entity) : undefined}
+      onDragEnd={draggable ? onDragEnd : undefined}
+    >
       {familyCol && (
         <td className={[
           'sticky left-0 z-sticky border-r border-border px-2 py-1.5 min-w-[170px] max-w-[170px]',
           stickyBgClass,
-        ].join(' ')}>
+          draggable ? 'cursor-grab active:cursor-grabbing' : '',
+        ].join(' ')}
+        title={draggable ? 'Drag to reorder within this family' : undefined}
+        >
           {familyCol.render
             ? familyCol.render(entity)
             : (entity.group_name

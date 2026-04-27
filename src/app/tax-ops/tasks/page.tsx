@@ -111,6 +111,8 @@ const QUICK_FILTERS: Array<{
 
 type ViewMode = 'list' | 'board';
 
+interface FamilyOption { id: string; name: string }
+
 export default function TasksListPage() {
   const [view, setView] = useState<ViewMode>('list');
   const [rows, setRows] = useState<TaskFull[] | null>(null);
@@ -119,6 +121,11 @@ export default function TasksListPage() {
   const [status, setStatus] = useState<string>('');
   const [assignee, setAssignee] = useState<string>('');
   const [preset, setPreset] = useState<string>('');
+  // Stint 51.A — family filter (Diego: "que se pudiese organizar también
+  //               igualmente por familias para ver bien todos los
+  //               distintos proyectos que están pendientes").
+  const [familyId, setFamilyId] = useState<string>('');
+  const [families, setFamilies] = useState<FamilyOption[]>([]);
   const toast = useToast();
 
   const load = useCallback(() => {
@@ -126,6 +133,7 @@ export default function TasksListPage() {
     if (q) qs.set('q', q);
     if (status) qs.set('status', status);
     if (assignee) qs.set('assignee', assignee);
+    if (familyId) qs.set('family_id', familyId);
     if (preset) {
       const p = QUICK_FILTERS.find(f => f.key === preset);
       p?.apply(qs);
@@ -134,16 +142,27 @@ export default function TasksListPage() {
     crmLoadShape<TaskFull[]>(`/api/tax-ops/tasks?${qs}`, b => (b as { tasks: TaskFull[] }).tasks)
       .then(rows => { setRows(rows); setError(null); })
       .catch(e => { setError(String(e instanceof Error ? e.message : e)); setRows([]); });
-  }, [q, status, assignee, preset]);
+  }, [q, status, assignee, familyId, preset]);
+
+  // Load families once for the filter dropdown — reuse the same list
+  // the matrices use (groups returned by /api/tax-ops/entities).
+  useEffect(() => {
+    fetch('/api/tax-ops/entities')
+      .then(r => r.ok ? r.json() : { groups: [] })
+      .then((body: { groups: FamilyOption[] }) => setFamilies(body.groups ?? []))
+      .catch(() => setFamilies([]));
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 
   const hasFilters = useMemo(
-    () => q !== '' || status !== '' || assignee !== '' || preset !== '',
-    [q, status, assignee, preset],
+    () => q !== '' || status !== '' || assignee !== '' || familyId !== '' || preset !== '',
+    [q, status, assignee, familyId, preset],
   );
 
-  function clearFilters() { setQ(''); setStatus(''); setAssignee(''); setPreset(''); }
+  function clearFilters() {
+    setQ(''); setStatus(''); setAssignee(''); setFamilyId(''); setPreset('');
+  }
 
   async function patchTask(taskId: string, patch: Record<string, unknown>): Promise<void> {
     const res = await fetch(`/api/tax-ops/tasks/${taskId}`, {
@@ -214,6 +233,15 @@ export default function TasksListPage() {
         >
           <option value="">All statuses</option>
           {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+        <select
+          value={familyId}
+          onChange={e => setFamilyId(e.target.value)}
+          className="px-2 py-1.5 text-sm border border-border rounded-md bg-surface"
+          title="Filter by family — shows tasks linked to entities in this family"
+        >
+          <option value="">All families</option>
+          {families.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
         <input
           value={assignee}

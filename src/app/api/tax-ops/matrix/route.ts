@@ -169,7 +169,9 @@ export async function GET(request: NextRequest) {
         LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
        WHERE (e.is_active = TRUE
               OR (e.liquidation_date IS NOT NULL AND e.liquidation_date >= make_date($4::int, 1, 1)))
-       ORDER BY g.name ASC NULLS LAST, e.legal_name ASC
+       -- Stint 51.D — display_order (drag-drop) wins inside a family;
+       -- fall back to alphabetical legal_name when no custom order set.
+       ORDER BY g.name ASC NULLS LAST, e.display_order ASC NULLS LAST, e.legal_name ASC
       `
     : `
       SELECT e.id, e.legal_name, e.liquidation_date::text AS liquidation_date,
@@ -186,7 +188,9 @@ export async function GET(request: NextRequest) {
          AND o.is_active = TRUE
          AND (e.is_active = TRUE
               OR (e.liquidation_date IS NOT NULL AND e.liquidation_date >= make_date($4::int, 1, 1)))
-       ORDER BY g.name ASC NULLS LAST, e.legal_name ASC
+       -- Stint 51.D — display_order (drag-drop) wins inside a family;
+       -- fall back to alphabetical legal_name when no custom order set.
+       ORDER BY g.name ASC NULLS LAST, e.display_order ASC NULLS LAST, e.legal_name ASC
       `;
 
   const entities = await query<{

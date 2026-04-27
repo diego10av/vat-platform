@@ -10,6 +10,7 @@ import type { MatrixColumn, MatrixEntity, MatrixCell } from './TaxTypeMatrix';
 import { InlineTagsCell, InlineTextCell, InlineDateCell, InlinePriceCell } from './inline-editors';
 import { DeadlineWithTolerance } from './DeadlineWithTolerance';
 import { familyChipClasses } from './familyColors';
+import { useFamilyChipClasses } from './FamilyColorContext';
 import { CspContactsEditor, type CspContact } from './CspContactsEditor';
 import { SearchableSelect, type SearchableOption } from '@/components/ui/SearchableSelect';
 
@@ -642,17 +643,9 @@ export function familyColumn(
       // between families at a glance. Click-to-edit when options passed.
       if (!editable) {
         if (!e.group_name) return <span className="text-ink-faint italic text-xs">—</span>;
-        return (
-          <span
-            className={[
-              'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium truncate max-w-[150px]',
-              familyChipClasses(e.group_name),
-            ].join(' ')}
-            title={e.group_name}
-          >
-            {e.group_name}
-          </span>
-        );
+        // Stint 51.C — use the render-context palette via hook so two
+        // adjacent families never share a colour.
+        return <FamilyChip name={e.group_name} />;
       }
       return (
         <FamilyInlineSelect
@@ -664,6 +657,24 @@ export function familyColumn(
       );
     },
   };
+}
+
+/** Chip rendered inside a TaxTypeMatrix — picks its colour from the
+ *  per-render FamilyColorContext so adjacent families look distinct.
+ *  Stint 51.C. */
+function FamilyChip({ name }: { name: string }) {
+  const cls = useFamilyChipClasses(name);
+  return (
+    <span
+      className={[
+        'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium truncate max-w-[150px]',
+        cls,
+      ].join(' ')}
+      title={name}
+    >
+      {name}
+    </span>
+  );
 }
 
 function FamilyInlineSelect({
@@ -732,9 +743,10 @@ function FamilyInlineSelect({
   // border/bg/min-width so the family chip's bg-{tone}-100 actually
   // renders. Without bare, the SearchableSelect's `bg-surface` was
   // winning over the chip color.
-  const chip = entity.group_name
-    ? familyChipClasses(entity.group_name)
-    : 'bg-surface-alt text-ink-muted';
+  // Stint 51.C — use the render-context palette so the trigger chip
+  // matches the row chip when collision-rotation kicks in.
+  const contextChip = useFamilyChipClasses(entity.group_name);
+  const chip = entity.group_name ? contextChip : 'bg-surface-alt text-ink-muted';
   return (
     <SearchableSelect
       options={options}

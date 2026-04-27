@@ -10,7 +10,7 @@ import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 import {
   useMatrixData, shortPeriodLabel, applyStatusChange, useClientGroups,
-  filterEntities,
+  filterEntities, makeReorderHandler,
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import { WhtTabs } from '@/components/tax-ops/WhtTabs';
@@ -107,6 +107,7 @@ export default function WhtMonthlyPage() {
           columns={columns}
           onEditFiling={setEditingFilingId}
           periodLabelsForEdit={data.period_labels}
+          onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
             applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }

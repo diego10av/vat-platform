@@ -12,7 +12,7 @@ import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 import {
   useMatrixData, shortPeriodLabel, applyStatusChange, useClientGroups,
-  filterEntities,
+  filterEntities, makeReorderHandler,
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import { VatTabs } from '@/components/tax-ops/VatTabs';
@@ -113,6 +113,7 @@ export default function VatQuarterlyPage() {
           periodLabelsForEdit={data.period_labels}
           liquidationVisuals
           onLiquidationChanged={refetch}
+          onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
             applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }

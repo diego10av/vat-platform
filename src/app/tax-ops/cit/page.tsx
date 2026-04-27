@@ -13,6 +13,7 @@ import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn, type MatrixEntity } from '@/components/tax-ops/TaxTypeMatrix';
 import {
   useMatrixData, applyStatusChange, useClientGroups, filterEntities,
+  makeReorderHandler,
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import {
@@ -265,6 +266,7 @@ export default function CitPage() {
           periodLabelsForEdit={[periodLabel]}
           liquidationVisuals
           onLiquidationChanged={refetchAll}
+          onReorderWithinFamily={makeReorderHandler(refetchAll)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
             applyStatusChange({ entity, column, cell, nextStatus, refetch: current.refetch, toast })
           }

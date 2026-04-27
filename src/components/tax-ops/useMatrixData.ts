@@ -77,6 +77,35 @@ const MONTH_NAMES = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 
+// ─── Stint 51.D — drag-drop reorder helper ──────────────────────────
+//
+// Returns a callback ready to plug into TaxTypeMatrix's
+// `onReorderWithinFamily` prop. POSTs the new sequential display_order
+// for every entity in the affected family + triggers a refetch.
+
+export function makeReorderHandler(refetch: () => void) {
+  return async ({ orderedIds }: { groupName: string; orderedIds: string[] }) => {
+    const updates = orderedIds.map((id, idx) => ({ id, display_order: idx }));
+    try {
+      const res = await fetch('/api/tax-ops/entities/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b?.error ?? `HTTP ${res.status}`);
+      }
+      refetch();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Reorder failed:', e);
+      // Refetch anyway so the local optimistic state is reset.
+      refetch();
+    }
+  };
+}
+
 // ─── Client groups (families) — used by familyColumn ────────────────
 
 export interface ClientGroup {

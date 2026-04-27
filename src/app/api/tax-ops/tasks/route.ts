@@ -5,6 +5,9 @@ import { query, execute, generateId, logAudit } from '@/lib/db';
 //   ?status=queued&status=in_progress&priority=high&assignee=Gab&
 //    due_in_days=14&related_filing=<id>&related_entity=<id>&q=text&
 //    parent=<id>&view=list|board
+//   Stint 51.A — filter by entity_id (new column from mig 048) or
+//   family_id (joins via tax_entities.client_group_id):
+//   ?entity_id=<id>&family_id=<id>
 //
 // POST /api/tax-ops/tasks  — create. Body carries all task fields
 //    except id/timestamps. Supports subtasks (pass parent_task_id)
@@ -49,6 +52,8 @@ export async function GET(request: NextRequest) {
   const dueIn = url.searchParams.get('due_in_days');
   const relatedFiling = url.searchParams.get('related_filing');
   const relatedEntity = url.searchParams.get('related_entity');
+  const entityId = url.searchParams.get('entity_id');     // Stint 51.A — new column
+  const familyId = url.searchParams.get('family_id');     // Stint 51.A — via group join
   const parentId = url.searchParams.get('parent');
   const q = url.searchParams.get('q')?.trim() ?? '';
   const onlyRoot = url.searchParams.get('only_root') === '1';
@@ -72,6 +77,18 @@ export async function GET(request: NextRequest) {
   }
   if (relatedFiling) { where.push(`t.related_filing_id = $${pi}`); params.push(relatedFiling); pi += 1; }
   if (relatedEntity) { where.push(`t.related_entity_id = $${pi}`); params.push(relatedEntity); pi += 1; }
+  // Stint 51.A — match against entity_id (new) OR related_entity_id (legacy) so the
+  //              entity detail "Tasks" widget surfaces tasks regardless of which
+  //              column was populated when the task was created.
+  if (entityId) {
+    where.push(`(t.entity_id = $${pi} OR t.related_entity_id = $${pi})`);
+    params.push(entityId); pi += 1;
+  }
+  if (familyId) {
+    where.push(`COALESCE(t.entity_id, t.related_entity_id) IN
+                  (SELECT id FROM tax_entities WHERE client_group_id = $${pi})`);
+    params.push(familyId); pi += 1;
+  }
   if (parentId) {
     where.push(`t.parent_task_id = $${pi}`); params.push(parentId); pi += 1;
   } else if (onlyRoot) {

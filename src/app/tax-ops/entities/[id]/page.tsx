@@ -13,6 +13,7 @@ import { useToast } from '@/components/Toaster';
 import { CspContactsEditor, type CspContact } from '@/components/tax-ops/CspContactsEditor';
 import { EntityFilingsMatrix } from '@/components/tax-ops/EntityFilingsMatrix';
 import { EntityTaxStatusPills } from '@/components/tax-ops/EntityTaxStatusPills';
+import { EntityTasksWidget } from '@/components/tax-ops/EntityTasksWidget';
 import { EntityTimeline } from '@/components/tax-ops/EntityTimeline';
 
 interface EntityDetail {
@@ -340,6 +341,12 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
         </p>
         <EntityTaxStatusPills filings={data.filings} />
       </div>
+
+      {/* Tasks for this entity (stint 51.A) — Diego: "si me metiese
+          en la entidad, que pudiese ver también las tax que se han
+          realizado, las que están pendientes, las que se tienen que
+          hacer, follow up". */}
+      <EntityTasksWidget entityId={id} />
 
       {/* CSP defaults — stint 48.U2.A pencil tag makes the editability
           obvious. Stint 48.U3.A: contacts shown here are the entity-wide

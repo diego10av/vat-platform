@@ -7,9 +7,13 @@
 // más claramente la diferencia." Stint 39.B.
 //
 // Requirements:
-//   1. Same family → always same color (stable across sessions, across
-//      years, regardless of order).
-//   2. Adjacent families should feel visually distinct (hashing helps).
+//   1. Same family → always same color WHEN POSSIBLE (stable across
+//      sessions and views).
+//   2. **Adjacent families in a render context must never share the same
+//      color** (stint 51.C — Diego: "hay a veces que los dos colores se
+//      repiten de manera seguida"). When a hash collision puts two
+//      adjacent families in the same palette slot, we rotate the second
+//      one forward (per render context) to break the tie.
 //   3. All colors must work on light backgrounds + pass AA contrast for
 //      small text chips.
 //   4. Zero dependencies — pure function on string input.
@@ -59,4 +63,64 @@ export function familyChipClasses(name: string | null | undefined): string {
 /** Class for a left-border stripe on the whole row (when grouped). */
 export function familyBorderClasses(name: string | null | undefined): string {
   return familyPalette(name).border;
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Stint 51.C — render-context palette assignment with collision avoidance.
+//
+// Given an ordered list of family names (in the order they will be
+// rendered), build a Map<name, palette-index> that:
+//   - Starts from each family's natural hash slot.
+//   - If the slot equals the previous family's slot in the list, rotates
+//     forward (+1, +2, …) until a non-colliding slot is found.
+//   - Stays stable across re-renders for the same input list.
+//
+// We only consider direct neighbour collisions (not pairs further apart),
+// because Diego's complaint is specifically "dos colores de manera
+// seguida" — chips that aren't adjacent on screen don't matter.
+// ────────────────────────────────────────────────────────────────────────
+
+export type FamilyColorMap = ReadonlyMap<string, number>;
+
+export function buildFamilyColorMap(orderedNames: ReadonlyArray<string | null | undefined>): FamilyColorMap {
+  const map = new Map<string, number>();
+  let lastIdx = -1;
+  for (const raw of orderedNames) {
+    const name = raw?.trim();
+    if (!name) continue;
+    const normalized = name.toUpperCase();
+    if (map.has(normalized)) {
+      // Already assigned — keep the natural slot. Update lastIdx so the
+      // *next* fresh family is checked against this one's slot, not an
+      // older one further up the list.
+      lastIdx = map.get(normalized)!;
+      continue;
+    }
+    let idx = hashString(normalized) % PALETTE.length;
+    let attempts = 0;
+    while (idx === lastIdx && attempts < PALETTE.length) {
+      idx = (idx + 1) % PALETTE.length;
+      attempts += 1;
+    }
+    map.set(normalized, idx);
+    lastIdx = idx;
+  }
+  return map;
+}
+
+/** Look up a family's chip class string in a context map; falls back to
+ *  the natural hash if the family isn't in the map. */
+export function familyChipClassesFromMap(
+  map: FamilyColorMap | null | undefined,
+  name: string | null | undefined,
+): string {
+  if (!name?.trim()) return `${NEUTRAL.bg} ${NEUTRAL.text}`;
+  if (map) {
+    const idx = map.get(name.trim().toUpperCase());
+    if (idx !== undefined) {
+      const p = PALETTE[idx]!;
+      return `${p.bg} ${p.text}`;
+    }
+  }
+  return familyChipClasses(name);
 }

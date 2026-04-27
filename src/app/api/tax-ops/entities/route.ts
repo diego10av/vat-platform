@@ -108,7 +108,8 @@ export async function GET(request: NextRequest) {
        FROM tax_entities e
        LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
        ${whereSQL}
-      ORDER BY g.name ASC NULLS LAST, e.legal_name ASC`,
+      -- Stint 51.D — drag-drop display_order wins, fallback to alphabetical
+      ORDER BY g.name ASC NULLS LAST, e.display_order ASC NULLS LAST, e.legal_name ASC`,
     params,
   );
 

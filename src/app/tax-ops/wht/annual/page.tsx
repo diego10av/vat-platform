@@ -9,7 +9,7 @@ import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn } from '@/components/tax-ops/TaxTypeMatrix';
 import {
-  useMatrixData, applyStatusChange, useClientGroups, filterEntities,
+  useMatrixData, applyStatusChange, useClientGroups, filterEntities, makeReorderHandler,
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import { WhtTabs } from '@/components/tax-ops/WhtTabs';
@@ -91,6 +91,7 @@ export default function WhtAnnualPage() {
         <TaxTypeMatrix
           entities={filtered}
           columns={columns}
+          onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
             applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
           }
