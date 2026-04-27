@@ -20,7 +20,7 @@ import {
   LandmarkIcon, SearchCheckIcon, EuroIcon, ReceiptIcon,
   WalletIcon, CoinsIcon, LibraryBigIcon, FolderIcon, CheckSquareIcon,
   BarChart3Icon, ShieldCheckIcon, SettingsIcon, ChevronRightIcon,
-  TargetIcon, CircleIcon, PercentIcon,
+  TargetIcon, CircleIcon, PercentIcon, CalculatorIcon, ScrollTextIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -32,6 +32,8 @@ const ICON_MAP: Record<string, LucideIcon> = {
   CoinsIcon, LibraryBigIcon, FolderIcon, FileStackIcon,
   FileTextIcon, Building2Icon, CalendarIcon, BriefcaseIcon,
   TargetIcon, CircleIcon, PercentIcon,
+  // Stint 51.F — Diego: "el símbolo del euro queda cutrísimo".
+  CalculatorIcon, ScrollTextIcon,
 };
 function iconFor(name: string | null | undefined): LucideIcon {
   return (name && ICON_MAP[name]) || CircleIcon;
@@ -105,17 +107,19 @@ function buildTaxCategoryNavItems(categories: TaxCategory[]): NavItem[] {
     // Fallback: the hardcoded list from stint 37.B. Used when /api/tax-ops/
     // categories is unreachable or hasn't run migration 050 yet.
     return [
-      { href: '/tax-ops/cit',              label: 'Corporate tax returns', icon: LandmarkIcon },
+      // Stint 51.F — Diego: VAT filings goes ABOVE Corporate tax returns.
       {
         href: '/tax-ops/vat',
         label: 'VAT filings',
-        icon: EuroIcon,
+        // Stint 51.F — was EuroIcon. Diego: "queda cutrísimo".
+        icon: CalculatorIcon,
         children: [
           { href: '/tax-ops/vat/annual',    label: 'Annual',    icon: ReceiptIcon },
           { href: '/tax-ops/vat/quarterly', label: 'Quarterly', icon: ReceiptIcon },
           { href: '/tax-ops/vat/monthly',   label: 'Monthly',   icon: ReceiptIcon },
         ],
       },
+      { href: '/tax-ops/cit',              label: 'Corporate tax returns', icon: LandmarkIcon },
       { href: '/tax-ops/subscription-tax', label: 'Subscription tax',     icon: PercentIcon },
       { href: '/tax-ops/wht',              label: 'Withholding tax',      icon: WalletIcon },
       { href: '/tax-ops/bcl',              label: 'BCL reporting',        icon: LibraryBigIcon },
@@ -123,8 +127,13 @@ function buildTaxCategoryNavItems(categories: TaxCategory[]): NavItem[] {
   }
 
   // Group by sidebar_group. null group → top-level.
-  const topLevel: NavItem[] = [];
-  const byGroup = new Map<string, NavItem[]>();
+  // Stint 51.F — track a sidebar_order alongside each item so we can sort
+  // the final top-level list by it (otherwise grouped parents always
+  // append to the end, which is why VAT filings used to sit at the bottom
+  // even though Diego wanted it on top).
+  type ItemWithOrder = { item: NavItem; order: number };
+  const topLevel: ItemWithOrder[] = [];
+  const byGroup = new Map<string, ItemWithOrder[]>();
   for (const c of categories) {
     const url = urlForTaxType(c.tax_type);
     const item: NavItem = {
@@ -132,30 +141,41 @@ function buildTaxCategoryNavItems(categories: TaxCategory[]): NavItem[] {
       label: c.sidebar_label,
       icon: iconFor(c.sidebar_icon),
     };
+    const entry = { item, order: c.sidebar_order ?? 100 };
     if (c.sidebar_group) {
       if (!byGroup.has(c.sidebar_group)) byGroup.set(c.sidebar_group, []);
-      byGroup.get(c.sidebar_group)!.push(item);
+      byGroup.get(c.sidebar_group)!.push(entry);
     } else {
-      topLevel.push(item);
+      topLevel.push(entry);
     }
   }
 
-  // For each group, create a parent item. Group 'vat' → VAT filings.
-  // Other groups use the group name as label (Diego can create new groups
-  // and they'll render automatically).
+  // For each group, create a parent item that takes the smallest order of
+  // its children — so the parent slots into the top level at the same
+  // position as its first child. Group 'vat' → VAT filings.
   for (const [groupName, children] of byGroup) {
     const parentLabel = groupName === 'vat' ? 'VAT filings'
                       : groupName.charAt(0).toUpperCase() + groupName.slice(1);
     const parentHref = groupName === 'vat' ? '/tax-ops/vat'
                      : `/tax-ops/group/${groupName}`;
+    // Stint 51.F — VAT parent gets CalculatorIcon explicitly (Diego asked
+    // for something less "cutre" than EuroIcon).
+    const parentIcon = groupName === 'vat'
+      ? CalculatorIcon
+      : (children[0]?.item.icon ?? FolderIcon);
+    const parentOrder = Math.min(...children.map(c => c.order));
     topLevel.push({
-      href: parentHref,
-      label: parentLabel,
-      icon: children[0]?.icon ?? FolderIcon,
-      children,
+      item: {
+        href: parentHref,
+        label: parentLabel,
+        icon: parentIcon,
+        children: children.map(c => c.item),
+      },
+      order: parentOrder,
     });
   }
-  return topLevel;
+  topLevel.sort((a, b) => a.order - b.order);
+  return topLevel.map(x => x.item);
 }
 
 function buildGroups(badges: SidebarBadges, taxCategories: TaxCategory[]): NavGroup[] {

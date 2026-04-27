@@ -197,14 +197,21 @@ export function AddEntityRow({
   }
 
   if (mode === 'button') {
+    // Stint 51.F — Diego: "no entiendo por qué ahora no puedo añadir
+    // una nueva entidad". The action existed but the label "Add entity
+    // to AVALLON" read as "associate" rather than "create". Rephrased
+    // to explicit "+ New entity" so creating is unmistakable; "Add
+    // existing" stays as the second option for when the entity already
+    // lives in another family.
     return (
       <div className="flex items-center gap-2 px-2 py-1">
         <button
           type="button"
           onClick={() => setMode('input')}
           className="inline-flex items-center gap-1 text-xs text-ink-muted hover:text-brand-700"
+          title="Create a brand-new entity in this family"
         >
-          <PlusIcon size={11} /> Add entity to {groupName || '(no family)'}
+          <PlusIcon size={11} /> New entity in {groupName || '(no family)'}
         </button>
         <span className="text-2xs text-ink-faint">·</span>
         <button
@@ -213,7 +220,7 @@ export function AddEntityRow({
           className="inline-flex items-center gap-1 text-xs text-ink-muted hover:text-brand-700"
           title="Add an entity that already exists (any family) to this tax type"
         >
-          ↳ Add existing
+          ↳ Add existing entity
         </button>
       </div>
     );

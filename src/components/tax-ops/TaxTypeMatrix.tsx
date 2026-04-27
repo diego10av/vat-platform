@@ -711,9 +711,6 @@ function CellRender({
           disabled={disabled}
           onSave={(next) => onStatusChange({ entity, column, cell, nextStatus: next })}
         />
-        {!cell && !disabled && (
-          <span className="ml-0.5 text-2xs text-ink-faint" aria-hidden>·new</span>
-        )}
       </td>
     );
   }
