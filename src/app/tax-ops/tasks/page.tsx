@@ -232,9 +232,25 @@ function TasksListContent() {
 
   // Stint 57.D.1 — sync state → URL. Skip the very first render
   // (otherwise we'd overwrite the URL the user came in with).
+  //
+  // Stint 59.D — segregate push vs replace per Linear/Asana/Height
+  // best practice. Diego: "cuando doy atrás (Google Chrome) no me va
+  // a la página anterior, me va a otra distinta."
+  // Root cause was using router.replace() for *every* state change
+  // including view toggles — replace() removes the previous history
+  // entry, so Back skipped two steps. Now:
+  //   • Filter changes (q/status/assignee/family_id/preset) → replace.
+  //     Filters are not navigation; Back should exit the page.
+  //   • View change (list / board / calendar) → push. Three sub-pages
+  //     conceptually; Back should return to the previous view.
   const firstSync = useRef(true);
+  const prevView = useRef<ViewMode>(view);
   useEffect(() => {
-    if (firstSync.current) { firstSync.current = false; return; }
+    if (firstSync.current) {
+      firstSync.current = false;
+      prevView.current = view;
+      return;
+    }
     const qs = new URLSearchParams();
     if (q) qs.set('q', q);
     if (status) qs.set('status', status);
@@ -242,8 +258,13 @@ function TasksListContent() {
     if (familyId) qs.set('family_id', familyId);
     if (preset) qs.set('preset', preset);
     if (view !== 'list') qs.set('view', view);
-    const s = qs.toString();
-    router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
+    const url = qs.toString() ? `${pathname}?${qs}` : pathname;
+    if (view !== prevView.current) {
+      router.push(url, { scroll: false });
+      prevView.current = view;
+    } else {
+      router.replace(url, { scroll: false });
+    }
   }, [q, status, assignee, familyId, preset, view, router, pathname]);
 
   const load = useCallback(() => {
