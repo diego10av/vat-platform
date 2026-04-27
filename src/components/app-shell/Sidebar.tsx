@@ -479,20 +479,103 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
   );
 }
 
+// Stint 61.B — UserMenu now fetches the live username from /api/auth/me
+// (was hard-coded "Diego" for the admin role) and exposes a Sign-out
+// affordance via a click-to-open menu. Closes Diego's "habría que añadir
+// la posibilidad de hacer logout, no?".
 function UserMenu({ role }: { role: Role }) {
-  const label = role === 'junior' ? 'Associate' : role === 'reviewer' ? 'Reviewer' : 'Diego';
+  const [username, setUsername] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/auth/me')
+      .then(r => r.ok ? r.json() : null)
+      .then(b => {
+        if (cancelled || !b) return;
+        if (typeof b.username === 'string') setUsername(b.username);
+      })
+      .catch(() => { /* keep fallback label */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Close menu when user clicks anywhere else.
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node | null;
+      if (!t) return;
+      const root = document.getElementById('cifra-user-menu');
+      if (root && !root.contains(t)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch { /* even if the request errors the cookie usually clears */ }
+    // Hard navigation so any cached auth state in memory is dropped too.
+    window.location.href = '/login';
+  }
+
+  // Display label: prefer the real username (capitalised), fall back to
+  // a role-based placeholder until /api/auth/me resolves.
+  const display =
+    username
+      ? username.charAt(0).toUpperCase() + username.slice(1)
+      : role === 'junior' ? 'Associate'
+      : role === 'reviewer' ? 'Reviewer'
+      : 'You';
   const tagline =
     role === 'junior' ? 'cifra · associate' :
     role === 'reviewer' ? 'cifra · reviewer' :
     'cifra · founder';
+
   return (
-    <div className="flex flex-col px-3 py-1.5 rounded-md hover:bg-surface-alt transition-colors cursor-pointer">
-      <div className="text-sm font-medium text-ink truncate leading-tight">
-        {label}
-      </div>
-      <div className="text-2xs text-ink-muted truncate leading-tight mt-0.5">
-        {tagline}
-      </div>
+    <div id="cifra-user-menu" className="relative">
+      {/* Popup menu — anchored above the button so it doesn't escape the
+          viewport at the bottom of the sidebar. */}
+      {open && (
+        <div
+          role="menu"
+          className="absolute bottom-full left-0 right-0 mb-1 bg-surface border border-border rounded-md shadow-lg overflow-hidden z-popover"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="w-full text-left px-3 py-2 text-sm text-ink hover:bg-surface-alt disabled:opacity-50 disabled:cursor-wait"
+          >
+            {signingOut ? 'Signing out…' : 'Sign out'}
+          </button>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="w-full flex flex-col px-3 py-1.5 rounded-md hover:bg-surface-alt transition-colors text-left"
+      >
+        <div className="text-sm font-medium text-ink truncate leading-tight">
+          {display}
+        </div>
+        <div className="text-2xs text-ink-muted truncate leading-tight mt-0.5">
+          {tagline}
+        </div>
+      </button>
     </div>
   );
 }
