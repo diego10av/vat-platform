@@ -118,24 +118,28 @@ export function TaxOpsHomeWidgets() {
     );
   }
 
+  // Stint 59.B — re-laid out as 2×2 grid (was 1 + 2-cols + 1).
+  // Three "actionable" widgets in the grid (deadline / my action / client
+  // approval), and Stale full-width below as a "low-frequency" hint that
+  // doesn't compete for attention with the daily-action widgets.
   return (
     <div className="space-y-3">
-      <WidgetShell
-        title="Deadline radar — next 30 days"
-        subtitle="Filings due soon that are not yet filed, paid, or waived."
-        icon={AlertCircleIcon}
-        tone="red"
-        count={data.deadline_radar.length}
-      >
-        {data.deadline_radar.length === 0
-          ? <EmptyWidget message="No filings coming due in the next 30 days. Clear runway." />
-          : data.deadline_radar.map(f => <FilingRow key={f.id} f={f} />)}
-      </WidgetShell>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <WidgetShell
+          title="Deadline radar — next 30d"
+          subtitle="Filings due soon, not yet filed/paid/waived."
+          icon={AlertCircleIcon}
+          tone="red"
+          count={data.deadline_radar.length}
+        >
+          {data.deadline_radar.length === 0
+            ? <EmptyWidget message="No filings due in 30 days. Clear runway." />
+            : data.deadline_radar.map(f => <FilingRow key={f.id} f={f} />)}
+        </WidgetShell>
+
+        <WidgetShell
           title="Pending my action"
-          subtitle="Awaiting info gather or in-progress work from the team."
+          subtitle="Info-gather or in-progress work waiting on you."
           icon={ClockIcon}
           tone="amber"
           count={data.pending_my_action.length}
@@ -149,7 +153,7 @@ export function TaxOpsHomeWidgets() {
 
         <WidgetShell
           title="Pending client approval (>7d)"
-          subtitle="Drafts sent to clients that haven't been approved yet."
+          subtitle="Drafts sent that clients haven't approved yet."
           icon={HourglassIcon}
           tone="amber"
           count={data.pending_client_approval.length}
@@ -164,25 +168,25 @@ export function TaxOpsHomeWidgets() {
                 />
               ))}
         </WidgetShell>
-      </div>
 
-      <WidgetShell
-        title="Stale assessments"
-        subtitle="Filed >180 days ago, still no tax assessment received. Chase the AED."
-        icon={FileQuestionIcon}
-        tone="grey"
-        count={data.stale_assessments.length}
-      >
-        {data.stale_assessments.length === 0
-          ? <EmptyWidget message="All filed returns have received an assessment." />
-          : data.stale_assessments.map(f => (
-              <FilingRow
-                key={f.id}
-                f={f}
-                subLine={f.filed_at ? `filed ${new Date(f.filed_at).toLocaleDateString()}` : undefined}
-              />
-            ))}
-      </WidgetShell>
+        <WidgetShell
+          title="Stale assessments (>180d)"
+          subtitle="Filed long ago, still no AED assessment. Worth chasing."
+          icon={FileQuestionIcon}
+          tone="grey"
+          count={data.stale_assessments.length}
+        >
+          {data.stale_assessments.length === 0
+            ? <EmptyWidget message="All filed returns have an assessment." />
+            : data.stale_assessments.map(f => (
+                <FilingRow
+                  key={f.id}
+                  f={f}
+                  subLine={f.filed_at ? `filed ${new Date(f.filed_at).toLocaleDateString()}` : undefined}
+                />
+              ))}
+        </WidgetShell>
+      </div>
     </div>
   );
 }

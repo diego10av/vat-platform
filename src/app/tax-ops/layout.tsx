@@ -12,17 +12,23 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboardIcon, FileTextIcon, BuildingIcon, CheckSquareIcon,
-  CalendarDaysIcon, SettingsIcon, HelpCircleIcon,
+  SettingsIcon, HelpCircleIcon,
 } from 'lucide-react';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
 import { QuickCaptureModal } from '@/components/tax-ops/QuickCaptureModal';
 
+// Stint 59.B — tabs reordered + Calendar tab removed.
+// • Tasks promoted to second slot (most-used surface for daily work).
+// • Calendar tab removed: it pointed to /tax-ops/calendar which was a
+//   ghost route (404). Calendar view lives inside /tax-ops/tasks as
+//   `view=calendar` toggle — go to Tasks → click Calendar layout.
+// • Filings demoted to last: it's a cross-tax-type search, useful but
+//   secondary. Daily flow is Sidebar → category matrix → filing detail.
 const PRIMARY_TABS = [
   { href: '/tax-ops',          label: 'Home',     icon: LayoutDashboardIcon },
-  { href: '/tax-ops/filings',  label: 'Filings',  icon: FileTextIcon },
-  { href: '/tax-ops/entities', label: 'Entities', icon: BuildingIcon },
   { href: '/tax-ops/tasks',    label: 'Tasks',    icon: CheckSquareIcon },
-  { href: '/tax-ops/calendar', label: 'Calendar', icon: CalendarDaysIcon },
+  { href: '/tax-ops/entities', label: 'Entities', icon: BuildingIcon },
+  { href: '/tax-ops/filings',  label: 'Filings',  icon: FileTextIcon },
 ];
 
 const OVERFLOW_ITEMS = [

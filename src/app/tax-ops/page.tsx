@@ -15,17 +15,21 @@ import { Button } from '@/components/ui/Button';
 
 // /tax-ops home — daily landing for compliance work.
 //
-// Shape (stint 35 redesign):
-//   1. Header + year-rollover button (top-right)
-//   2. 8-card category grid (CIT, NWT, VAT, Subscription, WHT, BCL,
-//      Other, Entities) — one click per category, matches Excel mental
-//      model. The grid is NOT decorative: each card takes you to a
-//      matrix page where real work happens.
-//   3. Actionable widgets (deadline radar, pending my action, etc.) —
-//      reused from stint 34.
+// Stint 59.B redesign — actionable-first per Hard Rule §11.
+// "Today's focus" sits at the top (tasks due + 4 filing widgets); the
+// "Browse by tax type" grid moves to the bottom because it's a
+// navigation shortcut (the sidebar already has every category), not a
+// daily-work surface.
 //
-// Paths like /tax-ops/tasks and /tax-ops/settings are in the sidebar
-// and don't get their own home card (secondary workflows).
+// Layout, top to bottom:
+//   1. Header + "Open {nextYear}" button (the only headline action).
+//   2. Today's focus
+//      ├── Tasks due this week (TasksDueWidget)
+//      └── Filings 2×2 grid (Deadline radar / My action / Client
+//          approval / Stale assessments)
+//   3. Browse by tax type — 6-card grid (CIT / BCL / VAT / Subtax /
+//      WHT / Other), useful for "I want to open the VAT matrix now"
+//      but secondary to actionable work.
 
 // Stint 40.J — NWT Reviews card removed from the grid: Diego said
 // "esa caja habría que borrarla porque no tiene sentido que esté ahí".
@@ -76,19 +80,10 @@ export default function TaxOpsHomePage() {
 
   return (
     <PageContainer width="wide">
-      <div className="space-y-4">
+      <div className="space-y-5">
       <PageHeader
         title="Tax-Ops"
-        subtitle={
-          <>
-            Pick a tax category below for its Excel-style matrix view. Sidebar
-            has every category + Entities + Tasks; use{' '}
-            <kbd className="text-2xs px-1 py-0.5 rounded bg-surface-alt border border-border">g t</kbd>
-            {' '}to jump here from anywhere, or{' '}
-            <kbd className="text-2xs px-1 py-0.5 rounded bg-surface-alt border border-border">⌘K</kbd>
-            {' '}to search.
-          </>
-        }
+        subtitle="Today's actionable work first; tax-type matrices below."
         actions={
           <Button
             variant="primary"
@@ -101,35 +96,54 @@ export default function TaxOpsHomePage() {
         }
       />
 
-      {/* Category grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-        {CATEGORIES.map(cat => {
-          const Icon = cat.icon;
-          return (
-            <Link
-              key={cat.href}
-              href={cat.href}
-              className="group rounded-md border border-border bg-surface px-3 py-2.5 hover:border-brand-500 hover:shadow-sm transition-all"
-            >
-              <div className="flex items-start gap-2">
-                <Icon size={16} className="shrink-0 mt-0.5 text-ink-soft group-hover:text-brand-500 transition-colors" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-ink truncate">
-                    {cat.title}
-                  </div>
-                  <div className="text-xs text-ink-muted mt-0.5 line-clamp-2">
-                    {cat.description}
+      {/* ── Today's focus ─────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold text-ink uppercase tracking-wide">
+            Today&apos;s focus
+          </h2>
+          <span className="text-2xs text-ink-muted">
+            Press{' '}
+            <kbd className="text-2xs px-1 py-0.5 rounded bg-surface-alt border border-border">⌘K</kbd>
+            {' '}for search ·{' '}
+            <kbd className="text-2xs px-1 py-0.5 rounded bg-surface-alt border border-border">N</kbd>
+            {' '}to capture a task
+          </span>
+        </div>
+        <TasksDueWidget />
+        <TaxOpsHomeWidgets />
+      </section>
+
+      {/* ── Browse by tax type — secondary navigation ─────────────── */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-ink-muted uppercase tracking-wide">
+          Browse by tax type
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {CATEGORIES.map(cat => {
+            const Icon = cat.icon;
+            return (
+              <Link
+                key={cat.href}
+                href={cat.href}
+                className="group rounded-md border border-border bg-surface px-3 py-2.5 hover:border-brand-500 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-start gap-2">
+                  <Icon size={16} className="shrink-0 mt-0.5 text-ink-soft group-hover:text-brand-500 transition-colors" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-ink truncate">
+                      {cat.title}
+                    </div>
+                    <div className="text-xs text-ink-muted mt-0.5 line-clamp-2">
+                      {cat.description}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
-
-      <TasksDueWidget />
-
-      <TaxOpsHomeWidgets />
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       <RolloverModal
         open={rolloverOpen}
