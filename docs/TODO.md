@@ -122,17 +122,18 @@ elimínamelas directamente."
   (× 3 distinct: Europe, V, VI GP), TTGV Investment GP.
 - **Hard-deleted 36 round-1 soft-deleted losers** in the same pass
   (verified zero remaining obligations beforehand).
-- **5 manual merges** (Diego confirmed): Nice Bay 3/4/5 (renamed winner
-  to "..., SARL"), Portobello Education Opportunity PSP Fund II SCA,
-  Portobello Serveo Continuation Vehicle. **Kept distinct** (Diego
-  confirmed): Green Arrow Sàrl ↔ SCA SICAV-RAIF (GP vs Fund pattern),
-  Trilantic Europe VI SCA RAIF ↔ SCSp (Fund vs Carry pattern).
+- **7 manual merges** (Diego confirmed): Nice Bay 2 / 3 / 4 / 5 / GP
+  (renamed winner to the full legal name in each case), Portobello
+  Education Opportunity PSP Fund II SCA, Portobello Serveo Continuation
+  Vehicle. **Kept distinct** (Diego confirmed): Green Arrow Sàrl ↔
+  SCA SICAV-RAIF (GP vs Fund pattern), Trilantic Europe VI SCA RAIF ↔
+  SCSp (Fund vs Carry pattern).
 - **Migration 065** drops mig-064 permissive index, recreates with the
   aggressive normalization. POST `/api/tax-ops/entities` pre-check
   updated to match.
 
-Final state: **162 active entities** + 0 inactive + 52 merge audit
-entries (36 round 1 + 11 round 2 + 5 manual) + 0 jsonb-strings + 0
+Final state: **160 active entities** + 0 inactive + 54 merge audit
+entries (36 round 1 + 11 round 2 + 7 manual) + 0 jsonb-strings + 0
 remaining duplicates under the aggressive normalization. 707 tests
 green, lint:design 0/473.
 
