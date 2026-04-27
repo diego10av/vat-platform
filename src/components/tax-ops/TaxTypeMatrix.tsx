@@ -55,12 +55,12 @@ export interface MatrixCell {
   /** Stint 40.O — invoice price + free-text note. */
   invoice_price_eur: string | null;
   invoice_price_note: string | null;
-  /** Stint 52 — separate ICS (Liste récapitulative / EC Sales List)
+  /** Stint 52 — separate ISS (Liste récapitulative / EC Sales List)
    *  invoice price. Lives in parallel with invoice_price_eur because
    *  cifra charges these as two distinct deliverables. NULL when no
-   *  ICS is prepared for the filing. Surfaced only on VAT matrices. */
-  invoice_price_ics_eur: string | null;
-  invoice_price_ics_note: string | null;
+   *  ISS is prepared for the filing. Surfaced only on VAT matrices. */
+  invoice_price_iss_eur: string | null;
+  invoice_price_iss_note: string | null;
   /** Stint 40.G — CSP / client contacts for this filing. */
   csp_contacts: Array<{ name: string; email?: string; role?: string }>;
 }

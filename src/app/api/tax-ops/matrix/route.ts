@@ -85,10 +85,11 @@ interface MatrixCell {
   invoice_price_eur: string | null;
   /** Stint 40.O — free-text clarification shown next to the price. */
   invoice_price_note: string | null;
-  /** Stint 52 — separate price for the ICS / EC Sales List
-   *  companion deliverable. Surfaced only on VAT matrices. */
-  invoice_price_ics_eur: string | null;
-  invoice_price_ics_note: string | null;
+  /** Stint 52 — separate price for the ISS / Intra-community
+   *  Supply of Services companion deliverable. Surfaced only on
+   *  VAT matrices. */
+  invoice_price_iss_eur: string | null;
+  invoice_price_iss_note: string | null;
   /** Stint 40.G — CSP / client contacts for this filing. */
   csp_contacts: Array<{ name: string; email?: string; role?: string }>;
 }
@@ -223,8 +224,8 @@ export async function GET(request: NextRequest) {
     last_action_at: string | null;
     invoice_price_eur: string | null;
     invoice_price_note: string | null;
-    invoice_price_ics_eur: string | null;
-    invoice_price_ics_note: string | null;
+    invoice_price_iss_eur: string | null;
+    invoice_price_iss_note: string | null;
     csp_contacts: Array<{ name: string; email?: string; role?: string }> | null;
   }> = [];
 
@@ -244,8 +245,8 @@ export async function GET(request: NextRequest) {
               f.last_action_at::text AS last_action_at,
               f.invoice_price_eur::text AS invoice_price_eur,
               f.invoice_price_note,
-              f.invoice_price_ics_eur::text AS invoice_price_ics_eur,
-              f.invoice_price_ics_note,
+              f.invoice_price_iss_eur::text AS invoice_price_iss_eur,
+              f.invoice_price_iss_note,
               f.csp_contacts
          FROM tax_filings f
         WHERE f.obligation_id = ANY($1::text[])
@@ -276,8 +277,8 @@ export async function GET(request: NextRequest) {
       last_action_at: f.last_action_at,
       invoice_price_eur: f.invoice_price_eur,
       invoice_price_note: f.invoice_price_note,
-      invoice_price_ics_eur: f.invoice_price_ics_eur,
-      invoice_price_ics_note: f.invoice_price_ics_note,
+      invoice_price_iss_eur: f.invoice_price_iss_eur,
+      invoice_price_iss_note: f.invoice_price_iss_note,
       csp_contacts: f.csp_contacts ?? [],
     });
   }

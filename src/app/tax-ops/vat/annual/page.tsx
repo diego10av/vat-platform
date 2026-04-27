@@ -17,7 +17,7 @@ import {
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import { VatTabs } from '@/components/tax-ops/VatTabs';
 import {
-  partnerInChargeColumn, associatesWorkingColumn, lastActionColumn, contactsColumn, commentsColumn, priceColumn, icsPriceColumn, deadlineColumn, familyColumn,
+  partnerInChargeColumn, associatesWorkingColumn, lastActionColumn, contactsColumn, commentsColumn, priceColumn, issPriceColumn, deadlineColumn, familyColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 import { AddEntityRow } from '@/components/tax-ops/AddEntityRow';
@@ -80,8 +80,8 @@ export default function VatAnnualPage() {
     contactsColumn([periodLabel], refetch),
     commentsColumn([periodLabel], refetch),
     priceColumn([periodLabel], refetch),
-    // Stint 52 — VAT-only companion column for the ICS / EC Sales List price.
-    icsPriceColumn([periodLabel], refetch),
+    // Stint 52 — VAT-only companion column for the ISS / Intra-community Supply of Services price.
+    issPriceColumn([periodLabel], refetch),
   ];
 
   const hasError = standard.error || simplified.error;

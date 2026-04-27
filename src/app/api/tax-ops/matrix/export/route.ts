@@ -79,9 +79,9 @@ interface FilingRow {
   /** Stint 40.O — invoice price + note. */
   invoice_price_eur: string | null;
   invoice_price_note: string | null;
-  /** Stint 52 — separate ICS / EC Sales List price + note. */
-  invoice_price_ics_eur: string | null;
-  invoice_price_ics_note: string | null;
+  /** Stint 52 — separate ISS / Intra-community Supply of Services price + note. */
+  invoice_price_iss_eur: string | null;
+  invoice_price_iss_note: string | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -150,8 +150,8 @@ export async function GET(request: NextRequest) {
               last_action_at::text AS last_action_at,
               invoice_price_eur::text AS invoice_price_eur,
               invoice_price_note,
-              invoice_price_ics_eur::text AS invoice_price_ics_eur,
-              invoice_price_ics_note
+              invoice_price_iss_eur::text AS invoice_price_iss_eur,
+              invoice_price_iss_note
          FROM tax_filings
         WHERE obligation_id = ANY($1::text[])
           AND period_label = ANY($2::text[])`,
@@ -171,7 +171,7 @@ export async function GET(request: NextRequest) {
 
   // Header — stint 43.D11 splits "Prepared with" into "Partner in charge"
   // + "Associates working", and stint 43.D6 renames "Last chased" → "Last
-  // action". Stint 52 — VAT exports also include the per-ICS price
+  // action". Stint 52 — VAT exports also include the per-ISS price
   // companion columns; non-VAT exports keep a single price pair.
   const isVatExport = tax_type?.startsWith('vat_') ?? false;
   const header: string[] = ['Group', 'Entity'];
@@ -183,8 +183,8 @@ export async function GET(request: NextRequest) {
   header.push(isVatExport ? 'Price per return (€)' : 'Price (€)');
   header.push(isVatExport ? 'Note (return)' : 'Price note');
   if (isVatExport) {
-    header.push('Price per ICS (€)');
-    header.push('Note (ICS)');
+    header.push('Price per ISS (€)');
+    header.push('Note (ISS)');
   }
   ws.addRow(header);
   ws.getRow(1).font = { bold: true };
@@ -206,8 +206,8 @@ export async function GET(request: NextRequest) {
     const actionDates: string[] = [];
     let invoicePrice: number | null = null;
     let invoicePriceNote: string | null = null;
-    let invoiceIcsPrice: number | null = null;
-    let invoiceIcsNote: string | null = null;
+    let invoiceIssPrice: number | null = null;
+    let invoiceIssNote: string | null = null;
     for (const c of cells) {
       // Prefer the new partner_in_charge field; fall back to legacy
       // prepared_with so old rows still show something useful.
@@ -222,11 +222,11 @@ export async function GET(request: NextRequest) {
         if (Number.isFinite(n)) invoicePrice = n;
       }
       if (!invoicePriceNote && c.invoice_price_note) invoicePriceNote = c.invoice_price_note;
-      if (invoiceIcsPrice === null && c.invoice_price_ics_eur) {
-        const n = Number(c.invoice_price_ics_eur);
-        if (Number.isFinite(n)) invoiceIcsPrice = n;
+      if (invoiceIssPrice === null && c.invoice_price_iss_eur) {
+        const n = Number(c.invoice_price_iss_eur);
+        if (Number.isFinite(n)) invoiceIssPrice = n;
       }
-      if (!invoiceIcsNote && c.invoice_price_ics_note) invoiceIcsNote = c.invoice_price_ics_note;
+      if (!invoiceIssNote && c.invoice_price_iss_note) invoiceIssNote = c.invoice_price_iss_note;
     }
     const latestAction = actionDates.length === 0 ? '' : actionDates.sort().slice(-1)[0]!;
     row.push(Array.from(partnerSet).join(', '));
@@ -236,8 +236,8 @@ export async function GET(request: NextRequest) {
     row.push(invoicePrice ?? '');
     row.push(invoicePriceNote ?? '');
     if (isVatExport) {
-      row.push(invoiceIcsPrice ?? '');
-      row.push(invoiceIcsNote ?? '');
+      row.push(invoiceIssPrice ?? '');
+      row.push(invoiceIssNote ?? '');
     }
     ws.addRow(row);
   }

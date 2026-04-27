@@ -108,15 +108,16 @@ function buildTaxCategoryNavItems(categories: TaxCategory[]): NavItem[] {
     // categories is unreachable or hasn't run migration 050 yet.
     return [
       // Stint 51.F — Diego: VAT filings goes ABOVE Corporate tax returns.
+      // Stint 52-followup — children share the same CalculatorIcon as the
+      // parent (was ReceiptIcon, which still rendered as a € glyph).
       {
         href: '/tax-ops/vat',
         label: 'VAT filings',
-        // Stint 51.F — was EuroIcon. Diego: "queda cutrísimo".
         icon: CalculatorIcon,
         children: [
-          { href: '/tax-ops/vat/annual',    label: 'Annual',    icon: ReceiptIcon },
-          { href: '/tax-ops/vat/quarterly', label: 'Quarterly', icon: ReceiptIcon },
-          { href: '/tax-ops/vat/monthly',   label: 'Monthly',   icon: ReceiptIcon },
+          { href: '/tax-ops/vat/annual',    label: 'Annual',    icon: CalculatorIcon },
+          { href: '/tax-ops/vat/quarterly', label: 'Quarterly', icon: CalculatorIcon },
+          { href: '/tax-ops/vat/monthly',   label: 'Monthly',   icon: CalculatorIcon },
         ],
       },
       { href: '/tax-ops/cit',              label: 'Corporate tax returns', icon: LandmarkIcon },
@@ -223,7 +224,9 @@ function buildGroups(badges: SidebarBadges, taxCategories: TaxCategory[]): NavGr
         {
           href: '/declarations',
           label: 'VAT',
-          icon: EuroIcon,
+          // Stint 52-followup — was EuroIcon, matched to CalculatorIcon
+          // for parity with the Tax-Ops "VAT filings" parent.
+          icon: CalculatorIcon,
           children: [
             { href: '/clients',      label: 'Clients',      icon: Building2Icon },
             { href: '/declarations', label: 'Declarations', icon: FileTextIcon,

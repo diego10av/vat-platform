@@ -17,7 +17,7 @@ import {
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import { VatTabs } from '@/components/tax-ops/VatTabs';
 import {
-  partnerInChargeColumn, associatesWorkingColumn, lastActionColumn, contactsColumn, commentsColumn, priceColumn, icsPriceColumn, familyColumn,
+  partnerInChargeColumn, associatesWorkingColumn, lastActionColumn, contactsColumn, commentsColumn, priceColumn, issPriceColumn, familyColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 import { AddEntityRow } from '@/components/tax-ops/AddEntityRow';
@@ -67,8 +67,8 @@ export default function VatQuarterlyPage() {
     columns.push(contactsColumn(visiblePeriodLabels, refetch));
     columns.push(commentsColumn(visiblePeriodLabels, refetch));
     columns.push(priceColumn(visiblePeriodLabels, refetch));
-    // Stint 52 — VAT-only companion column for the ICS / EC Sales List price.
-    columns.push(icsPriceColumn(visiblePeriodLabels, refetch));
+    // Stint 52 — VAT-only companion column for the ISS / Intra-community Supply of Services price.
+    columns.push(issPriceColumn(visiblePeriodLabels, refetch));
   }
   const periodOptions = (data?.period_labels ?? []).map(l => ({
     value: l,

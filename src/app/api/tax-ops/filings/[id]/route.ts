@@ -42,9 +42,9 @@ interface FilingDetail {
   last_info_request_sent_at: string | null;
   invoice_price_eur: string | null;
   invoice_price_note: string | null;
-  // Stint 52 — separate price for the ICS / EC Sales List companion.
-  invoice_price_ics_eur: string | null;
-  invoice_price_ics_note: string | null;
+  // Stint 52 — separate price for the ISS / Intra-community Supply of Services companion.
+  invoice_price_iss_eur: string | null;
+  invoice_price_iss_note: string | null;
   import_source: string;
   created_at: string;
   updated_at: string;
@@ -80,8 +80,8 @@ export async function GET(
             f.last_info_request_sent_at::text AS last_info_request_sent_at,
             f.invoice_price_eur::text AS invoice_price_eur,
             f.invoice_price_note,
-            f.invoice_price_ics_eur::text AS invoice_price_ics_eur,
-            f.invoice_price_ics_note,
+            f.invoice_price_iss_eur::text AS invoice_price_iss_eur,
+            f.invoice_price_iss_note,
             f.import_source,
             f.created_at::text, f.updated_at::text,
             r.statutory_description AS rule_statutory_description,
@@ -112,9 +112,10 @@ const ALLOWED_FIELDS = [
   'last_info_request_sent_at',
   // Stint 40.O — invoice price per filing + free-text clarification.
   'invoice_price_eur', 'invoice_price_note',
-  // Stint 52 — separate price for ICS (EC Sales List) deliverable.
-  // Surfaced only on VAT matrices but lives on every filing.
-  'invoice_price_ics_eur', 'invoice_price_ics_note',
+  // Stint 52 — separate price for ISS (Intra-community Supply of Services /
+  // Liste récapitulative) companion deliverable. Surfaced only on VAT
+  // matrices but lives on every filing.
+  'invoice_price_iss_eur', 'invoice_price_iss_note',
   // Stint 43.D6 — last_action_at (manual override of the auto-stamp).
   'last_action_at',
   // Stint 43.D11 — partner in charge + associates working (TEXT[]).

@@ -570,7 +570,7 @@ export function priceColumn(periodLabels: string[], refetch: () => void): Matrix
   return {
     key: 'invoice_price',
     // Stint 52 — was "Price". Renamed to "Price Per Return" so it can
-    // sit next to the new icsPriceColumn ("Price Per ICS") on VAT
+    // sit next to the new issPriceColumn ("Price Per ISS") on VAT
     // matrices without ambiguity. The DB column + key stay the same.
     label: 'Price Per Return',
     widthClass: 'w-[140px]',
@@ -603,16 +603,16 @@ export function priceColumn(periodLabels: string[], refetch: () => void): Matrix
 
 /**
  * Stint 52 — companion column to priceColumn, surfaced only on VAT
- * matrices. ICS = Intra-Community Supply of Services (Liste
+ * matrices. ISS = Intra-community Supply of Services (Liste
  * récapitulative / EC Sales List). cifra charges this as a separate
  * deliverable from the VAT return itself, so the prices are tracked
  * in parallel columns. Same per-filing storage + row-propagation
  * pattern as priceColumn — single edit syncs across Q1-Q4.
  */
-export function icsPriceColumn(periodLabels: string[], refetch: () => void): MatrixColumn {
+export function issPriceColumn(periodLabels: string[], refetch: () => void): MatrixColumn {
   return {
-    key: 'invoice_price_ics',
-    label: 'Price Per ICS',
+    key: 'invoice_price_iss',
+    label: 'Price Per ISS',
     widthClass: 'w-[140px]',
     alignRight: true,
     render: (e) => {
@@ -624,13 +624,13 @@ export function icsPriceColumn(periodLabels: string[], refetch: () => void): Mat
         .find((c): c is MatrixCell => !!c) ?? null;
       return (
         <InlinePriceCell
-          priceEur={first?.invoice_price_ics_eur ?? null}
-          note={first?.invoice_price_ics_note ?? null}
+          priceEur={first?.invoice_price_iss_eur ?? null}
+          note={first?.invoice_price_iss_note ?? null}
           disabled={allFilingIds.length === 0}
           onSave={async ({ priceEur, note }) => {
             await patchAllFilings(allFilingIds, {
-              invoice_price_ics_eur: priceEur,
-              invoice_price_ics_note: note,
+              invoice_price_iss_eur: priceEur,
+              invoice_price_iss_note: note,
             });
             refetch();
           }}
