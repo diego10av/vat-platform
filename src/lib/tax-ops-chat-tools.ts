@@ -42,7 +42,7 @@ export const TAX_OPS_TOOLS: Anthropic.Tool[] = [
         year: { type: 'number', description: 'Filing period year, e.g. 2026.' },
         status: {
           type: 'string',
-          enum: ['info_to_request', 'working',
+          enum: ['info_to_request', 'info_requested', 'working',
                  'awaiting_client_clarification', 'draft_sent',
                  'partially_approved', 'client_approved', 'filed'],
           description: 'Exact status match. Omit for any status.',

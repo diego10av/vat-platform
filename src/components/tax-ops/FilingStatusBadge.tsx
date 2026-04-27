@@ -3,6 +3,12 @@
 // Small status chip for tax filings. Colors chosen to be legible at a
 // glance in grid rows — not decorative.
 //
+// Status enum v4 (stint 49):
+//   - new info_requested between info_to_request and working
+//     (Diego: "puedo tener que pedir la información, pero si la he
+//     pedido, necesito saber que hay un estatus que es que la he
+//     pedido y que estoy esperando").
+//
 // Status enum v3 (stint 43):
 //   - info_received fused into working (Diego: si tengo info, ya estoy trabajando)
 //   - new partially_approved (some approvers signed off, others pending)
@@ -19,6 +25,11 @@ const STATUS_META: Record<string, { label: string; tone: string; description: st
     label: 'Info to request',
     tone: 'bg-surface-alt text-ink-muted',
     description: 'Aún no hemos pedido la información al CSP / cliente. Próximo paso: mandarles email pidiendo lo que falta.',
+  },
+  info_requested: {
+    label: 'Info requested',
+    tone: 'bg-amber-50 text-amber-800',
+    description: 'Ya hemos pedido la información al CSP / cliente y estamos esperando respuesta. La fecha en "Last action" indica cuándo se mandó la petición; si pasan días sin respuesta, mandar follow-up.',
   },
   working: {
     label: 'Working',
@@ -56,6 +67,7 @@ const STATUS_META: Record<string, { label: string; tone: string; description: st
  *  dropdown + edit selects render in this order. */
 export const FILING_STATUSES = [
   'info_to_request',
+  'info_requested',
   'working',
   'awaiting_client_clarification',
   'draft_sent',

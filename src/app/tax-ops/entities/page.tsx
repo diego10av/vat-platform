@@ -39,6 +39,36 @@ interface EntityRow {
   filings_ytd: number;
   filings_filed_ytd: number;
   last_assessment_year: number | null;
+  /** Stint 49.C1 — distinct active tax_types this entity is subject to. */
+  tax_types: string[];
+}
+
+// Stint 49.C1 — short label + canonical matrix URL per tax_type.
+// Used by the "Tax types" chips column on /tax-ops/entities and the
+// entity detail page.
+const TAX_TYPE_META: Record<string, { short: string; href: string }> = {
+  cit_annual:                { short: 'CIT',     href: '/tax-ops/cit' },
+  nwt_annual:                { short: 'NWT',     href: '/tax-ops/cit' },
+  vat_annual:                { short: 'VAT-A',   href: '/tax-ops/vat/annual' },
+  vat_simplified_annual:     { short: 'VAT-A·s', href: '/tax-ops/vat/annual' },
+  vat_quarterly:             { short: 'VAT-Q',   href: '/tax-ops/vat/quarterly' },
+  vat_monthly:               { short: 'VAT-M',   href: '/tax-ops/vat/monthly' },
+  subscription_tax_quarterly:{ short: 'Subs',    href: '/tax-ops/subscription-tax' },
+  wht_director_monthly:      { short: 'WHT-M',   href: '/tax-ops/wht/monthly' },
+  wht_director_semester:     { short: 'WHT-S',   href: '/tax-ops/wht/semester' },
+  wht_director_annual:       { short: 'WHT-A',   href: '/tax-ops/wht/annual' },
+  wht_director_quarterly:    { short: 'WHT-Q',   href: '/tax-ops/wht/monthly' },
+  bcl_sbs_quarterly:         { short: 'BCL·SBS', href: '/tax-ops/bcl' },
+  bcl_216_monthly:           { short: 'BCL·216', href: '/tax-ops/bcl' },
+  fatca_crs_annual:          { short: 'FATCA',   href: '/tax-ops/fatca-crs' },
+  functional_currency_request: { short: 'FCR',  href: '/tax-ops/other' },
+};
+
+function taxTypeShort(t: string): string {
+  return TAX_TYPE_META[t]?.short ?? t.replace(/_/g, ' ');
+}
+function taxTypeHref(t: string): string {
+  return TAX_TYPE_META[t]?.href ?? '/tax-ops';
 }
 
 interface GroupRow {
@@ -300,7 +330,7 @@ export default function EntitiesListPage() {
                         <th className="px-2 py-1.5 w-[28px]"></th>
                         <th className="px-3 py-1.5 font-medium">Legal name</th>
                         <th className="px-3 py-1.5 font-medium">VAT / Matricule</th>
-                        <th className="px-3 py-1.5 font-medium text-right">Obligations</th>
+                        <th className="px-3 py-1.5 font-medium">Tax types</th>
                         <th className="px-3 py-1.5 font-medium text-right">YTD filed</th>
                         <th className="px-3 py-1.5 font-medium text-right">Last assessment</th>
                       </tr>
@@ -342,7 +372,33 @@ export default function EntitiesListPage() {
                             <td className="px-3 py-1.5 text-ink-soft">
                               {e.vat_number || e.matricule || '—'}
                             </td>
-                            <td className="px-3 py-1.5 text-right tabular-nums">{e.obligations_count}</td>
+                            <td className="px-3 py-1.5">
+                              {/* Stint 49.C1 — tax-type chips. Click → that
+                                  matrix. Diego sees at a glance everything an
+                                  entity is subject to, no more "duplicates"
+                                  confusion. */}
+                              {(e.tax_types ?? []).length === 0 ? (
+                                <span className="text-2xs text-ink-faint italic">none</span>
+                              ) : (
+                                <div className="flex items-center gap-1 flex-wrap">
+                                  {(e.tax_types ?? []).slice(0, 4).map(t => (
+                                    <Link
+                                      key={t}
+                                      href={taxTypeHref(t)}
+                                      className="inline-flex items-center px-1.5 py-0 rounded text-2xs bg-brand-50 text-brand-700 hover:bg-brand-100 whitespace-nowrap"
+                                      title={`${t} — open ${taxTypeHref(t)}`}
+                                    >
+                                      {taxTypeShort(t)}
+                                    </Link>
+                                  ))}
+                                  {(e.tax_types ?? []).length > 4 && (
+                                    <span className="text-2xs text-ink-muted">
+                                      +{(e.tax_types ?? []).length - 4}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
                             <td className="px-3 py-1.5 text-right tabular-nums">
                               {pct !== null ? (
                                 <span className={pct >= 80 ? 'text-green-700' : pct >= 50 ? 'text-amber-700' : 'text-ink-muted'}>

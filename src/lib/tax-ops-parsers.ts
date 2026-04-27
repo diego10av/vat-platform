@@ -19,7 +19,7 @@
 // ("blocked", "waived", "assessment received") — we just remap to the
 // nearest valid v3 status when we see them.
 export type FilingStatus =
-  | 'info_to_request' | 'working'
+  | 'info_to_request' | 'info_requested' | 'working'
   | 'awaiting_client_clarification' | 'draft_sent'
   | 'partially_approved' | 'client_approved' | 'filed';
 
@@ -69,12 +69,18 @@ export function parseStatusCell(raw: string | null | undefined): ParsedStatus {
     return { status: 'info_to_request', residual_comment: text };
   }
 
-  // Requested info / financials requested
+  // Requested info / financials requested → v4: we KNOW it was already
+  // asked, so map to info_requested (= "asked, waiting"), not
+  // info_to_request (= "still need to ask"). Stint 49.A.
   if (/^(financials\s+)?requested\s+on/i.test(text)) {
-    return { status: 'info_to_request', residual_comment: text };
+    return { status: 'info_requested', residual_comment: text };
   }
   if (/requested/i.test(lower) && /info|financials|document/i.test(lower)) {
-    return { status: 'info_to_request', residual_comment: text };
+    return { status: 'info_requested', residual_comment: text };
+  }
+  // "Asked X" / "Awaiting info" / "Chasing X" — same bucket.
+  if (/^(asked|awaiting\s+info|chasing|chased)/i.test(text)) {
+    return { status: 'info_requested', residual_comment: text };
   }
 
   // Tax assessment received → in v3 we treat this as filed; the date

@@ -26,6 +26,20 @@ interface EntityListRow {
   filings_ytd: number;
   filings_filed_ytd: number;
   last_assessment_year: number | null;
+  /** Stint 49.C1 — list of distinct active tax_types per entity, for
+   *  the chips column on /tax-ops/entities. Aggregated from
+   *  tax_obligations where is_active = TRUE. */
+  tax_types: string[];
+  /** Stint 49.B2 — full active-obligation list per entity, returned
+   *  only when ?with_obligations=1 is set. The matrix's "Add existing
+   *  entity" flow uses this to filter out entities that already have
+   *  the obligation being added. */
+  obligations?: Array<{
+    tax_type: string;
+    period_pattern: string;
+    service_kind: string;
+    is_active: boolean;
+  }>;
 }
 
 export async function GET(request: NextRequest) {
@@ -35,6 +49,9 @@ export async function GET(request: NextRequest) {
   const groupId = url.searchParams.get('group_id');
   const isActiveParam = url.searchParams.get('is_active');
   const isActive = isActiveParam === '0' ? false : true;  // default active only
+  // Stint 49.B2 — when set, include full active-obligations list per row
+  // so the AddEntityRow "add existing" flow can filter eligible entities.
+  const withObligations = url.searchParams.get('with_obligations') === '1';
 
   const where: string[] = [];
   const params: unknown[] = [year];  // $1 fixed
@@ -68,7 +85,26 @@ export async function GET(request: NextRequest) {
             (SELECT EXTRACT(YEAR FROM MAX(f.tax_assessment_received_at))::int
                FROM tax_filings f
                JOIN tax_obligations o3 ON o3.id = f.obligation_id
-              WHERE o3.entity_id = e.id) AS last_assessment_year
+              WHERE o3.entity_id = e.id) AS last_assessment_year,
+            -- Stint 49.C1 — distinct active tax_types per entity for the
+            -- chips column on /tax-ops/entities.
+            COALESCE((
+              SELECT JSONB_AGG(DISTINCT o4.tax_type ORDER BY o4.tax_type)
+                FROM tax_obligations o4
+               WHERE o4.entity_id = e.id AND o4.is_active = TRUE
+            ), '[]'::jsonb) AS tax_types
+            ${withObligations ? `,
+            -- Stint 49.B2 — full active-obligations list (gated by ?with_obligations=1)
+            COALESCE((
+              SELECT JSONB_AGG(JSONB_BUILD_OBJECT(
+                'tax_type', o5.tax_type,
+                'period_pattern', o5.period_pattern,
+                'service_kind', o5.service_kind,
+                'is_active', o5.is_active
+              ) ORDER BY o5.tax_type)
+                FROM tax_obligations o5
+               WHERE o5.entity_id = e.id AND o5.is_active = TRUE
+            ), '[]'::jsonb) AS obligations` : ''}
        FROM tax_entities e
        LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
        ${whereSQL}

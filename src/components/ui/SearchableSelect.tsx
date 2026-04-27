@@ -25,6 +25,7 @@
 // the regular options as separate entries).
 
 import { useState, useRef, useEffect, useMemo, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
 
 export interface SearchableOption {
@@ -64,8 +65,25 @@ export function SearchableSelect({
   const [query, setQuery] = useState('');
   const [highlight, setHighlight] = useState(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listboxId = useId();
+  // Stint 49.B2 — popup is portaled to body (not anchored to the trigger
+  // via position:absolute) so it cannot be clipped by an overflow:auto
+  // ancestor (e.g. the matrix wrapper). We compute its viewport position
+  // from the trigger's bounding rect on open + reposition on scroll/resize.
+  const [popupPos, setPopupPos] = useState<{ left: number; top: number; minWidth: number } | null>(null);
+
+  function recomputePos() {
+    const t = triggerRef.current;
+    if (!t) return;
+    const r = t.getBoundingClientRect();
+    setPopupPos({
+      left: r.left,
+      top: r.bottom + 4,           // 4px gap below trigger
+      minWidth: Math.max(r.width, 200),
+    });
+  }
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -78,25 +96,48 @@ export function SearchableSelect({
   // Selected option lookup for the trigger label.
   const selected = options.find(o => o.value === value) ?? null;
 
-  // Click-outside to close
+  // Click-outside to close — listens on the document since the popup
+  // lives in a portal (outside the wrapperRef tree).
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (!wrapperRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (wrapperRef.current?.contains(target)) return;
+      // Allow clicks inside the portaled popup
+      const popup = document.getElementById(listboxId);
+      if (popup?.parentElement?.contains(target)) return;
+      setOpen(false);
     };
     window.addEventListener('mousedown', handler);
     return () => window.removeEventListener('mousedown', handler);
-  }, [open]);
+  }, [open, listboxId]);
 
-  // Auto-focus the search input when opening
+  // Auto-focus the search input when opening + position the portaled popup.
   useEffect(() => {
     if (open) {
+      recomputePos();
       requestAnimationFrame(() => inputRef.current?.focus());
       setHighlight(Math.max(0, filtered.findIndex(o => o.value === value)));
     } else {
       setQuery('');
+      setPopupPos(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Reposition the portaled popup when the page scrolls or resizes —
+  // necessary because the popup is fixed-position relative to the
+  // viewport while the trigger may scroll inside the matrix wrapper.
+  useEffect(() => {
+    if (!open) return;
+    const onScroll = () => recomputePos();
+    const onResize = () => recomputePos();
+    window.addEventListener('scroll', onScroll, true);   // capture, catches inner scrolls
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onResize);
+    };
   }, [open]);
 
   // Reset highlight on query change
@@ -133,9 +174,65 @@ export function SearchableSelect({
     }
   }
 
+  // Stint 49.B2 — popup portaled to body so overflow-auto ancestors
+  // (matrix wrapper) cannot clip it.
+  const popup = open && popupPos && typeof document !== 'undefined' ? createPortal(
+    <div
+      className="fixed z-popover bg-surface border border-border rounded-md shadow-lg overflow-hidden"
+      style={{
+        left: popupPos.left,
+        top: popupPos.top,
+        minWidth: popupPos.minWidth,
+        maxWidth: 360,
+      }}
+      role="dialog"
+    >
+      <div className="p-1.5 border-b border-border">
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Search…"
+          aria-label={`${ariaLabel ?? 'Search'} (search)`}
+          className="w-full px-2 py-1 text-sm border border-border rounded bg-surface"
+        />
+      </div>
+      <ul
+        id={listboxId}
+        role="listbox"
+        aria-label={ariaLabel}
+        className="max-h-[280px] overflow-auto py-0.5"
+      >
+        {filtered.length === 0 ? (
+          <li className="px-2.5 py-1.5 text-sm text-ink-faint italic">No matches</li>
+        ) : filtered.map((opt, i) => (
+          <li
+            key={opt.value}
+            role="option"
+            aria-selected={opt.value === value}
+            onMouseEnter={() => setHighlight(i)}
+            onClick={() => commit(opt)}
+            className={[
+              'px-2.5 py-1 text-sm cursor-pointer truncate',
+              i === highlight ? 'bg-brand-50' : '',
+              opt.value === value ? 'font-medium' : '',
+              opt.className ?? '',
+            ].join(' ')}
+          >
+            {opt.label}
+          </li>
+        ))}
+      </ul>
+    </div>,
+    document.body,
+  ) : null;
+
   return (
     <div ref={wrapperRef} className="relative inline-block">
       <button
+        ref={triggerRef}
         type="button"
         aria-label={ariaLabel}
         aria-haspopup="listbox"
@@ -156,48 +253,7 @@ export function SearchableSelect({
         </span>
         <ChevronDown size={12} className="shrink-0 text-ink-muted" />
       </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-popover min-w-[200px] max-w-[320px] bg-surface border border-border rounded-md shadow-lg overflow-hidden">
-          <div className="p-1.5 border-b border-border">
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder="Search…"
-              aria-label={`${ariaLabel ?? 'Search'} (search)`}
-              className="w-full px-2 py-1 text-sm border border-border rounded bg-surface"
-            />
-          </div>
-          <ul
-            id={listboxId}
-            role="listbox"
-            aria-label={ariaLabel}
-            className="max-h-[280px] overflow-auto py-0.5"
-          >
-            {filtered.length === 0 ? (
-              <li className="px-2.5 py-1.5 text-sm text-ink-faint italic">No matches</li>
-            ) : filtered.map((opt, i) => (
-              <li
-                key={opt.value}
-                role="option"
-                aria-selected={opt.value === value}
-                onMouseEnter={() => setHighlight(i)}
-                onClick={() => commit(opt)}
-                className={[
-                  'px-2.5 py-1 text-sm cursor-pointer truncate',
-                  i === highlight ? 'bg-brand-50' : '',
-                  opt.value === value ? 'font-medium' : '',
-                  opt.className ?? '',
-                ].join(' ')}
-              >
-                {opt.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {popup}
     </div>
   );
 }

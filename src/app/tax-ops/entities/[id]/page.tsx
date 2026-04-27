@@ -62,6 +62,26 @@ function humanTaxType(t: string): string {
   return t.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// Stint 49.C2 — canonical matrix URL per tax_type for the
+// "All tax obligations" chips section.
+const ENTITY_TAX_TYPE_HREF: Record<string, string> = {
+  cit_annual:                 '/tax-ops/cit',
+  nwt_annual:                 '/tax-ops/cit',
+  vat_annual:                 '/tax-ops/vat/annual',
+  vat_simplified_annual:      '/tax-ops/vat/annual',
+  vat_quarterly:              '/tax-ops/vat/quarterly',
+  vat_monthly:                '/tax-ops/vat/monthly',
+  subscription_tax_quarterly: '/tax-ops/subscription-tax',
+  wht_director_monthly:       '/tax-ops/wht/monthly',
+  wht_director_semester:      '/tax-ops/wht/semester',
+  wht_director_annual:        '/tax-ops/wht/annual',
+  wht_director_quarterly:     '/tax-ops/wht/monthly',
+  bcl_sbs_quarterly:          '/tax-ops/bcl',
+  bcl_216_monthly:            '/tax-ops/bcl',
+  fatca_crs_annual:           '/tax-ops/fatca-crs',
+  functional_currency_request: '/tax-ops/other',
+};
+
 export default function EntityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -282,6 +302,34 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
             <div className="font-mono">{data.entity.rcs_number ?? '—'}</div>
           </div>
         </div>
+      </div>
+
+      {/* Stint 49.C2 — "All tax obligations" cross-tax-type strip.
+          The unifying view Diego asked for: every tax type this entity
+          is subject to, as clickable chips that jump straight to the
+          matrix for that tax type. The aggregate replaces the old
+          "Obligations: N count" feeling with a real visual map. */}
+      <div className="rounded-md border border-border bg-surface px-4 py-3">
+        <h3 className="text-sm font-semibold text-ink mb-1">All tax obligations</h3>
+        <p className="text-xs text-ink-muted mb-2">
+          Every tax type this entity is subject to. Click a chip to jump to that matrix.
+        </p>
+        {data.obligations.length === 0 ? (
+          <span className="text-xs text-ink-faint italic">No obligations.</span>
+        ) : (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {Array.from(new Set(data.obligations.filter(o => o.is_active).map(o => o.tax_type))).map(t => (
+              <Link
+                key={t}
+                href={ENTITY_TAX_TYPE_HREF[t] ?? '/tax-ops'}
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-brand-50 text-brand-700 hover:bg-brand-100 border border-brand-200"
+                title={`Open ${humanTaxType(t)} matrix`}
+              >
+                {humanTaxType(t)}
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Tax status summary (stint 37.I) */}
