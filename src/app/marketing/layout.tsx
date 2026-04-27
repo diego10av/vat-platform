@@ -12,9 +12,9 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'cifra — Luxembourg tax compliance',
+  title: 'cifra — operating system for recurring compliance',
   description:
-    'cifra prepares VAT returns for Luxembourg fund entities in minutes, with the classifier depth a Magic Circle partner would sign off on.',
+    'cifra is the operating system for recurring compliance for private capital structures in Europe. Tax filings, deadlines, sign-off cascade, audit trail — one workspace.',
   // No Open Graph image yet — intentional, Diego doesn't want the page
   // surfaced in link previews until he's ready to distribute.
   robots: {

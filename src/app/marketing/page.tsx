@@ -1,26 +1,31 @@
-// Landing page — stint 60 rebuild.
+// Landing page — stint 60.B rebuild.
 //
-// Scope brief (Diego, 2026-04-27): short punchy + Stripe-style + Sign in
-// only + only what cifra does TODAY (no roadmap / no pipeline).
+// Positioning (Diego, 2026-04-27): "Operating system for recurring
+// compliance for private capital structures in Europe." Drop the Big-4
+// audience framing — irrelevant to Diego's actual reader (fund/structure
+// managers, AIFMs, GPs, family offices, the boutique services that
+// support them). No email contact anywhere — Diego doesn't want to be
+// reached. Sign-in is the only door.
 //
-// Three modules to surface:
+// Three modules surfaced (live today only — no pipeline, no roadmap):
 //   • Tax-Ops — every LU filing tracked: VAT (annual/quarterly/monthly),
 //     CIT, NWT, subscription tax, WHT (director), BCL. Deadlines + sign-
 //     off cascade preparer→reviewer→partner + audit trail.
-//   • CRM — clients (CSP / end-client / other), entities (SOPARFIs,
-//     AIFMs, SCSps), invoice OCR + classification.
-//   • AI classifier — 32+ deterministic rules citing LTVA + CJEU + AED
+//   • Classifier — 32+ deterministic rules citing LTVA + CJEU + AED
 //     circulars. AI suggests, humans decide, every override logged.
+//   • CRM — service providers, end-clients, fund families. Entities
+//     (SOPARFIs, AIFMs, SCSps) linked to obligations. Invoice OCR.
 //
-// Section order (4 sections, ~1 min scroll):
-//   1. Hero — headline + subhead + Sign in CTA
-//   2. ThreeModules — Tax-Ops / CRM / Classifier (3-up cards)
+// Section order (4 sections, ~1 min scroll, Stripe-style):
+//   1. Hero — operating-system headline + Sign in CTA
+//   2. ThreeModules — Tax-Ops / Classifier / CRM (3-up cards)
 //   3. DepthProof — stats grid + 4 CJEU cases
-//   4. Close — minimal, just nav back to Sign in
+//   4. Footer — Logo + Sign in
 //
 // Removed vs stint 11: HowItWorks 4-step, Roadmap 10-items grid,
-// CTA wall ("Want to see your next return"). The roadmap was Diego's
-// explicit ask — "no incluiría nada de lo que son proyectos".
+// CTA wall, all mailto contact references, all Big-4 framing.
+// The page is noindex/nofollow (see layout.tsx) — fully private even
+// when DNS goes live. Sign in is gated by AUTH_PASSWORD.
 
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
@@ -74,20 +79,20 @@ function Hero() {
   return (
     <section className="pt-20 pb-16 md:pt-28 md:pb-20">
       <Container>
-        <div className="max-w-[820px]">
-          <Eyebrow>Vertical · Luxembourg · Tax</Eyebrow>
+        <div className="max-w-[860px]">
+          <Eyebrow>Recurring compliance · Private capital · Europe</Eyebrow>
           <h1
             className="mt-5 text-[40px] md:text-[60px] leading-[1.04] tracking-[-0.025em] font-semibold text-ink"
           >
-            Luxembourg tax compliance,
+            The operating system for
             <br />
-            <span className="text-brand-500">rebuilt from the law up.</span>
+            <span className="text-brand-500">recurring compliance.</span>
           </h1>
-          <p className="mt-6 max-w-[640px] text-lg leading-[1.55] text-ink-soft">
-            One workspace for every Luxembourg filing your firm owns —
+          <p className="mt-6 max-w-[660px] text-lg leading-[1.55] text-ink-soft">
+            Built for private capital structures in Europe. Starting
+            with every Luxembourg tax filing your firm owns —
             VAT, corporate tax, subscription tax, withholding, BCL.
-            Deadline tracking, multi-stakeholder sign-off, and legal
-            citations down to the LTVA article.
+            Deadlines, sign-off cascade, audit trail, in one workspace.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-5">
             <a
@@ -104,16 +109,6 @@ function Hero() {
               See what cifra does
             </a>
           </div>
-          <p className="mt-10 text-sm text-ink-muted max-w-[560px]">
-            Built by a Luxembourg VAT professional. Closed beta — if
-            you prepare LU fund returns, write to{' '}
-            <a
-              href="mailto:contact@cifracompliance.com"
-              className="text-ink-soft hover:text-ink underline underline-offset-2"
-            >
-              contact@cifracompliance.com
-            </a>.
-          </p>
         </div>
       </Container>
     </section>
@@ -131,7 +126,7 @@ function ThreeModules() {
         'VAT (annual / quarterly / monthly), corporate tax, NWT, subscription tax for UCITS / SIF / RAIF, director WHT, BCL reporting. Deadlines auto-tracked per LTVA article. Sign-off cascade preparer → reviewer → partner with timestamps. Calendar feed for Google, Apple, Outlook.',
       bullets: [
         '7 tax types live, statutory deadlines encoded',
-        'Big-4 sign-off cascade with audit log',
+        'Multi-stakeholder sign-off with audit log',
         'Saved views, bulk actions, board / list / calendar',
       ],
     },
@@ -150,7 +145,7 @@ function ThreeModules() {
       eyebrow: 'CRM',
       title: 'Clients, entities, invoices — connected.',
       body:
-        'CSP firms, end-clients, fund families. Entities (SOPARFIs, AIFMs, SCSps) linked to obligations. Invoice OCR with Anthropic Claude classifies into LTVA treatment codes. AI suggests, humans decide, every override is logged for the audit committee.',
+        'Service providers, end-clients, fund families. Entities (SOPARFIs, AIFMs, SCSps) linked to obligations. Invoice OCR with Anthropic Claude classifies into LTVA treatment codes. AI suggests, humans decide, every override is logged.',
       bullets: [
         'Multi-stakeholder per entity (preparer / reviewer / partner)',
         'Invoice OCR + treatment-code classification',
@@ -162,15 +157,15 @@ function ThreeModules() {
   return (
     <section id="what" className="py-20 md:py-24 bg-white border-y border-[#EFEAE2]">
       <Container>
-        <div className="max-w-[640px] mb-14">
+        <div className="max-w-[680px] mb-14">
           <Eyebrow>What cifra does today</Eyebrow>
           <h2 className="mt-4 text-[32px] md:text-[40px] leading-[1.08] tracking-[-0.02em] font-semibold text-ink">
             One workspace, three connected modules.
           </h2>
           <p className="mt-5 text-base leading-[1.65] text-ink-soft">
             cifra ships the daily work — tracking, preparing, signing off,
-            filing — for the tax types and clients a Luxembourg fiduciary
-            handles every week.
+            filing — for the recurring compliance that every private capital
+            structure has to do, week after week, year after year.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
@@ -240,7 +235,7 @@ function Depth() {
           <div className="md:col-span-5">
             <Eyebrow>The depth</Eyebrow>
             <h2 className="mt-4 text-[32px] md:text-[40px] leading-[1.08] tracking-[-0.02em] font-semibold text-ink">
-              Numbers a Big-4 partner would recognise.
+              Numbers, not promises.
             </h2>
             <p className="mt-5 text-base leading-[1.65] text-ink-soft">
               cifra treats Luxembourg tax like a first-class engineering
@@ -303,17 +298,9 @@ function Footer() {
           <Logo />
           <span className="text-sm text-ink-muted">· Luxembourg</span>
         </div>
-        <div className="flex items-center gap-5 text-sm text-ink-muted">
-          <a
-            href="mailto:contact@cifracompliance.com"
-            className="hover:text-ink transition-colors"
-          >
-            contact@cifracompliance.com
-          </a>
-          <Link href="/login" className="hover:text-ink transition-colors">
-            Sign in
-          </Link>
-        </div>
+        <Link href="/login" className="text-sm text-ink-muted hover:text-ink transition-colors">
+          Sign in
+        </Link>
       </Container>
     </footer>
   );
