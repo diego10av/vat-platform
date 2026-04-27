@@ -13,9 +13,10 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   SearchIcon, ChevronDownIcon, ChevronRightIcon, XIcon,
-  ArchiveIcon, ArchiveRestoreIcon, FoldersIcon,
+  ArchiveIcon, ArchiveRestoreIcon, FoldersIcon, PlusIcon,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
@@ -23,6 +24,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { crmLoadShape } from '@/lib/useCrmFetch';
 import { useToast } from '@/components/Toaster';
+import { NewEntityModal } from '@/components/tax-ops/NewEntityModal';
 
 interface EntityRow {
   id: string;
@@ -89,6 +91,7 @@ type BulkAction =
   | { kind: 'reactivate' };
 
 export default function EntitiesListPage() {
+  const router = useRouter();
   const [year] = useState<string>('2026');
   const [q, setQ] = useState('');
   const [includeArchived, setIncludeArchived] = useState(false);
@@ -97,6 +100,9 @@ export default function EntitiesListPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [openAction, setOpenAction] = useState<BulkAction | null>(null);
+  // Stint 51.G — global "+ New entity" modal launched from page header
+  // and from each matrix toolbar.
+  const [newEntityOpen, setNewEntityOpen] = useState(false);
   const toast = useToast();
 
   const load = useCallback(() => {
@@ -212,6 +218,21 @@ export default function EntitiesListPage() {
       <PageHeader
         title="Entities"
         subtitle={`${data.entities.length} active entit${data.entities.length === 1 ? 'y' : 'ies'} across ${grouped.filter(([, items]) => items.some(i => i.is_active)).length} client groups${includeArchived ? ` · ${archivedRows.length} archived included` : ''}.`}
+        actions={
+          <button
+            type="button"
+            onClick={() => setNewEntityOpen(true)}
+            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm rounded-md bg-brand-500 text-white hover:bg-brand-600"
+          >
+            <PlusIcon size={12} /> New entity
+          </button>
+        }
+      />
+
+      <NewEntityModal
+        open={newEntityOpen}
+        onClose={() => setNewEntityOpen(false)}
+        onCreated={(id) => router.push(`/tax-ops/entities/${id}`)}
       />
 
       <div className="flex gap-2 items-center mb-3 flex-wrap">

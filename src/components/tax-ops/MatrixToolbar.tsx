@@ -9,12 +9,14 @@
 // the toast surfaces the failure.
 
 import { useState, useMemo } from 'react';
-import { DownloadIcon } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { DownloadIcon, PlusIcon } from 'lucide-react';
 import { useToast } from '@/components/Toaster';
 import { FILING_STATUSES, filingStatusLabel } from './FilingStatusBadge';
 import { useTaxTeamMembers, ownershipNamesInCells } from './useMatrixData';
 import type { MatrixEntity } from './TaxTypeMatrix';
 import { SearchableSelect, type SearchableOption } from '@/components/ui/SearchableSelect';
+import { NewEntityModal } from './NewEntityModal';
 
 interface Props {
   year: number;
@@ -78,6 +80,11 @@ export function MatrixToolbar({
   periodOptions, periodFilter, onPeriodFilterChange, periodLabel = 'Period',
 }: Props) {
   const [busy, setBusy] = useState(false);
+  // Stint 51.G — global "+ New entity" CTA on every matrix toolbar so
+  // Diego can register a fresh client + every obligation it's subject
+  // to without having to drill into a family-specific row first.
+  const [newEntityOpen, setNewEntityOpen] = useState(false);
+  const router = useRouter();
   const toast = useToast();
   // Lazy-load team members only when at least one ownership filter is wired
   // so pages that don't use them don't pay the fetch cost.
@@ -227,7 +234,15 @@ export function MatrixToolbar({
       <div className="text-xs text-ink-muted">
         {count} {countLabel}
       </div>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setNewEntityOpen(true)}
+          className="inline-flex items-center gap-1 px-2.5 py-1 text-sm rounded-md bg-brand-500 text-white hover:bg-brand-600"
+          title="Create a brand-new entity (any family) and tick its obligations"
+        >
+          <PlusIcon size={12} /> New entity
+        </button>
         <button
           onClick={downloadExcel}
           disabled={busy || count === 0}
@@ -238,6 +253,11 @@ export function MatrixToolbar({
           {busy ? 'Exporting…' : 'Export Excel'}
         </button>
       </div>
+      <NewEntityModal
+        open={newEntityOpen}
+        onClose={() => setNewEntityOpen(false)}
+        onCreated={(id) => router.push(`/tax-ops/entities/${id}`)}
+      />
     </div>
   );
 }
