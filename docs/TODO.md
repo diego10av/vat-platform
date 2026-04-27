@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-26 (stints 44-47 closed — post-CIT polish + design-system audit en 3 fases. Stint 44: associate placeholder visible, filter dropdowns con nombres en celdas, assessment tri-state Aligned/Under-audit + mig 062, kebab actions menu reemplaza chip permanente de liquidación. Stints 45-47 (Phases 1-3): tokens de tipografía + radii + spacing en @theme, PageHeader variants + PageContainer, DataTable + Field + Drawer + Popover primitives, 155-file bulk text-scale migration, focus-state unification, hex purge, docs/DESIGN_SYSTEM.md source-of-truth, npm run lint:design CI guard (0 violations across 469 files). CLAUDE.md gana Hard Rule §13 — design uniformity across all modules. 707 tests green.)
+> Last updated: 2026-04-27 (stint 50 closed — data-integrity emergency. Diego reportó dos issues críticos en uso real: (a) contactos "borrados" en VAT trimestral de Green Arrow tras refactor stint-48.U3.A (entity-level vs filing-level) — recovery via migración 063 backfilling latest filing-level → entity-level. (b) 33 grupos de duplicates en producción del importer stint-34 (~70 entidades) — script transactional dedup-entities.ts con dry-run + --apply, winner-pick por obligations + group + oldest, per-loser merge con union de contactos. Bug encontrado mid-apply: postgres-js con prepare:false auto-encodea arrays a jsonb cuando el cast es ::jsonb, pre-stringificar con JSON.stringify produce double-encoding → jsonb-string en vez de jsonb-array. Healed via SQL + parchados los dos endpoints latentes (entities POST + bulk-set-contacts). Migración 064 UNIQUE partial index sobre LOWER+REGEXP_REPLACE para prevenir regresión + POST pre-check con 409 + existing_entity_id. Final: 178 active + 36 soft-deleted + 0 jsonb-strings + 0 dupes restantes. 707 tests verde.)
 
 > Earlier: 2026-04-24 (stint 41 closed — WHT per-entity cadence switcher. Migration 055 adds wht_director_quarterly rule (now 5 cadences: Monthly/Quarterly/Semester/Annual/Ad-hoc). New /change-cadence endpoint moves an obligation within the wht_director_* family atomically, with audit log. New cadenceColumn/CadenceInlineCell surfaces a 1-click dropdown on every WHT matrix page. Filings stay attached to the obligation; old period_labels remain in the audit log but won't render in the new cadence's matrix — Diego confirmed that's fine per the "cambio de cadencia" flow he described. 678 tests green. No backlog left from stints 40/41.)
 
@@ -99,6 +99,46 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-27** — Stint 50: data-integrity emergency · contactos + dedup (`cfd6025`)
+
+Two issues from real production use, addressed in one stint with
+zero data loss:
+
+- **A · Contactos recuperados** (mig 063). Diego: "había incluido unos
+  contactos en el iva trimestral de green arrow y se han borrado." Root
+  cause: stint 48.U3.A refactored contactsColumn to read/write entity-
+  level instead of filing-level — the data was preserved at filing-level
+  but the new UI didn't see it. Migration backfills entity-level from
+  the latest filing-level entry per entity. Idempotent. Michele Di
+  Vietri (Green Arrow) restored.
+- **B · Dedup 70 → 34 entidades** (`scripts/dedup-entities.ts`). Diego:
+  "son la misma entidad. mira bien toda la lista." 33 duplicate groups
+  from the stint-34 importer; mostly variants of "S.A." vs "SA",
+  "S.à r.l." vs "Sà rl", plus orphan copies without client_group_id.
+  Dry-run + --apply, transactional. Winner-pick: most active
+  obligations → has client_group_id → named group over UNGROUPED →
+  oldest created_at → shortest legal_name. Per-loser merge: move
+  obligations (or archive duplicates), union csp_contacts, concat
+  notes, take first-non-null on identifiers, soft-delete the loser
+  with a `[merged into <winner_id>]` tag, audit-log a tax_entity_merged
+  event. 36 soft-deletes, 36 audit rows.
+- **B-bis · postgres-js bug found + healed**. First-run produced 34
+  jsonb-string instead of jsonb-array values for csp_contacts —
+  postgres-js with `prepare: false` auto-encodes JS arrays when the
+  cast is `::jsonb`, so my `JSON.stringify(...)` pre-stringified it
+  and double-encoded. Healed via SQL (`(csp_contacts #>> '{}')::jsonb`).
+  Patched the same latent pattern in /api/tax-ops/entities POST and
+  /api/tax-ops/entities/bulk-set-contacts to pass arrays directly.
+- **C · Prevention** (mig 064 + POST pre-check). UNIQUE partial index
+  `tax_entities_norm_unique` on the same normalization the dedup script
+  uses (lower + REGEXP_REPLACE punctuation), `WHERE is_active = TRUE`
+  so liquidations don't block re-creates. POST returns 409 +
+  `existing_entity_id` instead of letting the constraint fire as 500.
+
+DB final state: 178 active entities + 36 soft-deleted + 0 jsonb-string
+contacts + 0 remaining duplicates + unique index live. 707 tests green,
+tsc clean, lint:design 0/473.
 
 **2026-04-26** — Stints 45-47: design-system audit, 3 phases (3 commits)
 

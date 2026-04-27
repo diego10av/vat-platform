@@ -211,9 +211,35 @@ clients → entities → declarations → invoices → invoice_lines
 
 ## 4 · Current state (keep this section fresh on each stint)
 
-**As of 2026-04-26, stints 44-47 just closed (CIT polish + design-system audit, Phases 1-3).** Status:
+**As of 2026-04-27, stint 50 just closed (data-integrity emergency).** Status:
 
 ### Shipped — recent stints (newest first)
+- ✅ **Stint 50** (2026-04-27, 1 commit `cfd6025`): data-integrity
+  emergency, two issues Diego found in real use, fixed in one stint
+  with zero data loss. **A · Contactos recuperados** (mig 063) —
+  stint 48.U3.A had refactored contactsColumn to read/write entity-
+  level, leaving Diego's previously-saved filing-level contacts
+  invisible. Migration backfills latest filing-level → entity-level
+  per entity, idempotent. Michele Di Vietri (Green Arrow) restored.
+  **B · Dedup 70 → 34 entidades** via `scripts/dedup-entities.ts` —
+  33 duplicate groups from the stint-34 importer (S.A./SA, Sà rl/
+  S.à r.l., orphan copies without client_group_id). Dry-run +
+  --apply, transactional. Winner-pick: most obligations → has
+  client_group_id → named group over UNGROUPED → oldest → shortest
+  name. Per-loser merge: move obligations, union contacts, concat
+  notes, take first-non-null on identifiers, soft-delete with
+  `[merged into <id>]` tag, audit log entry. Filings ride their
+  obligations. **B-bis · postgres-js bug** caught mid-apply:
+  `prepare: false` + `JSON.stringify` + `::jsonb` double-encodes →
+  jsonb-string instead of jsonb-array. Healed via SQL
+  (`(csp_contacts #>> '{}')::jsonb`) and patched two latent endpoints
+  (entities POST + bulk-set-contacts) to pass arrays directly.
+  **C · Prevention** (mig 064): UNIQUE partial index
+  `tax_entities_norm_unique` on LOWER+REGEXP_REPLACE normalization
+  WHERE is_active = TRUE; POST pre-check returns 409 +
+  `existing_entity_id` instead of 500. Final: 178 active + 36 soft-
+  deleted + 0 jsonb-strings + 0 dupes + unique index live. 707 tests
+  green.
 - ✅ **Stints 45-47** (2026-04-26, design-system audit in 3 phases):
   Diego: "el diseño tiene que estar alineado en todo cifra. En todos
   los distintos módulos." Three-phase sweep that lands tokens +
