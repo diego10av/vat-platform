@@ -13,7 +13,7 @@
 > Claude keeps it here with an age indicator. This is a feature, not
 > a failure. Diego has a day job and two small kids; many things slip.
 >
-> Last updated: 2026-04-27 (stint 50 closed — data-integrity emergency. Diego reportó dos issues críticos en uso real: (a) contactos "borrados" en VAT trimestral de Green Arrow tras refactor stint-48.U3.A (entity-level vs filing-level) — recovery via migración 063 backfilling latest filing-level → entity-level. (b) 33 grupos de duplicates en producción del importer stint-34 (~70 entidades) — script transactional dedup-entities.ts con dry-run + --apply, winner-pick por obligations + group + oldest, per-loser merge con union de contactos. Bug encontrado mid-apply: postgres-js con prepare:false auto-encodea arrays a jsonb cuando el cast es ::jsonb, pre-stringificar con JSON.stringify produce double-encoding → jsonb-string en vez de jsonb-array. Healed via SQL + parchados los dos endpoints latentes (entities POST + bulk-set-contacts). Migración 064 UNIQUE partial index sobre LOWER+REGEXP_REPLACE para prevenir regresión + POST pre-check con 409 + existing_entity_id. Final: 178 active + 36 soft-deleted + 0 jsonb-strings + 0 dupes restantes. 707 tests verde.)
+> Last updated: 2026-04-27 (stints 50 + 50.D closed — data-integrity emergency en dos rounds. Round 1: contactos backfill (mig 063) + dedup 70→34 con normalización permisiva [,.()]. Round 2 (Diego: "todavía hay muchos duplicados... no me las dejes como inactivas"): normalización agresiva con TRANSLATE accents + strip todo non-alphanumeric, hard-delete por default, 11 grupos extra mergeados (22→11), 36 soft-deleted previos hard-deleted, 5 merges manuales aprobados (Nice Bay 3/4/5 + Portobello Education + Portobello Serveo), 2 mantenidos como entidades distintas (Green Arrow Sàrl/SCA = GP/Fund, Trilantic VI SCA RAIF/SCSp = Fund/Carry). Migración 065 reemplaza mig 064 con la regex agresiva + POST pre-check actualizado. Final: 162 active + 0 inactive + 52 merge audits + 0 dupes restantes. 707 tests verde.)
 
 > Earlier: 2026-04-24 (stint 41 closed — WHT per-entity cadence switcher. Migration 055 adds wht_director_quarterly rule (now 5 cadences: Monthly/Quarterly/Semester/Annual/Ad-hoc). New /change-cadence endpoint moves an obligation within the wht_director_* family atomically, with audit log. New cadenceColumn/CadenceInlineCell surfaces a 1-click dropdown on every WHT matrix page. Filings stay attached to the obligation; old period_labels remain in the audit log but won't render in the new cadence's matrix — Diego confirmed that's fine per the "cambio de cadencia" flow he described. 678 tests green. No backlog left from stints 40/41.)
 
@@ -99,6 +99,42 @@ Things worth remembering but not actionable yet:
 ## ✅ Done this week
 
 *(Archived every Monday morning into `docs/archive/TODO-YYYY-WW.md`.)*
+
+**2026-04-27** — Stint 50.D: round-2 dedup + hard-delete (`3b72ef2` + manual SQL)
+
+Diego después de round 1: "todavía hay muchos duplicados... lo único que
+es distinto es que hay una, punto y coma, o la forma jurídica de Sarl,
+que vienen con puntos." También: "no me las dejes como inactivas;
+elimínamelas directamente."
+
+- **Normalización agresiva**: switched from `[,.()]` strip to `TRANSLATE`
+  (Latin-1 accents → ASCII) + `[^a-zA-Z0-9]+` (strip ALL non-alphanumeric).
+  Pilla "S.à r.l." vs "SARL", trailing ";" / ":", accents, mixed case.
+- **Hard-delete by default**: audit log entry written FIRST (preserves
+  winner_id + loser_id + diff in new_value), then `DELETE FROM
+  tax_entities`. Cascades are safe because step-1 of the merge moves
+  every active obligation to the winner; tax_ops_tasks FKs are SET NULL.
+- **Round 2 (script)**: 11 new groups merged · 22 → 11 entities.
+  Avallon MBO Fund III (vs `;`), Avallon MBO II SARL/Sàrl,
+  Avallon Partners III SARL/Sàrl, Energy Transition Investments GP,
+  Magenta CL Sàrl/SARL;, Peninsula Capital III SARL/Sàrl, Portobello
+  Capital Coinvestment Fund (vs `:`), Trilantic Europe SARL/Sàrl
+  (× 3 distinct: Europe, V, VI GP), TTGV Investment GP.
+- **Hard-deleted 36 round-1 soft-deleted losers** in the same pass
+  (verified zero remaining obligations beforehand).
+- **5 manual merges** (Diego confirmed): Nice Bay 3/4/5 (renamed winner
+  to "..., SARL"), Portobello Education Opportunity PSP Fund II SCA,
+  Portobello Serveo Continuation Vehicle. **Kept distinct** (Diego
+  confirmed): Green Arrow Sàrl ↔ SCA SICAV-RAIF (GP vs Fund pattern),
+  Trilantic Europe VI SCA RAIF ↔ SCSp (Fund vs Carry pattern).
+- **Migration 065** drops mig-064 permissive index, recreates with the
+  aggressive normalization. POST `/api/tax-ops/entities` pre-check
+  updated to match.
+
+Final state: **162 active entities** + 0 inactive + 52 merge audit
+entries (36 round 1 + 11 round 2 + 5 manual) + 0 jsonb-strings + 0
+remaining duplicates under the aggressive normalization. 707 tests
+green, lint:design 0/473.
 
 **2026-04-27** — Stint 50: data-integrity emergency · contactos + dedup (`cfd6025`)
 
