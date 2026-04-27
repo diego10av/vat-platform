@@ -123,6 +123,12 @@ export async function GET(request: NextRequest) {
               (SELECT g.name FROM tax_entities e2 LEFT JOIN tax_client_groups g ON g.id = e2.client_group_id WHERE e2.id = t.entity_id),
               (SELECT g.name FROM tax_entities e3 LEFT JOIN tax_client_groups g ON g.id = e3.client_group_id WHERE e3.id = t.related_entity_id)
             ) AS family_name,
+            -- Stint 53 — family_id surfaced so the list page can link
+            -- the chip to /tax-ops/families/[id].
+            COALESCE(
+              (SELECT g.id FROM tax_entities e4 LEFT JOIN tax_client_groups g ON g.id = e4.client_group_id WHERE e4.id = t.entity_id),
+              (SELECT g.id FROM tax_entities e5 LEFT JOIN tax_client_groups g ON g.id = e5.client_group_id WHERE e5.id = t.related_entity_id)
+            ) AS family_id,
             CASE WHEN f.id IS NOT NULL
                  THEN (SELECT ent.legal_name FROM tax_obligations o
                         JOIN tax_entities ent ON ent.id = o.entity_id
@@ -131,11 +137,19 @@ export async function GET(request: NextRequest) {
        FROM tax_ops_tasks t
        LEFT JOIN tax_filings f ON f.id = t.related_filing_id
        ${whereSQL}
+      -- Stint 53 — Diego: "que las que la fecha de actuación sean las
+      -- más próximas, aparezcan arriba". The "next action date" is the
+      -- earliest of follow_up_date (chase reminder) and due_date. We
+      -- rank by COALESCE(follow_up_date, due_date) ASC NULLS LAST so
+      -- whatever's most imminent floats to the top, then break ties on
+      -- priority then created_at. Done tasks always sink to the bottom
+      -- regardless of their dates.
       ORDER BY
+        CASE WHEN t.status IN ('done','cancelled') THEN 1 ELSE 0 END,
+        COALESCE(t.follow_up_date, t.due_date) ASC NULLS LAST,
         CASE t.priority
           WHEN 'urgent' THEN 0 WHEN 'high' THEN 1
           WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END,
-        t.due_date ASC NULLS LAST,
         t.created_at DESC`,
     params,
   );

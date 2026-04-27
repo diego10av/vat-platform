@@ -30,6 +30,12 @@ interface TaskDetail {
   completed_by: string | null;
   created_at: string;
   updated_at: string;
+  // Stint 53 — added to the GET payload so the detail page can edit them.
+  entity_id: string | null;
+  task_kind: string | null;
+  waiting_on_kind: string | null;
+  waiting_on_note: string | null;
+  follow_up_date: string | null;
 }
 
 interface SubtaskRow {
@@ -57,13 +63,18 @@ export async function GET(
   const { id } = await params;
   const [taskRows, subtasks, blockedByUs, blockerTask] = await Promise.all([
     query<TaskDetail>(
+      // Stint 53 — surface task_kind / waiting_on_* / follow_up_date /
+      // entity_id so the detail page can edit them inline (Hito 1).
       `SELECT id, title, description, status, priority,
               due_date::text, remind_at::text,
               parent_task_id, depends_on_task_id, recurrence_rule, tags,
               related_filing_id, related_entity_id,
               assignee, auto_generated,
               completed_at::text, completed_by,
-              created_at::text, updated_at::text
+              created_at::text, updated_at::text,
+              entity_id, task_kind,
+              waiting_on_kind, waiting_on_note,
+              follow_up_date::text AS follow_up_date
          FROM tax_ops_tasks WHERE id = $1`,
       [id],
     ),

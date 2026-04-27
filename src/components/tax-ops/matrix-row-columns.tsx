@@ -824,3 +824,35 @@ export function deadlineColumn(periodLabel: string, toleranceDays = 0): MatrixCo
     },
   };
 }
+
+/**
+ * Stint 53 — variant of deadlineColumn for matrices with multiple
+ * periods per row (quarterly / monthly). Shows the deadline of the
+ * NEXT pending cell — i.e. the earliest period whose status is not
+ * yet 'filed' / 'paid' / 'waived'. If every cell is closed, falls
+ * back to the last period's deadline (so the column never goes blank
+ * for fully-closed entities). Headed "Next deadline" so Diego knows
+ * it's a forward-looking view, not a fixed date.
+ */
+export function nextDeadlineColumn(periodLabels: string[], toleranceDays = 0): MatrixColumn {
+  const CLOSED_STATUSES = new Set(['filed', 'paid', 'waived']);
+  return {
+    key: 'next_deadline',
+    label: 'Next deadline',
+    widthClass: 'w-[180px]',
+    render: (e) => {
+      const ordered = periodLabels
+        .map(l => ({ label: l, cell: e.cells[l] ?? null }))
+        .filter(x => x.cell?.deadline_date);
+      const open = ordered.find(x => x.cell && !CLOSED_STATUSES.has(x.cell.status));
+      const target = open ?? ordered[ordered.length - 1] ?? null;
+      return (
+        <DeadlineWithTolerance
+          value={target?.cell?.deadline_date ?? null}
+          toleranceDays={toleranceDays}
+          label="Next deadline"
+        />
+      );
+    },
+  };
+}

@@ -39,6 +39,12 @@ interface Task {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  // Stint 53 — Hito 1 surfaces these fields in the detail editor.
+  task_kind: string | null;
+  waiting_on_kind: string | null;
+  waiting_on_note: string | null;
+  follow_up_date: string | null;
+  entity_id: string | null;
 }
 
 interface Subtask {
@@ -241,6 +247,61 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               Auto-generated
             </span>
           )}
+        </div>
+        {/* Stint 53 — Hito 1: surface task_kind / waiting_on / follow_up
+            so the detail page covers every column the list now exposes. */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+          <label className="inline-flex items-center gap-1">
+            <span className="text-ink-muted">Kind:</span>
+            <select
+              value={t.task_kind ?? 'action'}
+              onChange={e => patch({ task_kind: e.target.value })}
+              className="px-2 py-1 border border-border rounded-md bg-surface"
+            >
+              <option value="action">Action</option>
+              <option value="follow_up">Follow-up</option>
+              <option value="clarification">Clarification</option>
+              <option value="approval_request">Approval request</option>
+              <option value="review">Review</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="inline-flex items-center gap-1">
+            <span className="text-ink-muted">Waiting on:</span>
+            <select
+              value={t.waiting_on_kind ?? ''}
+              onChange={e => patch({ waiting_on_kind: e.target.value || null })}
+              className="px-2 py-1 border border-border rounded-md bg-surface"
+            >
+              <option value="">— not waiting —</option>
+              <option value="csp_contact">CSP contact</option>
+              <option value="client">Client</option>
+              <option value="internal_team">Internal team</option>
+              <option value="aed">AED (tax authority)</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          {t.waiting_on_kind && (
+            <label className="inline-flex items-center gap-1 flex-1 min-w-[200px]">
+              <span className="text-ink-muted shrink-0">Who:</span>
+              <input
+                defaultValue={t.waiting_on_note ?? ''}
+                onBlur={e => patch({ waiting_on_note: e.target.value.trim() || null })}
+                placeholder="e.g. Maria @ XYZ CSP"
+                className="flex-1 px-2 py-1 border border-border rounded-md bg-surface"
+              />
+            </label>
+          )}
+          <label className="inline-flex items-center gap-1">
+            <span className="text-ink-muted">Follow-up:</span>
+            <input
+              type="date"
+              value={t.follow_up_date ?? ''}
+              onChange={e => patch({ follow_up_date: e.target.value || null })}
+              className="px-2 py-1 border border-border rounded-md bg-surface"
+              title="Chase / re-check date — independent of due date"
+            />
+          </label>
         </div>
         {visibleTags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">

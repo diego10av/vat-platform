@@ -20,6 +20,11 @@ import { DateBadge } from '@/components/crm/DateBadge';
 import { crmLoadShape } from '@/lib/useCrmFetch';
 import { TaskBoard, type TaskRow } from '@/components/tax-ops/TaskBoard';
 import { useToast } from '@/components/Toaster';
+// Stint 53 — Hito 1 of the Tasks redesign: every cell is editable in
+// place, family chips are coloured + clickeable to /families/[id], and
+// the row order respects the next pending action.
+import { InlineTextCell, InlineDateCell } from '@/components/tax-ops/inline-editors';
+import { familyChipClasses } from '@/components/tax-ops/familyColors';
 
 interface TaskFull extends TaskRow {
   description: string | null;
@@ -30,6 +35,7 @@ interface TaskFull extends TaskRow {
   entity_id: string | null;
   entity_name: string | null;
   family_name: string | null;
+  family_id: string | null;
   task_kind: string;
   waiting_on_kind: string | null;
   waiting_on_note: string | null;
@@ -309,20 +315,54 @@ export default function TasksListPage() {
             <tbody>
               {rows.map(t => (
                 <tr key={t.id} className="border-t border-border/70 hover:bg-surface-alt/50 align-top">
-                  <td className="px-2 py-1.5 text-ink-soft text-xs truncate max-w-[120px]">
-                    {t.family_name ?? '—'}
+                  {/* Family — coloured chip linked to the family detail page.
+                      No family / unattached → faint dash. Stint 53. */}
+                  <td className="px-2 py-1.5">
+                    {t.family_name && t.family_id ? (
+                      <Link
+                        href={`/tax-ops/families/${t.family_id}`}
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium truncate max-w-[110px] hover:opacity-80 ${familyChipClasses(t.family_name)}`}
+                        title={`Open ${t.family_name} family`}
+                      >
+                        {t.family_name}
+                      </Link>
+                    ) : (
+                      <span className="text-ink-faint italic text-xs">—</span>
+                    )}
                   </td>
-                  <td className="px-2 py-1.5 text-ink-soft text-xs truncate max-w-[150px]" title={t.entity_name ?? undefined}>
+                  {/* Entity — kept link, only rendered when there's one. */}
+                  <td className="px-2 py-1.5 text-xs truncate max-w-[150px]" title={t.entity_name ?? undefined}>
                     {t.entity_id ? (
-                      <Link href={`/tax-ops/entities/${t.entity_id}`} className="hover:text-brand-700">
+                      <Link
+                        href={`/tax-ops/entities/${t.entity_id}`}
+                        className="text-ink hover:text-brand-700 hover:underline"
+                      >
                         {t.entity_name ?? '(unknown)'}
                       </Link>
-                    ) : '—'}
+                    ) : <span className="text-ink-faint">—</span>}
                   </td>
+                  {/* Title — inline-editable. Click on the link icon to open
+                      the detail page, but the text itself stays editable. */}
                   <td className="px-2 py-1.5">
-                    <Link href={`/tax-ops/tasks/${t.id}`} className="font-medium text-ink hover:text-brand-700 text-sm">
-                      {t.title}
-                    </Link>
+                    <div className="flex items-center gap-1">
+                      <div className="flex-1 min-w-0">
+                        <InlineTextCell
+                          value={t.title}
+                          onSave={async v => {
+                            await patchTask(t.id, { title: v ?? '' });
+                          }}
+                          placeholder="(empty)"
+                        />
+                      </div>
+                      <Link
+                        href={`/tax-ops/tasks/${t.id}`}
+                        className="shrink-0 text-ink-faint hover:text-brand-700 text-xs"
+                        title="Open task detail"
+                        aria-label="Open task"
+                      >
+                        ↗
+                      </Link>
+                    </div>
                     {t.tags.length > 0 && (
                       <div className="mt-0.5 flex flex-wrap gap-1">
                         {t.tags.filter(tg => !tg.startsWith('recurring_from:')).slice(0, 3).map((tg, i) => (
@@ -331,9 +371,19 @@ export default function TasksListPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-2 py-1.5 text-xs text-ink-soft">
-                    {TASK_KIND_LABELS[t.task_kind] ?? t.task_kind}
+                  {/* Kind — inline editable dropdown. */}
+                  <td className="px-2 py-1.5">
+                    <select
+                      value={t.task_kind}
+                      onChange={e => patchTask(t.id, { task_kind: e.target.value }).catch(err => toast.error(String(err)))}
+                      className="w-full px-1 py-0.5 text-xs border border-border rounded bg-surface"
+                    >
+                      {Object.entries(TASK_KIND_LABELS).map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
                   </td>
+                  {/* Status — already inline editable. */}
                   <td className="px-2 py-1.5">
                     <select
                       value={t.status}
@@ -343,33 +393,60 @@ export default function TasksListPage() {
                       {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                     </select>
                   </td>
+                  {/* Waiting on — inline editable: dropdown for kind + note. */}
+                  <td className="px-2 py-1.5">
+                    <select
+                      value={t.waiting_on_kind ?? ''}
+                      onChange={e => patchTask(t.id, { waiting_on_kind: e.target.value || null }).catch(err => toast.error(String(err)))}
+                      className="w-full px-1 py-0.5 text-xs border border-border rounded bg-surface mb-0.5"
+                    >
+                      <option value="">— not waiting —</option>
+                      {Object.entries(WAITING_ON_LABELS).map(([v, l]) => (
+                        <option key={v} value={v}>{l}</option>
+                      ))}
+                    </select>
+                    {t.waiting_on_kind && (
+                      <InlineTextCell
+                        value={t.waiting_on_note}
+                        onSave={async v => { await patchTask(t.id, { waiting_on_note: v }); }}
+                        placeholder="who? (optional)"
+                      />
+                    )}
+                  </td>
+                  {/* Follow-up — inline editable date. */}
+                  <td className="px-2 py-1.5">
+                    <InlineDateCell
+                      value={t.follow_up_date}
+                      onSave={async v => { await patchTask(t.id, { follow_up_date: v }); }}
+                    />
+                  </td>
+                  {/* Assignee — inline editable text. */}
                   <td className="px-2 py-1.5 text-xs">
-                    {t.waiting_on_kind ? (
-                      <div>
-                        <span className="inline-flex items-center px-1 py-0 rounded bg-amber-50 text-amber-800 text-2xs">
-                          {WAITING_ON_LABELS[t.waiting_on_kind] ?? t.waiting_on_kind}
-                        </span>
-                        {t.waiting_on_note && (
-                          <div className="text-2xs text-ink-muted mt-0.5 truncate" title={t.waiting_on_note}>
-                            {t.waiting_on_note}
-                          </div>
-                        )}
-                      </div>
-                    ) : <span className="text-ink-faint">—</span>}
+                    <InlineTextCell
+                      value={t.assignee}
+                      onSave={async v => { await patchTask(t.id, { assignee: v }); }}
+                      placeholder="—"
+                    />
                   </td>
+                  {/* Due — inline editable date. */}
                   <td className="px-2 py-1.5">
-                    <DateBadge value={t.follow_up_date} mode="urgency" />
+                    <InlineDateCell
+                      value={t.due_date}
+                      onSave={async v => { await patchTask(t.id, { due_date: v }); }}
+                    />
                   </td>
-                  <td className="px-2 py-1.5 text-ink-soft text-xs">
-                    {t.assignee ?? '—'}
-                  </td>
+                  {/* Priority — inline editable dropdown. */}
                   <td className="px-2 py-1.5">
-                    <DateBadge value={t.due_date} mode="urgency" />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-2xs font-medium ${PRIORITY_COLORS[t.priority] ?? ''}`}>
-                      {t.priority}
-                    </span>
+                    <select
+                      value={t.priority}
+                      onChange={e => patchTask(t.id, { priority: e.target.value }).catch(err => toast.error(String(err)))}
+                      className={`w-full px-1 py-0.5 text-2xs border border-border rounded font-medium ${PRIORITY_COLORS[t.priority] ?? 'bg-surface'}`}
+                    >
+                      <option value="urgent">Urgent</option>
+                      <option value="high">High</option>
+                      <option value="medium">Medium</option>
+                      <option value="low">Low</option>
+                    </select>
                   </td>
                   <td className="px-2 py-1.5 text-right">
                     <button

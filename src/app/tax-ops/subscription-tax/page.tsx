@@ -14,7 +14,7 @@ import {
 } from '@/components/tax-ops/useMatrixData';
 import { yearOptions } from '@/components/tax-ops/yearOptions';
 import {
-  partnerInChargeColumn, associatesWorkingColumn, lastActionColumn, contactsColumn, commentsColumn, priceColumn, familyColumn,
+  partnerInChargeColumn, associatesWorkingColumn, lastActionColumn, contactsColumn, commentsColumn, priceColumn, familyColumn, nextDeadlineColumn,
 } from '@/components/tax-ops/matrix-row-columns';
 import { MatrixToolbar } from '@/components/tax-ops/MatrixToolbar';
 import { AddEntityRow } from '@/components/tax-ops/AddEntityRow';
@@ -55,6 +55,10 @@ export default function SubscriptionTaxPage() {
     for (const label of visiblePeriodLabels) {
       columns.push({ key: label, label: shortPeriodLabel(label), widthClass: 'w-[80px]' });
     }
+    // Stint 53 — Diego asked for a deadline column on the subscription-tax
+    // matrix. Shows the next pending deadline per row (Loi 17 déc 2010
+    // Art. 175 §3 — 20 days after quarter-end, strict).
+    columns.push(nextDeadlineColumn(visiblePeriodLabels));
     columns.push(lastActionColumn(visiblePeriodLabels, refetch));
     columns.push(partnerInChargeColumn(visiblePeriodLabels, refetch));
     columns.push(associatesWorkingColumn(visiblePeriodLabels, refetch));
@@ -71,7 +75,7 @@ export default function SubscriptionTaxPage() {
     <div className="space-y-3">
       <PageHeader
         title="Subscription tax"
-        subtitle="UCI / AIF quarterly subscription tax — filing + payment on the 15th day of the month after quarter-end. Strict deadline."
+        subtitle="UCI / AIF / RAIF quarterly subscription tax — filing AND payment within 20 days of each quarter-end (Loi 17 déc. 2010 Art. 175 §3 / Loi 13 fév. 2007 Art. 68 §2 / Loi RAIF 2016 Art. 46). Strict deadline, identical for all vehicles."
       />
 
       <MatrixToolbar
