@@ -26,6 +26,9 @@ import {
   RecurrenceEditor, describeRecurrence, type RecurrenceRule,
 } from '@/components/tax-ops/RecurrenceEditor';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { TaskSignoffCard } from '@/components/tax-ops/TaskSignoffCard';
+import { TaskTimeline } from '@/components/tax-ops/TaskTimeline';
+import { TaskAttachmentsPanel } from '@/components/tax-ops/TaskAttachmentsPanel';
 
 interface Task {
   id: string;
@@ -49,6 +52,13 @@ interface Task {
   waiting_on_note: string | null;
   follow_up_date: string | null;
   entity_id: string | null;
+  // Stint 56.A — sign-off cascade.
+  preparer: string | null;
+  preparer_at: string | null;
+  reviewer: string | null;
+  reviewer_at: string | null;
+  partner_sign_off: string | null;
+  partner_sign_off_at: string | null;
 }
 
 interface Subtask {
@@ -318,6 +328,22 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         )}
       </div>
 
+      {/* Stint 56.A — sign-off cascade card right under the header so
+          the formal approval path is impossible to miss. */}
+      <TaskSignoffCard
+        taskId={id}
+        snapshot={{
+          preparer: t.preparer,
+          preparer_at: t.preparer_at,
+          reviewer: t.reviewer,
+          reviewer_at: t.reviewer_at,
+          partner_sign_off: t.partner_sign_off,
+          partner_sign_off_at: t.partner_sign_off_at,
+        }}
+        defaultSigner={t.assignee ?? 'Diego'}
+        onChanged={load}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left column */}
         <div className="lg:col-span-2 space-y-4">
@@ -427,6 +453,18 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                 <SendIcon size={11} /> Send
               </button>
             </div>
+          </div>
+
+          {/* Attachments — Stint 56.C. Drag-drop + listing with signed
+              download URLs. Max 25 MB / file. */}
+          <TaskAttachmentsPanel taskId={id} />
+
+          {/* Activity — Stint 56.B. Surfaces every audit_log row
+              tagged tax_ops_task for this id (status changes,
+              sign-offs, attachments, reassignments). */}
+          <div className="rounded-md border border-border bg-surface px-4 py-3">
+            <h3 className="text-sm font-semibold text-ink mb-2">Activity</h3>
+            <TaskTimeline taskId={id} />
           </div>
         </div>
 

@@ -12,6 +12,7 @@ import {
   SearchIcon, LayoutListIcon, LayoutGridIcon, PlusIcon, FilterXIcon,
   CalendarIcon, MessagesSquareIcon, ListIcon, Trash2Icon,
   ChevronRightIcon, ChevronDownIcon, LockIcon, UnlockIcon,
+  StarIcon, XIcon,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
@@ -44,6 +45,12 @@ interface TaskFull extends TaskRow {
   // Stint 55.B — blocker info for the 🔒/🔓 badge.
   blocker_title: string | null;
   blocker_status: string | null;
+  // Stint 56.A — sign-off snapshot for the N/3 chip.
+  preparer: string | null;
+  reviewer: string | null;
+  partner_sign_off: string | null;
+  // Stint 56.D — favourite.
+  is_starred: boolean;
 }
 
 const STATUSES = [
@@ -118,6 +125,12 @@ const QUICK_FILTERS: Array<{
     apply: (p) => p.set('ready', '1'),
   },
   {
+    key: 'starred',
+    label: 'Starred',
+    tooltip: 'Tasks you marked with a star.',
+    apply: (p) => p.set('starred', '1'),
+  },
+  {
     key: 'thisweek',
     label: 'Due this week',
     tooltip: 'Open tasks with due_date in the next 7 days.',
@@ -147,6 +160,8 @@ export default function TasksListPage() {
   // chevron. Cached so re-expand is instant.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [childrenByParent, setChildrenByParent] = useState<Record<string, TaskFull[]>>({});
+  // Stint 56.D — bulk select state for the multi-select toolbar.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const toast = useToast();
 
   const load = useCallback(() => {
@@ -248,6 +263,34 @@ export default function TasksListPage() {
     }
   }
 
+  // Stint 56.D — toggle one row in the bulk-select set.
+  function toggleSelected(taskId: string) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId); else next.add(taskId);
+      return next;
+    });
+  }
+
+  function clearSelection() { setSelected(new Set()); }
+
+  async function bulkPatch(patch: Record<string, unknown>) {
+    if (selected.size === 0) return;
+    try {
+      const res = await fetch('/api/tax-ops/tasks/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task_ids: Array.from(selected), patch }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success(`${selected.size} task(s) updated`);
+      clearSelection();
+      load();
+    } catch (e) {
+      toast.error(String(e instanceof Error ? e.message : e));
+    }
+  }
+
   async function deleteTask(taskId: string) {
     if (!confirm('Delete this task? Cascade-deletes subtasks + comments.')) return;
     const res = await fetch(`/api/tax-ops/tasks/${taskId}`, { method: 'DELETE' });
@@ -334,7 +377,14 @@ export default function TasksListPage() {
             <FilterXIcon size={12} /> Clear
           </button>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <Link
+            href="/tax-ops/tasks/templates"
+            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm rounded-md border border-border hover:bg-surface-alt"
+            title="Browse task templates / playbooks"
+          >
+            Templates
+          </Link>
           <button
             onClick={() => {
               window.dispatchEvent(new KeyboardEvent('keydown', { key: 'N' }));
@@ -354,10 +404,82 @@ export default function TasksListPage() {
           description={hasFilters ? 'Loosen the filters or press N to add a new task.' : 'Press N anywhere in /tax-ops to capture your first task.'}
         />
       ) : view === 'list' ? (
-        <div className="rounded-md border border-border bg-surface overflow-auto">
+        <div className="rounded-md border border-border bg-surface overflow-auto relative">
+          {/* Stint 56.D — bulk action toolbar slides in when ≥1 row
+              is selected. Sticks to the top so it never scrolls out
+              of reach with long lists. */}
+          {selected.size > 0 && (
+            <div className="sticky top-0 z-popover bg-brand-50 border-b border-brand-200 px-3 py-2 flex items-center gap-2 text-sm">
+              <span className="font-medium text-brand-800">{selected.size} selected</span>
+              <button
+                type="button"
+                onClick={() => void bulkPatch({ status: 'done' })}
+                className="px-2 py-0.5 text-xs rounded border border-border bg-surface hover:bg-surface-alt"
+              >
+                Mark done
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const v = window.prompt('New assignee (blank to clear):');
+                  if (v === null) return;
+                  void bulkPatch({ assignee: v.trim() || null });
+                }}
+                className="px-2 py-0.5 text-xs rounded border border-border bg-surface hover:bg-surface-alt"
+              >
+                Reassign…
+              </button>
+              <select
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v) void bulkPatch({ priority: v });
+                  e.target.value = '';
+                }}
+                defaultValue=""
+                className="px-2 py-0.5 text-xs rounded border border-border bg-surface"
+              >
+                <option value="">Set priority…</option>
+                <option value="urgent">Urgent</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => void bulkPatch({ is_starred: true })}
+                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-border bg-surface hover:bg-surface-alt"
+              >
+                <StarIcon size={11} /> Star
+              </button>
+              <button
+                type="button"
+                onClick={clearSelection}
+                aria-label="Clear selection"
+                className="ml-auto p-1 text-ink-muted hover:text-ink"
+                title="Clear selection"
+              >
+                <XIcon size={12} />
+              </button>
+            </div>
+          )}
           <table className="w-full text-sm">
             <thead className="bg-surface-alt text-ink-muted sticky top-0 z-sticky">
               <tr className="text-left">
+                <th className="px-2 py-1.5 font-medium w-[28px]">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible"
+                    checked={rows.length > 0 && rows.every(t => selected.has(t.id))}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelected(new Set(rows.map(t => t.id)));
+                      } else {
+                        clearSelection();
+                      }
+                    }}
+                  />
+                </th>
+                <th className="px-2 py-1.5 font-medium w-[28px]" aria-label="Star"></th>
                 <th className="px-2 py-1.5 font-medium w-[120px]">Family</th>
                 <th className="px-2 py-1.5 font-medium w-[150px]">Entity</th>
                 <th className="px-2 py-1.5 font-medium">Title</th>
@@ -373,7 +495,32 @@ export default function TasksListPage() {
             </thead>
             <tbody>
               {flattenTree(rows).map(({ task: t, depth }) => (
-                <tr key={t.id} className="border-t border-border/70 hover:bg-surface-alt/50 align-top">
+                <tr
+                  key={t.id}
+                  className={[
+                    'border-t border-border/70 align-top',
+                    selected.has(t.id) ? 'bg-brand-50/40' : 'hover:bg-surface-alt/50',
+                  ].join(' ')}
+                >
+                  <td className="px-2 py-1.5">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(t.id)}
+                      onChange={() => toggleSelected(t.id)}
+                      aria-label={`Select task ${t.title}`}
+                    />
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <button
+                      type="button"
+                      onClick={() => void patchTask(t.id, { is_starred: !t.is_starred })}
+                      aria-label={t.is_starred ? 'Unstar' : 'Star'}
+                      title={t.is_starred ? 'Unstar' : 'Star this task'}
+                      className={t.is_starred ? 'text-amber-500 hover:text-amber-600' : 'text-ink-faint hover:text-amber-500'}
+                    >
+                      <StarIcon size={14} fill={t.is_starred ? 'currentColor' : 'none'} />
+                    </button>
+                  </td>
                   {/* Family — coloured chip linked to the family detail page.
                       No family / unattached → faint dash. Stint 53. */}
                   <td className="px-2 py-1.5">
@@ -430,6 +577,22 @@ export default function TasksListPage() {
                           placeholder="(empty)"
                         />
                       </div>
+                      {/* Stint 56.A — sign-off progress chip. Hidden when 0/3
+                          (no sign-offs yet) to avoid clutter. */}
+                      {(() => {
+                        const done = (t.preparer ? 1 : 0) + (t.reviewer ? 1 : 0) + (t.partner_sign_off ? 1 : 0);
+                        if (done === 0) return null;
+                        const tone = done === 3 ? 'bg-success-100 text-success-800' : 'bg-amber-50 text-amber-800';
+                        const tip = `Sign-off: preparer=${t.preparer ?? '—'} · reviewer=${t.reviewer ?? '—'} · partner=${t.partner_sign_off ?? '—'}`;
+                        return (
+                          <span
+                            className={`shrink-0 inline-flex items-center px-1 rounded text-2xs font-medium ${tone}`}
+                            title={tip}
+                          >
+                            {done}/3
+                          </span>
+                        );
+                      })()}
                       {t.depends_on_task_id && t.blocker_status && (
                         t.blocker_status === 'done' ? (
                           <span

@@ -40,7 +40,11 @@ export type InboxItemKind =
   | 'validator_findings'
   | 'budget_warn'
   | 'feedback_new'
-  | 'schema_missing';
+  | 'schema_missing'
+  // Stint 56.F — task-driven inbox events.
+  | 'task_due_today'
+  | 'task_followup_today'
+  | 'task_unblocked';
 
 interface InboxItem {
   id: string;
@@ -351,6 +355,117 @@ export async function GET() {
         title: `${uniqueMigrations.length} migration${uniqueMigrations.length === 1 ? '' : 's'} pending`,
         description: uniqueMigrations.join(', ') + ' — apply in Supabase SQL Editor',
         href: '/settings',
+      });
+    }
+
+    // ── 9. Tasks: due today + follow-up today + just-unblocked ──
+    //
+    // Stint 56.F — surface task events Diego asked for ("notifications
+    // light"). Computed on-demand (same as everything else here), no
+    // cron. Email digest can come later if Diego wants.
+    const tasksDue = await safeQuery<{
+      id: string; title: string; entity_name: string | null;
+      family_name: string | null; due_date: string;
+    }>(
+      `SELECT t.id, t.title,
+              COALESCE(
+                (SELECT legal_name FROM tax_entities WHERE id = t.entity_id),
+                (SELECT legal_name FROM tax_entities WHERE id = t.related_entity_id)
+              ) AS entity_name,
+              COALESCE(
+                (SELECT g.name FROM tax_entities e JOIN tax_client_groups g ON g.id = e.client_group_id WHERE e.id = t.entity_id),
+                (SELECT g.name FROM tax_entities e JOIN tax_client_groups g ON g.id = e.client_group_id WHERE e.id = t.related_entity_id)
+              ) AS family_name,
+              t.due_date::text AS due_date
+         FROM tax_ops_tasks t
+        WHERE t.due_date = CURRENT_DATE
+          AND t.status NOT IN ('done','cancelled')
+        ORDER BY t.priority, t.created_at
+        LIMIT 30`,
+    );
+    for (const t of tasksDue) {
+      items.push({
+        id: `task-due-${t.id}`,
+        kind: 'task_due_today',
+        severity: 'critical',
+        title: `Due today — ${t.title}`,
+        description: [t.family_name, t.entity_name].filter(Boolean).join(' · ') || 'No entity',
+        href: `/tax-ops/tasks/${t.id}`,
+        context: { task_id: t.id },
+        created_at: t.due_date,
+      });
+    }
+
+    const tasksFollowUp = await safeQuery<{
+      id: string; title: string; entity_name: string | null;
+      family_name: string | null; follow_up_date: string;
+    }>(
+      `SELECT t.id, t.title,
+              COALESCE(
+                (SELECT legal_name FROM tax_entities WHERE id = t.entity_id),
+                (SELECT legal_name FROM tax_entities WHERE id = t.related_entity_id)
+              ) AS entity_name,
+              COALESCE(
+                (SELECT g.name FROM tax_entities e JOIN tax_client_groups g ON g.id = e.client_group_id WHERE e.id = t.entity_id),
+                (SELECT g.name FROM tax_entities e JOIN tax_client_groups g ON g.id = e.client_group_id WHERE e.id = t.related_entity_id)
+              ) AS family_name,
+              t.follow_up_date::text AS follow_up_date
+         FROM tax_ops_tasks t
+        WHERE t.follow_up_date = CURRENT_DATE
+          AND t.status NOT IN ('done','cancelled')
+        ORDER BY t.priority, t.created_at
+        LIMIT 30`,
+    );
+    for (const t of tasksFollowUp) {
+      items.push({
+        id: `task-followup-${t.id}`,
+        kind: 'task_followup_today',
+        severity: 'warning',
+        title: `Follow-up today — ${t.title}`,
+        description: [t.family_name, t.entity_name].filter(Boolean).join(' · ') || 'Chase reminder',
+        href: `/tax-ops/tasks/${t.id}`,
+        context: { task_id: t.id },
+        created_at: t.follow_up_date,
+      });
+    }
+
+    // task_unblocked: tasks whose blocker reached 'done' in the last
+    // 24h and that haven't been completed yet → "your blocker just
+    // cleared, you can move".
+    const tasksUnblocked = await safeQuery<{
+      id: string; title: string; entity_name: string | null;
+      family_name: string | null; blocker_completed_at: string;
+    }>(
+      `SELECT t.id, t.title,
+              COALESCE(
+                (SELECT legal_name FROM tax_entities WHERE id = t.entity_id),
+                (SELECT legal_name FROM tax_entities WHERE id = t.related_entity_id)
+              ) AS entity_name,
+              COALESCE(
+                (SELECT g.name FROM tax_entities e JOIN tax_client_groups g ON g.id = e.client_group_id WHERE e.id = t.entity_id),
+                (SELECT g.name FROM tax_entities e JOIN tax_client_groups g ON g.id = e.client_group_id WHERE e.id = t.related_entity_id)
+              ) AS family_name,
+              b.completed_at::text AS blocker_completed_at
+         FROM tax_ops_tasks t
+         JOIN tax_ops_tasks b ON b.id = t.depends_on_task_id
+        WHERE t.depends_on_task_id IS NOT NULL
+          AND b.status = 'done'
+          AND b.completed_at IS NOT NULL
+          AND b.completed_at >= NOW() - INTERVAL '24 hours'
+          AND t.status NOT IN ('done','cancelled')
+        ORDER BY b.completed_at DESC
+        LIMIT 20`,
+    );
+    for (const t of tasksUnblocked) {
+      items.push({
+        id: `task-unblocked-${t.id}`,
+        kind: 'task_unblocked',
+        severity: 'info',
+        title: `Unblocked — ${t.title}`,
+        description: 'Blocker just completed; ready to work on.',
+        href: `/tax-ops/tasks/${t.id}`,
+        context: { task_id: t.id },
+        created_at: t.blocker_completed_at,
       });
     }
 

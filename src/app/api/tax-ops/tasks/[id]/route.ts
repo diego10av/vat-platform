@@ -36,6 +36,15 @@ interface TaskDetail {
   waiting_on_kind: string | null;
   waiting_on_note: string | null;
   follow_up_date: string | null;
+  // Stint 56.A — sign-off cascade.
+  preparer: string | null;
+  preparer_at: string | null;
+  reviewer: string | null;
+  reviewer_at: string | null;
+  partner_sign_off: string | null;
+  partner_sign_off_at: string | null;
+  // Stint 56.D — favourite.
+  is_starred: boolean;
 }
 
 interface SubtaskRow {
@@ -57,6 +66,13 @@ const ALLOWED = [
   'completed_at', 'completed_by',
   // Stint 37.G
   'entity_id', 'task_kind', 'waiting_on_kind', 'waiting_on_note', 'follow_up_date',
+  // Stint 56.A — sign-off cascade. Setting these directly works for
+  // emergency overrides; the canonical path is POST /sign which
+  // enforces the cascade + audit log.
+  'preparer', 'preparer_at', 'reviewer', 'reviewer_at',
+  'partner_sign_off', 'partner_sign_off_at',
+  // Stint 56.D — favourite/star.
+  'is_starred',
 ] as const;
 
 export async function GET(
@@ -77,7 +93,12 @@ export async function GET(
               created_at::text, updated_at::text,
               entity_id, task_kind,
               waiting_on_kind, waiting_on_note,
-              follow_up_date::text AS follow_up_date
+              follow_up_date::text AS follow_up_date,
+              preparer, preparer_at::text AS preparer_at,
+              reviewer, reviewer_at::text AS reviewer_at,
+              partner_sign_off,
+              partner_sign_off_at::text AS partner_sign_off_at,
+              is_starred
          FROM tax_ops_tasks WHERE id = $1`,
       [id],
     ),

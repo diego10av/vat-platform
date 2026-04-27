@@ -41,6 +41,12 @@ interface TaskListRow {
   // Stint 55.B — blocker fields
   blocker_title: string | null;
   blocker_status: string | null;
+  // Stint 56.A — sign-off snapshot for the chip in title cell.
+  preparer: string | null;
+  reviewer: string | null;
+  partner_sign_off: string | null;
+  // Stint 56.D — favourite.
+  is_starred: boolean;
 }
 
 const VALID_STATUSES = ['queued', 'in_progress', 'waiting_on_external',
@@ -63,6 +69,8 @@ export async function GET(request: NextRequest) {
   // Stint 55.B — "Ready to work on" filter: exclude tasks blocked by
   // a dependency that hasn't been completed.
   const onlyReady = url.searchParams.get('ready') === '1';
+  // Stint 56.D — "Starred only" filter.
+  const onlyStarred = url.searchParams.get('starred') === '1';
 
   const where: string[] = [];
   const params: unknown[] = [];
@@ -110,6 +118,9 @@ export async function GET(request: NextRequest) {
         OR (SELECT b.status FROM tax_ops_tasks b WHERE b.id = t.depends_on_task_id) = 'done')`,
     );
   }
+  if (onlyStarred) {
+    where.push(`t.is_starred = TRUE`);
+  }
 
   const whereSQL = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
@@ -149,7 +160,11 @@ export async function GET(request: NextRequest) {
             -- Stint 55.B — blocker info so the list page can render
             -- "🔒 blocked by X" / "🔓 ready" indicators.
             (SELECT b.title FROM tax_ops_tasks b WHERE b.id = t.depends_on_task_id) AS blocker_title,
-            (SELECT b.status FROM tax_ops_tasks b WHERE b.id = t.depends_on_task_id) AS blocker_status
+            (SELECT b.status FROM tax_ops_tasks b WHERE b.id = t.depends_on_task_id) AS blocker_status,
+            -- Stint 56.A — sign-off snapshot for the chip in title cell.
+            t.preparer, t.reviewer, t.partner_sign_off,
+            -- Stint 56.D — favourite.
+            t.is_starred
        FROM tax_ops_tasks t
        LEFT JOIN tax_filings f ON f.id = t.related_filing_id
        ${whereSQL}
@@ -162,6 +177,8 @@ export async function GET(request: NextRequest) {
       -- regardless of their dates.
       ORDER BY
         CASE WHEN t.status IN ('done','cancelled') THEN 1 ELSE 0 END,
+        -- Stint 56.D — starred bubbles to the top within each status bucket.
+        CASE WHEN t.is_starred THEN 0 ELSE 1 END,
         COALESCE(t.follow_up_date, t.due_date) ASC NULLS LAST,
         CASE t.priority
           WHEN 'urgent' THEN 0 WHEN 'high' THEN 1
