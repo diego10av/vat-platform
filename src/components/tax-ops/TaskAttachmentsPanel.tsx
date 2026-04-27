@@ -153,6 +153,22 @@ export function TaskAttachmentsPanel({ taskId }: Props) {
                 href={a.download_url}
                 target="_blank"
                 rel="noreferrer"
+                onClick={async (e) => {
+                  // Stint 58.T1.3 — signed URLs expire after 1h. If the
+                  // user lands on a stale URL we get a silent 403. Try
+                  // a HEAD first; on failure, refresh the list (which
+                  // mints fresh URLs) and ask the user to click again.
+                  try {
+                    const r = await fetch(a.download_url!, { method: 'HEAD' });
+                    if (r.status === 403 || r.status === 404) {
+                      e.preventDefault();
+                      toast.info('Download link expired — refreshing. Click again.');
+                      await load();
+                    }
+                  } catch {
+                    // Network error; let the browser handle the click.
+                  }
+                }}
                 className="flex-1 text-ink hover:text-brand-700 truncate"
                 title={a.filename}
               >

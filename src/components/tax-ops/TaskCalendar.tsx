@@ -74,6 +74,10 @@ export function TaskCalendar({ tasks }: Props) {
   const monthLabel = cursor.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const selectedTasks = selectedDate ? (byDate.get(selectedDate) ?? []) : [];
+  // Stint 58.T1.2 — empty state: if no task in the visible set has a
+  // due_date, the calendar grid would be entirely blank without
+  // explanation. Surface a banner so Diego knows it's by design.
+  const hasAnyDate = byDate.size > 0;
 
   return (
     <div>
@@ -108,6 +112,14 @@ export function TaskCalendar({ tasks }: Props) {
           </button>
         </div>
       </div>
+
+      {!hasAnyDate && (
+        <div className="mb-3 rounded-md border border-amber-300 bg-amber-50/60 px-3 py-2 text-sm text-amber-900">
+          None of the tasks in this view have a <strong>due date</strong> set,
+          so the calendar is empty. Add a due date in the list view (or detail
+          page) to see tasks here.
+        </div>
+      )}
 
       <div className="grid grid-cols-[1fr,320px] gap-4">
         <div className="border border-border rounded-lg bg-surface overflow-hidden">

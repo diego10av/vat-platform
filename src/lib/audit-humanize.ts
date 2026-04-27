@@ -19,6 +19,13 @@ export interface AuditRow {
 
 /** Emoji prefix by action type. Falls back to · when unknown. */
 export function iconFor(action: string): string {
+  // Stint 58.T1.5 — task-specific actions (signed/unsigned, attachment
+  // add/remove, bulk update). Most-specific matches first.
+  if (action.startsWith('task_signed_')) return '✅';
+  if (action.startsWith('task_unsigned_')) return '↩️';
+  if (action === 'task_attachment_added') return '📎';
+  if (action === 'task_attachment_removed') return '🗑️';
+  if (action === 'task_bulk_update') return '📝';
   if (action.includes('status') || action.includes('filing_update')) return '🏷️';
   if (action.includes('merge')) return '🧩';
   if (action.includes('archive') || action.includes('deregister')) return '🗃️';
@@ -73,6 +80,27 @@ export function humanize(row: AuditRow): string {
     return `Obligation updated: ${keys.join(', ')}`;
   }
 
+  // Stint 58.T1.5 — task sign-off audit lines.
+  if (action.startsWith('task_signed_')) {
+    const role = action.slice('task_signed_'.length);
+    const signer = parsed && typeof parsed.signer === 'string' ? parsed.signer : 'someone';
+    return `${capitalize(role)} signed by ${signer}`;
+  }
+  if (action.startsWith('task_unsigned_')) {
+    const role = action.slice('task_unsigned_'.length);
+    return `${capitalize(role)} sign-off cleared`;
+  }
+  if (action === 'task_attachment_added' && parsed) {
+    return `Attachment added: ${parsed.filename ?? '(file)'}`;
+  }
+  if (action === 'task_attachment_removed' && parsed) {
+    return `Attachment removed: ${parsed.filename ?? '(file)'}`;
+  }
+  if (action === 'task_bulk_update' && parsed) {
+    const fields = Object.keys(parsed);
+    return `Bulk update: ${fields.join(', ')}`;
+  }
+
   // Fallback: just name the action.
   return prettyAction(action) + (target_type ? ` (${target_type})` : '');
 }
@@ -88,6 +116,11 @@ function prettyField(f: string): string {
 
 function prettyAction(a: string): string {
   return a.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function capitalize(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
 }
 
 function safeParse(s: string | null): Record<string, unknown> | null {

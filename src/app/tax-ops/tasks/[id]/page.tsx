@@ -113,6 +113,9 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [description, setDescription] = useState('');
   const [subtaskDraft, setSubtaskDraft] = useState('');
   const [commentDraft, setCommentDraft] = useState('');
+  // Stint 58.T1.1 — guard against duplicate posts when the user
+  // mashes Send (or ⌘+Enter) before the round-trip finishes.
+  const [sendingComment, setSendingComment] = useState(false);
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -186,7 +189,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   async function addComment() {
     const t = commentDraft.trim();
-    if (!t) return;
+    if (!t || sendingComment) return;
+    setSendingComment(true);
     try {
       const res = await fetch(`/api/tax-ops/tasks/${id}/comments`, {
         method: 'POST',
@@ -198,6 +202,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       load();
     } catch (e) {
       toast.error(String(e instanceof Error ? e.message : e));
+    } finally {
+      setSendingComment(false);
     }
   }
 
@@ -397,6 +403,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     toast.success('Promoted to root task');
                     load();
                   }}
+                  onAddChild={async (parentId, title) => {
+                    // Stint 58.T3.2 — quick-add sub-task under any node.
+                    await fetch('/api/tax-ops/tasks', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ title, parent_task_id: parentId, priority: 'medium' }),
+                    });
+                    // Re-load task detail so subtask_total counts refresh.
+                    load();
+                  }}
                 />
               ))}
             </div>
@@ -447,10 +463,10 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               />
               <button
                 onClick={addComment}
-                disabled={!commentDraft.trim()}
+                disabled={!commentDraft.trim() || sendingComment}
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm rounded-md bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50 self-start"
               >
-                <SendIcon size={11} /> Send
+                <SendIcon size={11} /> {sendingComment ? 'Sending…' : 'Send'}
               </button>
             </div>
           </div>
@@ -481,20 +497,29 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             onChanged={load}
           />
 
-          {/* Recurrence */}
-          <div className="rounded-md border border-border bg-surface px-4 py-3">
-            <h3 className="text-sm font-semibold text-ink mb-2">Recurrence</h3>
-            <RecurrenceEditor
-              value={t.recurrence_rule}
-              onChange={rule => patch({ recurrence_rule: rule }, 'Recurrence saved')}
-            />
-            {t.recurrence_rule && (
-              <p className="mt-2 text-xs text-ink-muted italic">
-                When marked done, a new instance will be created on the next occurrence.
-                ({describeRecurrence(t.recurrence_rule)})
-              </p>
-            )}
-          </div>
+          {/* Recurrence — Stint 58.T3.3: collapsed by default. Most
+              tasks aren't recurring; surfacing the editor unconditionally
+              wasted vertical space. Now a tiny <details> that expands
+              if the user has set a rule (or wants to). */}
+          <details className="rounded-md border border-border bg-surface px-4 py-2 group" open={!!t.recurrence_rule}>
+            <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-ink">
+              <span>Recurrence{t.recurrence_rule ? ' · active' : ''}</span>
+              <span className="text-2xs text-ink-muted">
+                {t.recurrence_rule ? describeRecurrence(t.recurrence_rule) : 'Make this task recurring'}
+              </span>
+            </summary>
+            <div className="mt-2">
+              <RecurrenceEditor
+                value={t.recurrence_rule}
+                onChange={rule => patch({ recurrence_rule: rule }, 'Recurrence saved')}
+              />
+              {t.recurrence_rule && (
+                <p className="mt-2 text-xs text-ink-muted italic">
+                  When marked done, a new instance will be created on the next occurrence.
+                </p>
+              )}
+            </div>
+          </details>
 
           {/* Related */}
           {(data.related_entity_name || data.related_filing_label) && (
@@ -549,36 +574,66 @@ interface SubtaskNodeProps {
   onToggleDone: (sub: Subtask) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
   onPromote: (id: string) => void | Promise<void>;
+  /** Stint 58.T3.2 — per-node "+ Add sub" creator. Adds a child under
+   *  this task with parent_task_id = task.id, then re-fetches. */
+  onAddChild: (parentId: string, title: string) => Promise<void>;
 }
 
-function SubtaskNode({ task, depth, onToggleDone, onDelete, onPromote }: SubtaskNodeProps) {
+function SubtaskNode({
+  task, depth, onToggleDone, onDelete, onPromote, onAddChild,
+}: SubtaskNodeProps) {
   const [expanded, setExpanded] = useState(false);
   const [children, setChildren] = useState<Subtask[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const hasChildren = (task.subtask_total ?? 0) > 0;
+  const [addingChild, setAddingChild] = useState(false);
+  const [childDraft, setChildDraft] = useState('');
+  const [refreshTick, setRefreshTick] = useState(0);
+  const hasChildren = (task.subtask_total ?? 0) > 0 || (children !== null && children.length > 0);
+
+  async function loadChildren() {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/tax-ops/tasks?parent=${encodeURIComponent(task.id)}`);
+      if (r.ok) {
+        const body = await r.json() as { tasks: Subtask[] };
+        setChildren(body.tasks ?? []);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function toggle() {
     if (!hasChildren) return;
     if (!expanded && children === null) {
-      setLoading(true);
-      try {
-        const r = await fetch(`/api/tax-ops/tasks?parent=${encodeURIComponent(task.id)}`);
-        if (r.ok) {
-          const body = await r.json() as { tasks: Subtask[] };
-          setChildren(body.tasks ?? []);
-        }
-      } finally {
-        setLoading(false);
-      }
+      await loadChildren();
     }
     setExpanded(v => !v);
   }
 
+  async function handleAddChild() {
+    const t = childDraft.trim();
+    if (!t) return;
+    await onAddChild(task.id, t);
+    setChildDraft('');
+    setAddingChild(false);
+    // Force re-fetch of children + auto-expand so the new node is visible.
+    await loadChildren();
+    setExpanded(true);
+    setRefreshTick(x => x + 1);
+  }
+
   return (
-    <div className="border-b border-border/50 last:border-b-0">
+    <div
+      className="group/node"
+      // Stint 58.T3.4 — left rail for tree hierarchy. depth>0 nodes
+      // get a subtle border-l on the wrapper so descendants visually
+      // connect to their parent column.
+      style={depth > 0 ? { borderLeft: '1px solid var(--color-border)', marginLeft: '0.5rem' } : undefined}
+    >
       <div
-        className="flex items-center gap-2 py-1 text-sm"
-        style={{ paddingLeft: `${depth * 1}rem` }}
+        className="flex items-center gap-2 py-1 text-sm border-b border-border/40 last:border-b-0"
+        style={{ paddingLeft: `${depth > 0 ? 0.75 : 0}rem` }}
       >
         {hasChildren ? (
           <button
@@ -586,7 +641,7 @@ function SubtaskNode({ task, depth, onToggleDone, onDelete, onPromote }: Subtask
             onClick={() => void toggle()}
             aria-label={expanded ? 'Collapse' : 'Expand'}
             className="shrink-0 text-ink-muted hover:text-ink"
-            title={`${task.subtask_total} sub-task${task.subtask_total === 1 ? '' : 's'}`}
+            title={`${task.subtask_total ?? children?.length ?? 0} sub-task${(task.subtask_total ?? children?.length ?? 0) === 1 ? '' : 's'}`}
           >
             {expanded ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />}
           </button>
@@ -610,13 +665,24 @@ function SubtaskNode({ task, depth, onToggleDone, onDelete, onPromote }: Subtask
         {task.assignee && (
           <span className="text-xs px-1 bg-surface-alt text-ink-soft rounded">{task.assignee}</span>
         )}
+        {/* Stint 58.T3.2 — quick-add sub-task per node. Hover-only so
+            it doesn't clutter the row at rest. */}
+        <button
+          type="button"
+          onClick={() => setAddingChild(v => !v)}
+          aria-label="Add sub-task under this node"
+          title="Add sub-task here"
+          className="opacity-0 group-hover/node:opacity-100 transition-opacity text-ink-muted hover:text-brand-700"
+        >
+          <PlusIcon size={11} />
+        </button>
         {depth > 0 && (
           <button
             type="button"
             onClick={() => void onPromote(task.id)}
             aria-label="Promote to root task"
             title="Promote — make this a root-level task"
-            className="text-ink-muted hover:text-brand-700"
+            className="opacity-0 group-hover/node:opacity-100 transition-opacity text-ink-muted hover:text-brand-700"
           >
             <ArrowUpIcon size={11} />
           </button>
@@ -624,16 +690,50 @@ function SubtaskNode({ task, depth, onToggleDone, onDelete, onPromote }: Subtask
         <button
           onClick={() => void onDelete(task.id)}
           aria-label="Delete subtask"
-          className="text-ink-muted hover:text-danger-600"
+          className="opacity-0 group-hover/node:opacity-100 transition-opacity text-ink-muted hover:text-danger-600"
         >
           <Trash2Icon size={11} />
         </button>
       </div>
+      {addingChild && (
+        <div
+          className="flex items-center gap-2 py-1"
+          style={{ paddingLeft: `${depth > 0 ? 0.75 : 0}rem` }}
+        >
+          <span className="shrink-0 w-3" aria-hidden="true" />
+          <input
+            autoFocus
+            value={childDraft}
+            onChange={e => setChildDraft(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); void handleAddChild(); }
+              if (e.key === 'Escape') { e.preventDefault(); setChildDraft(''); setAddingChild(false); }
+            }}
+            placeholder="New sub-task title…"
+            className="flex-1 px-2 py-1 text-sm border border-border rounded bg-surface"
+          />
+          <button
+            type="button"
+            onClick={() => void handleAddChild()}
+            disabled={!childDraft.trim()}
+            className="px-2 py-0.5 text-xs rounded bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50"
+          >
+            Add
+          </button>
+          <button
+            type="button"
+            onClick={() => { setChildDraft(''); setAddingChild(false); }}
+            className="px-2 py-0.5 text-xs rounded border border-border hover:bg-surface-alt"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
       {expanded && (
-        <div>
-          {loading && <div className="text-2xs text-ink-faint italic px-4 py-1">Loading…</div>}
+        <div key={refreshTick}>
+          {loading && <div className="text-2xs text-ink-faint italic py-1" style={{ paddingLeft: `${(depth + 1) * 0.75}rem` }}>Loading…</div>}
           {!loading && children && children.length === 0 && (
-            <div className="text-2xs text-ink-faint italic px-4 py-1">No deeper sub-tasks.</div>
+            <div className="text-2xs text-ink-faint italic py-1" style={{ paddingLeft: `${(depth + 1) * 0.75}rem` }}>No deeper sub-tasks.</div>
           )}
           {!loading && children?.map(child => (
             <SubtaskNode
@@ -643,6 +743,7 @@ function SubtaskNode({ task, depth, onToggleDone, onDelete, onPromote }: Subtask
               onToggleDone={onToggleDone}
               onDelete={onDelete}
               onPromote={onPromote}
+              onAddChild={onAddChild}
             />
           ))}
         </div>

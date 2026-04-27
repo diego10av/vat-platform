@@ -85,15 +85,26 @@ export function TaskSavedViews({ currentQuery }: Props) {
         className="inline-flex items-center gap-1 px-2 py-1.5 text-sm rounded-md border border-border hover:bg-surface-alt"
         aria-haspopup="listbox"
         aria-expanded={open}
-        title="Saved views (browser-local)"
+        title="Saved views — apply your filters once, save under a name, recall later in one click. Stored locally per browser."
       >
-        <BookmarkIcon size={11} /> Views <ChevronDownIcon size={11} />
+        <BookmarkIcon size={11} /> Views{views.length > 0 ? ` (${views.length})` : ''} <ChevronDownIcon size={11} />
       </button>
       {open && (
         <div
-          className="absolute z-popover top-full left-0 mt-1 w-[280px] bg-surface border border-border rounded-md shadow-lg p-1.5"
+          className="absolute z-popover top-full left-0 mt-1 w-[300px] bg-surface border border-border rounded-md shadow-lg p-1.5"
           onMouseLeave={() => setOpen(false)}
         >
+          {/* Stint 58.T1.6 — micro-explanation so first-time users know
+              what this dropdown is for. Hides itself once Diego has at
+              least one saved view (he gets the idea by then). */}
+          {views.length === 0 && (
+            <div className="px-2 py-1.5 mb-1 text-2xs text-ink-muted bg-surface-alt/50 rounded leading-snug">
+              <strong className="text-ink">Saved views</strong> let you
+              capture a filter combination (e.g. <em>family + ready + due
+              this week</em>) and recall it in one click. Set some filters
+              first, then hit “Save current as…” below.
+            </div>
+          )}
           <button
             type="button"
             onClick={() => { setOpen(false); router.push(pathname, { scroll: false }); }}
@@ -101,11 +112,6 @@ export function TaskSavedViews({ currentQuery }: Props) {
           >
             All tasks
           </button>
-          {views.length === 0 && (
-            <div className="px-2 py-1 text-xs text-ink-muted italic">
-              No saved views yet. Configure filters and hit “Save current as…”.
-            </div>
-          )}
           {views.map(v => (
             <div
               key={v.name}

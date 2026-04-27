@@ -13,7 +13,7 @@ import {
   SearchIcon, LayoutListIcon, LayoutGridIcon, PlusIcon, FilterXIcon,
   CalendarIcon, MessagesSquareIcon, ListIcon, Trash2Icon,
   ChevronRightIcon, ChevronDownIcon, LockIcon, UnlockIcon,
-  StarIcon, XIcon,
+  StarIcon, XIcon, SlidersHorizontalIcon,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
@@ -32,6 +32,7 @@ import { TaskSavedViews } from '@/components/tax-ops/TaskSavedViews';
 import { TaskHoverPreview } from '@/components/tax-ops/TaskHoverPreview';
 import { TaskCalendar } from '@/components/tax-ops/TaskCalendar';
 import { TaskContextMenu, type ContextTask } from '@/components/tax-ops/TaskContextMenu';
+import { ChipSelect } from '@/components/tax-ops/ChipSelect';
 
 interface TaskFull extends TaskRow {
   description: string | null;
@@ -89,6 +90,16 @@ const PRIORITY_COLORS: Record<string, string> = {
   high:   'bg-amber-100 text-amber-800',
   medium: 'bg-brand-100 text-brand-800',
   low:    'bg-surface-alt text-ink-soft',
+};
+
+// Stint 58.T2.3 — status tones for ChipSelect.
+const STATUS_TONES: Record<string, string> = {
+  queued:              'bg-surface-alt text-ink',
+  in_progress:         'bg-info-50 text-info-800',
+  waiting_on_external: 'bg-amber-50 text-amber-800',
+  waiting_on_internal: 'bg-amber-50 text-amber-800',
+  done:                'bg-success-50 text-success-800',
+  cancelled:           'bg-surface-alt text-ink-faint',
 };
 
 // Stint 40.I — filter labels clarified per Diego's feedback ("no entiendo
@@ -185,6 +196,32 @@ function TasksListContent() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Stint 57.D.7 — context menu state.
   const [contextMenu, setContextMenu] = useState<{ task: ContextTask; x: number; y: number } | null>(null);
+  // Stint 58.T2.2 — column visibility. Default surfaces only the
+  // high-signal columns; Diego can opt in to the noisier ones via
+  // the gear button. Stored in localStorage so the choice survives
+  // refresh — independent of saved views.
+  const [extraColsVisible, setExtraColsVisible] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const raw = window.localStorage.getItem('cifra.tasks.cols.v1');
+      if (raw) return new Set(JSON.parse(raw) as string[]);
+    } catch { /* ignore */ }
+    return new Set();
+  });
+  const [colsMenuOpen, setColsMenuOpen] = useState(false);
+  function toggleCol(key: string) {
+    setExtraColsVisible(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try {
+        window.localStorage.setItem('cifra.tasks.cols.v1', JSON.stringify(Array.from(next)));
+      } catch { /* ignore */ }
+      return next;
+    });
+  }
+  const showKind     = extraColsVisible.has('kind');
+  const showWaiting  = extraColsVisible.has('waiting');
+  const showFollowUp = extraColsVisible.has('followup');
   const toast = useToast();
 
   // Stint 57.D.1 — sync state → URL. Skip the very first render
@@ -435,6 +472,48 @@ function TasksListContent() {
           </button>
         )}
         <TaskSavedViews currentQuery={currentQuery} />
+        {/* Stint 58.T2.2 — column visibility toggle. Default columns
+            (Client, Title, Status, Assignee, Due, Priority) cover ~90%
+            of cases; the noisier ones (Kind, Waiting on, Follow-up)
+            opt in via this menu. Choice persisted in localStorage. */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setColsMenuOpen(o => !o)}
+            className="inline-flex items-center gap-1 px-2 py-1.5 text-sm rounded-md border border-border hover:bg-surface-alt"
+            aria-haspopup="menu"
+            aria-expanded={colsMenuOpen}
+            title="Show or hide columns"
+          >
+            <SlidersHorizontalIcon size={11} /> Columns
+          </button>
+          {colsMenuOpen && (
+            <div
+              className="absolute z-popover top-full left-0 mt-1 w-[220px] bg-surface border border-border rounded-md shadow-lg p-2 text-sm"
+              onMouseLeave={() => setColsMenuOpen(false)}
+            >
+              <div className="text-2xs text-ink-muted mb-1.5">Optional columns</div>
+              {[
+                { key: 'kind', label: 'Kind' },
+                { key: 'waiting', label: 'Waiting on' },
+                { key: 'followup', label: 'Follow-up date' },
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-2 px-1 py-0.5 cursor-pointer hover:bg-surface-alt rounded">
+                  <input
+                    type="checkbox"
+                    checked={extraColsVisible.has(key)}
+                    onChange={() => toggleCol(key)}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+              <div className="mt-2 text-2xs text-ink-faint italic leading-snug">
+                Default columns (Client, Title, Status, Assignee, Due,
+                Priority) are always shown.
+              </div>
+            </div>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-2">
           <Link
             href="/tax-ops/tasks/templates"
@@ -538,16 +617,17 @@ function TasksListContent() {
                   />
                 </th>
                 <th className="px-2 py-1.5 font-medium w-[28px]" aria-label="Star"></th>
-                <th className="px-2 py-1.5 font-medium w-[120px]">Family</th>
-                <th className="px-2 py-1.5 font-medium w-[150px]">Entity</th>
+                {/* Stint 58.T2.1 — Family + Entity merged into one
+                    "Client" column with a Family › Entity breadcrumb. */}
+                <th className="px-2 py-1.5 font-medium w-[200px]">Client</th>
                 <th className="px-2 py-1.5 font-medium">Title</th>
-                <th className="px-2 py-1.5 font-medium w-[110px]">Kind</th>
-                <th className="px-2 py-1.5 font-medium w-[130px]">Status</th>
-                <th className="px-2 py-1.5 font-medium w-[150px]">Waiting on</th>
-                <th className="px-2 py-1.5 font-medium w-[110px]">Follow-up</th>
+                {showKind     && <th className="px-2 py-1.5 font-medium w-[120px]">Kind</th>}
+                <th className="px-2 py-1.5 font-medium w-[120px]">Status</th>
+                {showWaiting  && <th className="px-2 py-1.5 font-medium w-[150px]">Waiting on</th>}
+                {showFollowUp && <th className="px-2 py-1.5 font-medium w-[110px]">Follow-up</th>}
                 <th className="px-2 py-1.5 font-medium w-[100px]">Assignee</th>
                 <th className="px-2 py-1.5 font-medium w-[110px]">Due</th>
-                <th className="px-2 py-1.5 font-medium w-[80px]">Priority</th>
+                <th className="px-2 py-1.5 font-medium w-[90px]">Priority</th>
                 <th className="px-2 py-1.5 w-[30px]"></th>
               </tr>
             </thead>
@@ -556,6 +636,14 @@ function TasksListContent() {
                 <tr
                   key={t.id}
                   onContextMenu={(e) => {
+                    // Stint 58.T1.4 — let the browser handle right-click
+                    // when the target is an editable field so paste /
+                    // select-all / spell-check stay accessible.
+                    const tgt = e.target as HTMLElement;
+                    const tag = tgt.tagName?.toLowerCase();
+                    if (tag === 'input' || tag === 'textarea' || tgt.isContentEditable) {
+                      return;
+                    }
                     e.preventDefault();
                     setContextMenu({
                       task: { id: t.id, title: t.title, status: t.status, is_starred: t.is_starred },
@@ -587,31 +675,39 @@ function TasksListContent() {
                       <StarIcon size={14} fill={t.is_starred ? 'currentColor' : 'none'} />
                     </button>
                   </td>
-                  {/* Family — coloured chip linked to the family detail page.
-                      No family / unattached → faint dash. Stint 53. */}
-                  <td className="px-2 py-1.5">
-                    {t.family_name && t.family_id ? (
-                      <Link
-                        href={`/tax-ops/families/${t.family_id}`}
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium truncate max-w-[110px] hover:opacity-80 ${familyChipClasses(t.family_name)}`}
-                        title={`Open ${t.family_name} family`}
-                      >
-                        {t.family_name}
-                      </Link>
+                  {/* Stint 58.T2.1 — Client column = Family › Entity
+                      breadcrumb. Both segments are independent links
+                      (family chip → /families/[id], entity → entity detail). */}
+                  <td className="px-2 py-1.5 max-w-[220px]">
+                    {t.family_id || t.entity_id ? (
+                      <div className="flex items-center gap-1 min-w-0 text-xs">
+                        {t.family_id && t.family_name ? (
+                          <Link
+                            href={`/tax-ops/families/${t.family_id}`}
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded font-medium truncate max-w-[110px] hover:opacity-80 ${familyChipClasses(t.family_name)}`}
+                            title={`Open ${t.family_name} family`}
+                          >
+                            {t.family_name}
+                          </Link>
+                        ) : (
+                          <span className="text-ink-faint italic">—</span>
+                        )}
+                        {t.entity_id && (
+                          <>
+                            <span className="text-ink-faint shrink-0" aria-hidden>›</span>
+                            <Link
+                              href={`/tax-ops/entities/${t.entity_id}`}
+                              className="text-ink hover:text-brand-700 hover:underline truncate"
+                              title={t.entity_name ?? undefined}
+                            >
+                              {t.entity_name ?? '(unknown)'}
+                            </Link>
+                          </>
+                        )}
+                      </div>
                     ) : (
                       <span className="text-ink-faint italic text-xs">—</span>
                     )}
-                  </td>
-                  {/* Entity — kept link, only rendered when there's one. */}
-                  <td className="px-2 py-1.5 text-xs truncate max-w-[150px]" title={t.entity_name ?? undefined}>
-                    {t.entity_id ? (
-                      <Link
-                        href={`/tax-ops/entities/${t.entity_id}`}
-                        className="text-ink hover:text-brand-700 hover:underline"
-                      >
-                        {t.entity_name ?? '(unknown)'}
-                      </Link>
-                    ) : <span className="text-ink-faint">—</span>}
                   </td>
                   {/* Title — inline-editable. Click on the link icon to open
                       the detail page, but the text itself stays editable.
@@ -645,38 +741,28 @@ function TasksListContent() {
                           />
                         </TaskHoverPreview>
                       </div>
-                      {/* Stint 56.A — sign-off progress chip. Hidden when 0/3
-                          (no sign-offs yet) to avoid clutter. */}
-                      {(() => {
-                        const done = (t.preparer ? 1 : 0) + (t.reviewer ? 1 : 0) + (t.partner_sign_off ? 1 : 0);
-                        if (done === 0) return null;
-                        const tone = done === 3 ? 'bg-success-100 text-success-800' : 'bg-amber-50 text-amber-800';
-                        const tip = `Sign-off: preparer=${t.preparer ?? '—'} · reviewer=${t.reviewer ?? '—'} · partner=${t.partner_sign_off ?? '—'}`;
-                        return (
-                          <span
-                            className={`shrink-0 inline-flex items-center px-1 rounded text-2xs font-medium ${tone}`}
-                            title={tip}
-                          >
-                            {done}/3
-                          </span>
-                        );
-                      })()}
+                      {/* Stint 58.T2.4 — sign-off progress + blocker chips
+                          moved out of the title cell into the hover
+                          preview. Title cell now has just chevron + text
+                          + ↗ link for clarity. The hover popover surfaces
+                          richer status (description, counts, blocker,
+                          last comment, sign-off names). Compact 🔒/🔓
+                          icon-only kept inline so blocked rows stay
+                          glanceable; full title goes in the popover. */}
                       {t.depends_on_task_id && t.blocker_status && (
-                        t.blocker_status === 'done' ? (
-                          <span
-                            className="shrink-0 inline-flex items-center gap-0.5 text-2xs text-success-700"
-                            title={`Blocker "${t.blocker_title ?? ''}" is done — ready to work on`}
-                          >
-                            <UnlockIcon size={10} /> ready
-                          </span>
-                        ) : (
-                          <span
-                            className="shrink-0 inline-flex items-center gap-0.5 text-2xs text-warning-700 truncate max-w-[120px]"
-                            title={`Blocked by "${t.blocker_title ?? ''}" (${t.blocker_status})`}
-                          >
-                            <LockIcon size={10} /> {t.blocker_title ?? 'blocker'}
-                          </span>
-                        )
+                        <span
+                          className="shrink-0"
+                          title={
+                            t.blocker_status === 'done'
+                              ? `Ready: blocker "${t.blocker_title ?? ''}" is done`
+                              : `Blocked by "${t.blocker_title ?? ''}"`
+                          }
+                          aria-label={t.blocker_status === 'done' ? 'Ready' : 'Blocked'}
+                        >
+                          {t.blocker_status === 'done'
+                            ? <UnlockIcon size={11} className="text-success-700" />
+                            : <LockIcon size={11} className="text-warning-700" />}
+                        </span>
                       )}
                       <Link
                         href={`/tax-ops/tasks/${t.id}`}
@@ -695,55 +781,68 @@ function TasksListContent() {
                       </div>
                     )}
                   </td>
-                  {/* Kind — inline editable dropdown. */}
-                  <td className="px-2 py-1.5">
-                    <select
-                      value={t.task_kind}
-                      onChange={e => patchTask(t.id, { task_kind: e.target.value }).catch(err => toast.error(String(err)))}
-                      className="w-full px-1 py-0.5 text-xs border border-border rounded bg-surface"
-                    >
-                      {Object.entries(TASK_KIND_LABELS).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
-                  </td>
-                  {/* Status — already inline editable. */}
-                  <td className="px-2 py-1.5">
-                    <select
-                      value={t.status}
-                      onChange={e => patchTask(t.id, { status: e.target.value }).catch(err => toast.error(String(err)))}
-                      className="w-full px-1 py-0.5 text-xs border border-border rounded bg-surface"
-                    >
-                      {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
-                  </td>
-                  {/* Waiting on — inline editable: dropdown for kind + note. */}
-                  <td className="px-2 py-1.5">
-                    <select
-                      value={t.waiting_on_kind ?? ''}
-                      onChange={e => patchTask(t.id, { waiting_on_kind: e.target.value || null }).catch(err => toast.error(String(err)))}
-                      className="w-full px-1 py-0.5 text-xs border border-border rounded bg-surface mb-0.5"
-                    >
-                      <option value="">— not waiting —</option>
-                      {Object.entries(WAITING_ON_LABELS).map(([v, l]) => (
-                        <option key={v} value={v}>{l}</option>
-                      ))}
-                    </select>
-                    {t.waiting_on_kind && (
-                      <InlineTextCell
-                        value={t.waiting_on_note}
-                        onSave={async v => { await patchTask(t.id, { waiting_on_note: v }); }}
-                        placeholder="who? (optional)"
+                  {/* Kind — Stint 58.T2.3: ChipSelect for design parity.
+                      Hidden by default (gear menu), shows when toggled. */}
+                  {showKind && (
+                    <td className="px-2 py-1.5">
+                      <ChipSelect
+                        value={t.task_kind}
+                        options={Object.entries(TASK_KIND_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                        onChange={(next) => patchTask(t.id, { task_kind: next }).catch(err => toast.error(String(err)))}
+                        ariaLabel="Task kind"
                       />
-                    )}
-                  </td>
-                  {/* Follow-up — inline editable date. */}
+                    </td>
+                  )}
+                  {/* Status — ChipSelect with status-toned chips. */}
                   <td className="px-2 py-1.5">
-                    <InlineDateCell
-                      value={t.follow_up_date}
-                      onSave={async v => { await patchTask(t.id, { follow_up_date: v }); }}
+                    <ChipSelect
+                      value={t.status}
+                      options={STATUSES.map(s => ({
+                        value: s.value,
+                        label: s.label,
+                        tone: STATUS_TONES[s.value],
+                      }))}
+                      onChange={(next) => patchTask(t.id, { status: next }).catch(err => toast.error(String(err)))}
+                      ariaLabel="Task status"
                     />
                   </td>
+                  {/* Waiting on — kept as gear-toggle column. ChipSelect for
+                      kind + InlineTextCell for the optional note. */}
+                  {showWaiting && (
+                    <td className="px-2 py-1.5">
+                      <ChipSelect
+                        value={t.waiting_on_kind ?? ''}
+                        options={[
+                          { value: '', label: '— not waiting —' },
+                          ...Object.entries(WAITING_ON_LABELS).map(([v, l]) => ({
+                            value: v, label: l,
+                            tone: 'bg-amber-50 text-amber-800',
+                          })),
+                        ]}
+                        onChange={(next) => patchTask(t.id, { waiting_on_kind: next || null }).catch(err => toast.error(String(err)))}
+                        ariaLabel="Waiting on"
+                        placeholder="—"
+                      />
+                      {t.waiting_on_kind && (
+                        <div className="mt-0.5">
+                          <InlineTextCell
+                            value={t.waiting_on_note}
+                            onSave={async v => { await patchTask(t.id, { waiting_on_note: v }); }}
+                            placeholder="who? (optional)"
+                          />
+                        </div>
+                      )}
+                    </td>
+                  )}
+                  {/* Follow-up — gear-toggle column. */}
+                  {showFollowUp && (
+                    <td className="px-2 py-1.5">
+                      <InlineDateCell
+                        value={t.follow_up_date}
+                        onSave={async v => { await patchTask(t.id, { follow_up_date: v }); }}
+                      />
+                    </td>
+                  )}
                   {/* Assignee — inline editable text. */}
                   <td className="px-2 py-1.5 text-xs">
                     <InlineTextCell
@@ -759,18 +858,19 @@ function TasksListContent() {
                       onSave={async v => { await patchTask(t.id, { due_date: v }); }}
                     />
                   </td>
-                  {/* Priority — inline editable dropdown. */}
+                  {/* Priority — Stint 58.T2.3: ChipSelect with priority tone. */}
                   <td className="px-2 py-1.5">
-                    <select
+                    <ChipSelect
                       value={t.priority}
-                      onChange={e => patchTask(t.id, { priority: e.target.value }).catch(err => toast.error(String(err)))}
-                      className={`w-full px-1 py-0.5 text-2xs border border-border rounded font-medium ${PRIORITY_COLORS[t.priority] ?? 'bg-surface'}`}
-                    >
-                      <option value="urgent">Urgent</option>
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
-                    </select>
+                      options={[
+                        { value: 'urgent', label: 'Urgent', tone: PRIORITY_COLORS.urgent },
+                        { value: 'high',   label: 'High',   tone: PRIORITY_COLORS.high },
+                        { value: 'medium', label: 'Medium', tone: PRIORITY_COLORS.medium },
+                        { value: 'low',    label: 'Low',    tone: PRIORITY_COLORS.low },
+                      ]}
+                      onChange={(next) => patchTask(t.id, { priority: next }).catch(err => toast.error(String(err)))}
+                      ariaLabel="Priority"
+                    />
                   </td>
                   <td className="px-2 py-1.5 text-right">
                     <button
