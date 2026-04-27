@@ -27,6 +27,12 @@ const PRICING_USD: Record<string, { input: number; output: number; cache_read?: 
   // Opus (when available for this key)
   'claude-opus-4-5-20250929':         { input: 15.0, output: 75.0, cache_read: 1.5, cache_write: 18.75 },
   'claude-opus-4-5':                  { input: 15.0, output: 75.0, cache_read: 1.5, cache_write: 18.75 },
+  // Sonnet 4.6 — current Sonnet tier (confirmed pricing: docs.anthropic.com 2026-04-27)
+  'claude-sonnet-4-6':                { input: 3.0, output: 15.0, cache_read: 0.3, cache_write: 3.75 },
+  // Opus 4.6 — legacy Opus, still available (confirmed pricing: docs.anthropic.com 2026-04-27)
+  'claude-opus-4-6':                  { input: 5.0, output: 25.0, cache_read: 0.5, cache_write: 6.25 },
+  // Opus 4.5 snapshot 20251101 — alternative snapshot id (confirmed pricing: docs.anthropic.com 2026-04-27)
+  'claude-opus-4-5-20251101':         { input: 5.0, output: 25.0, cache_read: 0.5, cache_write: 6.25 },
   // Opus 4.7 — current top tier. Placeholder pricing pegged to 4.5
   // while Anthropic public pricing for 4.7 is confirmed (verify on
   // the next tax-alert refresh). If 4.7 is priced higher, the only

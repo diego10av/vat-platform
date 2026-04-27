@@ -421,9 +421,15 @@ function CadenceInlineCell({
  * persona de un proveedor de servicios o al cliente. Entonces estaría
  * bien poder tener a mano los contactos."
  *
- * Stored per-filing in `tax_filings.csp_contacts` (JSONB). Same
- * row-level pattern: display shows chip(s) from the first filed
- * cell; save propagates to every filing in the row via patchAllFilings.
+ * Stint 48.U3.A — refactored to write at the ENTITY level instead of
+ * per-filing. Diego's report: contacts added in /vat/quarterly didn't
+ * show up on /tax-ops/entities/[id] because the matrix was patching
+ * `tax_filings.csp_contacts` while the entity page reads
+ * `entities.csp_contacts`. Now both surfaces talk to the same field.
+ *
+ * Per-filing override is still supported (FilingEditDrawer still has
+ * `csp_contacts` in its allowed-fields list), for the rare case where
+ * Diego needs different contacts for one specific filing.
  */
 export function contactsColumn(periodLabels: string[], refetch: () => void): MatrixColumn {
   return {
@@ -431,18 +437,21 @@ export function contactsColumn(periodLabels: string[], refetch: () => void): Mat
     label: 'Contacts',
     widthClass: 'w-[220px]',
     render: (e) => {
-      const allFilingIds = periodLabels
-        .map(l => e.cells[l]?.filing_id)
-        .filter((x): x is string => !!x);
-      const first = periodLabels
-        .map(l => e.cells[l])
-        .find((c): c is MatrixCell => !!c) ?? null;
+      const value = e.csp_contacts ?? [];
       return (
         <ContactsInlineEditor
-          value={first?.csp_contacts ?? []}
-          disabled={allFilingIds.length === 0}
+          value={value}
+          // Entity-level edit always available (no filing required).
+          // The legacy filing-level override is now reachable only via
+          // the FilingEditDrawer pencil ✎ when Diego truly needs it.
+          disabled={false}
           onSave={async (next) => {
-            await patchAllFilings(allFilingIds, { csp_contacts: next });
+            const res = await fetch(`/api/tax-ops/entities/${e.id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ csp_contacts: next }),
+            });
+            if (!res.ok) throw new Error(`Save failed (${res.status})`);
             refetch();
           }}
         />

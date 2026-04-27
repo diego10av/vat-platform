@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeftIcon } from 'lucide-react';
+import { ArrowLeftIcon, PencilIcon } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { useToast } from '@/components/Toaster';
@@ -168,18 +168,29 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
         </nav>
       </div>
 
-      {/* Identity header */}
+      {/* Identity header — stint 48.U2.A: pencil icon makes the inline-edit
+          affordance obvious. Diego: "no tengo manera de editar nada" — the
+          on-blur input always was editable, just not visually flagged. */}
       <div className="rounded-md border border-border bg-surface px-4 py-3">
-        <input
-          value={editName}
-          onChange={e => setEditName(e.target.value)}
-          onBlur={() => {
-            if (editName.trim() && editName !== data.entity.legal_name) {
-              save({ legal_name: editName.trim() }, 'Legal name saved');
-            }
-          }}
-          className="w-full text-base font-semibold text-ink bg-transparent border-0 p-0 focus:ring-0 focus:bg-surface-alt/60 px-1 rounded"
-        />
+        <div className="flex items-center gap-1.5 group">
+          <input
+            value={editName}
+            onChange={e => setEditName(e.target.value)}
+            onBlur={() => {
+              if (editName.trim() && editName !== data.entity.legal_name) {
+                save({ legal_name: editName.trim() }, 'Legal name saved');
+              }
+            }}
+            className="flex-1 text-base font-semibold text-ink bg-transparent border-0 p-0 focus:bg-surface-alt/60 px-1 rounded"
+            aria-label="Legal name (click to edit)"
+            title="Click to edit · saves on blur"
+          />
+          <PencilIcon
+            size={12}
+            className="shrink-0 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-hidden="true"
+          />
+        </div>
         <div className="text-sm text-ink-muted mt-0.5 flex items-center gap-2 flex-wrap">
           {data.entity.group_name && data.entity.group_id && (
             <Link
@@ -282,12 +293,21 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
         <EntityTaxStatusPills filings={data.filings} />
       </div>
 
-      {/* CSP defaults */}
+      {/* CSP defaults — stint 48.U2.A pencil tag makes the editability
+          obvious. Stint 48.U3.A: contacts shown here are the entity-wide
+          default that the matrix's contactsColumn now edits directly. */}
       <div className="rounded-md border border-border bg-surface px-4 py-3">
-        <h3 className="text-sm font-semibold text-ink mb-2">CSP contacts (defaults)</h3>
+        <div className="flex items-center gap-1.5 mb-2">
+          <h3 className="text-sm font-semibold text-ink">CSP contacts (defaults)</h3>
+          <span className="inline-flex items-center gap-1 text-2xs text-ink-faint">
+            <PencilIcon size={10} aria-hidden="true" />
+            editable
+          </span>
+        </div>
         <p className="text-xs text-ink-muted mb-2">
-          Default Corporate Service Provider contacts to chase for this entity&apos;s
-          filings. Each filing can override with its own contacts.
+          Default Corporate Service Provider contacts for this entity. Edits
+          here propagate to every filing in the tax-ops matrices. Add / edit
+          / remove rows below, then click <strong>Save contacts</strong>.
         </p>
         <CspContactsEditor
           value={cspContacts}
@@ -304,9 +324,15 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      {/* Notes */}
+      {/* Notes — stint 48.U2.A: visible "editable" tag */}
       <div className="rounded-md border border-border bg-surface px-4 py-3">
-        <h3 className="text-sm font-semibold text-ink mb-2">Notes</h3>
+        <div className="flex items-center gap-1.5 mb-2">
+          <h3 className="text-sm font-semibold text-ink">Notes</h3>
+          <span className="inline-flex items-center gap-1 text-2xs text-ink-faint">
+            <PencilIcon size={10} aria-hidden="true" />
+            editable · saves on blur
+          </span>
+        </div>
         <textarea
           value={notes}
           onChange={e => setNotes(e.target.value)}

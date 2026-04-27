@@ -70,6 +70,11 @@ export interface MatrixEntity {
    *  When set + matrix opted into liquidationVisuals, drives the
    *  liquidation chip + row tinting + final-return border. */
   liquidation_date?: string | null;
+  /** Stint 48.U3.A — entity-level CSP contacts (the canonical default).
+   *  Matrix's contactsColumn now reads + writes here directly. Filing
+   *  level overrides (in `cell.csp_contacts`) still exist for edge cases
+   *  but are accessed via the FilingEditDrawer. */
+  csp_contacts?: Array<{ name: string; email?: string; role?: string }>;
   cells: Record<string, MatrixCell | null>;
 }
 

@@ -10,6 +10,7 @@ import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn, type MatrixEntity } from '@/components/tax-ops/TaxTypeMatrix';
+import { VatSubtypeInlineCell } from '@/components/tax-ops/VatSubtypeInlineCell';
 import {
   useMatrixData, applyStatusChange, useClientGroups, filterEntities,
 } from '@/components/tax-ops/useMatrixData';
@@ -32,6 +33,9 @@ export default function VatAnnualPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [associateFilter, setAssociateFilter] = useState('all');
+  // Stint 48.F1.A — Standard/Simplified subtype filter. 'all' shows both;
+  // 'standard' / 'simplified' narrows the combined list.
+  const [subtypeFilter, setSubtypeFilter] = useState<'all' | 'standard' | 'simplified'>('all');
   const [editingFilingId, setEditingFilingId] = useState<string | null>(null);
   const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
@@ -55,16 +59,16 @@ export default function VatAnnualPage() {
     {
       key: 'subtype',
       label: 'Subtype',
-      widthClass: 'w-[100px]',
+      widthClass: 'w-[120px]',
       render: (e) => {
         const subtype = (e as CombinedEntity).subtype;
         return (
-          <span className={[
-            'inline-flex items-center px-1.5 py-0.5 rounded-full text-2xs',
-            subtype === 'simplified' ? 'bg-brand-50 text-brand-700' : 'bg-surface-alt text-ink-soft',
-          ].join(' ')}>
-            {subtype}
-          </span>
+          <VatSubtypeInlineCell
+            entityName={e.legal_name}
+            obligationId={e.obligation_id}
+            current={subtype}
+            onChanged={refetch}
+          />
         );
       },
     },
@@ -86,6 +90,9 @@ export default function VatAnnualPage() {
     partner: partnerFilter,
     associate: associateFilter,
     periodLabels: [periodLabel],
+  }).filter(e => {
+    if (subtypeFilter === 'all') return true;
+    return (e as CombinedEntity).subtype === subtypeFilter;
   });
 
   return (
@@ -111,6 +118,20 @@ export default function VatAnnualPage() {
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
         entitiesForFilters={combined}
+        extraChildren={
+          <label className="inline-flex items-center gap-1.5 text-sm">
+            <span className="text-ink-muted">Subtype:</span>
+            <select
+              value={subtypeFilter}
+              onChange={(e) => setSubtypeFilter(e.target.value as typeof subtypeFilter)}
+              className="px-2 py-1 text-sm border border-border rounded-md bg-surface"
+            >
+              <option value="all">All</option>
+              <option value="standard">Standard</option>
+              <option value="simplified">Simplified</option>
+            </select>
+          </label>
+        }
       />
 
       {hasError && <CrmErrorBox message={String(hasError)} onRetry={refetch} />}

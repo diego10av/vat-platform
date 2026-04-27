@@ -29,6 +29,7 @@ export default function WhtSemesterPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [associateFilter, setAssociateFilter] = useState('all');
+  const [periodFilter, setPeriodFilter] = useState('all');
   const [editingFilingId, setEditingFilingId] = useState<string | null>(null);
   const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
@@ -39,24 +40,35 @@ export default function WhtSemesterPage() {
   });
 
   const periodLabels = data?.period_labels ?? [];
+  const visiblePeriodLabels = periodLabels.filter(
+    l => periodFilter === 'all' || l === periodFilter,
+  );
   const filtered = filterEntities({
     entities: data?.entities ?? [],
     status: statusFilter,
     partner: partnerFilter,
     associate: associateFilter,
-    periodLabels: periodLabels,
+    periodLabels: visiblePeriodLabels,
   });
   const columns: MatrixColumn[] = [
     familyColumn({ groups, refetch, onGroupsChanged: refetchGroups }),
     cadenceColumn({ currentTaxType: 'wht_director_semester', refetch, toast }),
-    { key: `${year}-S1`, label: 'S1 (Jan-Jun)', widthClass: 'w-[120px]' },
-    { key: `${year}-S2`, label: 'S2 (Jul-Dec)', widthClass: 'w-[120px]' },
-    lastActionColumn(periodLabels, refetch),
-    partnerInChargeColumn(periodLabels, refetch),
-    associatesWorkingColumn(periodLabels, refetch),
-    contactsColumn(periodLabels, refetch),
-    commentsColumn(periodLabels, refetch),
-    priceColumn(periodLabels, refetch),
+    ...(periodFilter === 'all' || periodFilter === `${year}-S1`
+      ? [{ key: `${year}-S1`, label: 'S1 (Jan-Jun)', widthClass: 'w-[120px]' }]
+      : []),
+    ...(periodFilter === 'all' || periodFilter === `${year}-S2`
+      ? [{ key: `${year}-S2`, label: 'S2 (Jul-Dec)', widthClass: 'w-[120px]' }]
+      : []),
+    lastActionColumn(visiblePeriodLabels, refetch),
+    partnerInChargeColumn(visiblePeriodLabels, refetch),
+    associatesWorkingColumn(visiblePeriodLabels, refetch),
+    contactsColumn(visiblePeriodLabels, refetch),
+    commentsColumn(visiblePeriodLabels, refetch),
+    priceColumn(visiblePeriodLabels, refetch),
+  ];
+  const periodOptions = [
+    { value: `${year}-S1`, label: 'S1 (Jan-Jun)' },
+    { value: `${year}-S2`, label: 'S2 (Jul-Dec)' },
   ];
 
   return (
@@ -82,6 +94,10 @@ export default function WhtSemesterPage() {
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
         entitiesForFilters={data?.entities ?? []}
+        periodOptions={periodOptions}
+        periodFilter={periodFilter}
+        onPeriodFilterChange={setPeriodFilter}
+        periodLabel="Semester"
       />
 
       {error && <CrmErrorBox message={error} onRetry={refetch} />}

@@ -31,6 +31,9 @@ export default function VatQuarterlyPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [associateFilter, setAssociateFilter] = useState('all');
+  // Stint 48 — sub-period filter: 'all' shows Q1-Q4, '2026-Q2' collapses
+  // the matrix to that single quarter.
+  const [periodFilter, setPeriodFilter] = useState('all');
   const [editingFilingId, setEditingFilingId] = useState<string | null>(null);
   const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
@@ -39,28 +42,36 @@ export default function VatQuarterlyPage() {
     year,
     period_pattern: 'quarterly',
   });
+  // The active period_labels — narrowed to one when periodFilter is set.
+  const visiblePeriodLabels = (data?.period_labels ?? []).filter(
+    l => periodFilter === 'all' || l === periodFilter,
+  );
   const filtered = filterEntities({
     entities: data?.entities ?? [],
     status: statusFilter,
     partner: partnerFilter,
     associate: associateFilter,
-    periodLabels: data?.period_labels ?? [],
+    periodLabels: visiblePeriodLabels,
   });
 
   const columns: MatrixColumn[] = [
     familyColumn({ groups, refetch, onGroupsChanged: refetchGroups }),
   ];
   if (data) {
-    for (const label of data.period_labels) {
+    for (const label of visiblePeriodLabels) {
       columns.push({ key: label, label: shortPeriodLabel(label), widthClass: 'w-[80px]' });
     }
-    columns.push(lastActionColumn(data.period_labels, refetch));
-    columns.push(partnerInChargeColumn(data.period_labels, refetch));
-    columns.push(associatesWorkingColumn(data.period_labels, refetch));
-    columns.push(contactsColumn(data.period_labels, refetch));
-    columns.push(commentsColumn(data.period_labels, refetch));
-    columns.push(priceColumn(data.period_labels, refetch));
+    columns.push(lastActionColumn(visiblePeriodLabels, refetch));
+    columns.push(partnerInChargeColumn(visiblePeriodLabels, refetch));
+    columns.push(associatesWorkingColumn(visiblePeriodLabels, refetch));
+    columns.push(contactsColumn(visiblePeriodLabels, refetch));
+    columns.push(commentsColumn(visiblePeriodLabels, refetch));
+    columns.push(priceColumn(visiblePeriodLabels, refetch));
   }
+  const periodOptions = (data?.period_labels ?? []).map(l => ({
+    value: l,
+    label: shortPeriodLabel(l),
+  }));
 
   return (
     <div className="space-y-3">
@@ -85,6 +96,10 @@ export default function VatQuarterlyPage() {
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
         entitiesForFilters={data?.entities ?? []}
+        periodOptions={periodOptions}
+        periodFilter={periodFilter}
+        onPeriodFilterChange={setPeriodFilter}
+        periodLabel="Quarter"
       />
 
       {error && <CrmErrorBox message={error} onRetry={refetch} />}

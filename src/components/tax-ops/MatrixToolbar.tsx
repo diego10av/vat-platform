@@ -52,6 +52,18 @@ interface Props {
    * "What you see in the matrix is what you can filter on."
    */
   entitiesForFilters?: MatrixEntity[];
+  /**
+   * Stint 48 (post-audit) — period (quarter / month) sub-filter on top
+   * of the year. Diego: "ahora mismo sólo aparece 2026 — habría que
+   * poder filtrar por quarter y por mes". Quarterly pages pass the 4
+   * quarters; monthly pages pass the 12 months. 'all' shows every
+   * column; a specific period_label collapses the matrix to that one
+   * period.
+   */
+  periodOptions?: Array<{ value: string; label: string }>;
+  periodFilter?: string;
+  onPeriodFilterChange?: (next: string) => void;
+  periodLabel?: string;        // "Quarter" / "Month" — dropdown label
 }
 
 export function MatrixToolbar({
@@ -63,6 +75,7 @@ export function MatrixToolbar({
   partnerFilter, onPartnerFilterChange,
   associateFilter, onAssociateFilterChange,
   entitiesForFilters,
+  periodOptions, periodFilter, onPeriodFilterChange, periodLabel = 'Period',
 }: Props) {
   const [busy, setBusy] = useState(false);
   const toast = useToast();
@@ -138,6 +151,24 @@ export function MatrixToolbar({
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
       </label>
+      {/* Stint 48 — period sub-filter for quarterly/monthly matrices.
+          Pages pass the available periods; selecting one collapses the
+          matrix to a single column. */}
+      {periodOptions && onPeriodFilterChange && (
+        <label className="inline-flex items-center gap-1.5 text-sm">
+          <span className="text-ink-muted">{periodLabel}:</span>
+          <select
+            value={periodFilter ?? 'all'}
+            onChange={(e) => onPeriodFilterChange(e.target.value)}
+            className="px-2 py-1 text-sm border border-border rounded-md bg-surface"
+          >
+            <option value="all">All</option>
+            {periodOptions.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+      )}
       {onStatusFilterChange && (
         <label className="inline-flex items-center gap-1.5 text-sm">
           <span className="text-ink-muted">Status:</span>

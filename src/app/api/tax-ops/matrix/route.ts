@@ -100,6 +100,9 @@ interface EntityRow {
   /** Stint 43.D15 — date the entity was/will be liquidated. Drives the
    *  liquidation chip + row tinting + final-return border. NULL = active. */
   liquidation_date: string | null;
+  /** Stint 48.U3.A — entity-level CSP contacts (the canonical default).
+   *  Matrix's contactsColumn now reads + writes here, not on tax_filings. */
+  csp_contacts: Array<{ name: string; email?: string; role?: string }>;
   cells: Record<string, MatrixCell | null>;
 }
 
@@ -144,6 +147,7 @@ export async function GET(request: NextRequest) {
   const entityQuery = showInactive
     ? `
       SELECT e.id, e.legal_name, e.liquidation_date::text AS liquidation_date,
+             e.csp_contacts AS csp_contacts,
              g.id AS group_id, g.name AS group_name,
              (SELECT o.id
                 FROM tax_obligations o
@@ -169,6 +173,7 @@ export async function GET(request: NextRequest) {
       `
     : `
       SELECT e.id, e.legal_name, e.liquidation_date::text AS liquidation_date,
+             e.csp_contacts AS csp_contacts,
              g.id AS group_id, g.name AS group_name,
              o.id AS obligation_id,
              o.form_code
@@ -187,6 +192,7 @@ export async function GET(request: NextRequest) {
   const entities = await query<{
     id: string; legal_name: string;
     liquidation_date: string | null;
+    csp_contacts: Array<{ name: string; email?: string; role?: string }> | null;
     group_id: string | null; group_name: string | null;
     obligation_id: string | null;
     form_code: string | null;
@@ -278,6 +284,7 @@ export async function GET(request: NextRequest) {
       obligation_id: e.obligation_id,
       form_code: e.form_code ?? null,
       liquidation_date: e.liquidation_date ?? null,
+      csp_contacts: e.csp_contacts ?? [],
       cells,
     };
   });
