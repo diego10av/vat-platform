@@ -107,10 +107,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(home);
   }
 
-  // Thread the role into the downstream app via a request header the
-  // layout / server components can read.
+  // Thread the role + username into the downstream app via request
+  // headers the layout / server components can read. Stint 61 added
+  // username so future audit trails can record "who" not just "what role".
   const response = NextResponse.next();
   response.headers.set('x-cifra-role', session.role);
+  response.headers.set('x-cifra-username', session.username);
   return response;
 }
 

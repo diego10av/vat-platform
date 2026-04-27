@@ -443,8 +443,15 @@ How we iterate. See `docs/PROTOCOLS.md` for the long form.
 
 ## 6 · Security posture
 
-- Single-password auth today (`AUTH_PASSWORD` env). Multi-user +
-  roles is P0 #2 — NOT shipped, waiting for first paying customer.
+- **Username + password auth** (stint 61, 2026-04-27). Configured via
+  `AUTH_USERS="user1:role1,user2:role2"` + per-user `AUTH_PASS_<USER>`
+  env vars. Backward-compat with stint-11 single-password
+  (`AUTH_PASSWORD` / `_REVIEWER` / `_JUNIOR`) until Diego rotates and
+  stint 62 cleanup removes the legacy fallback. Cookie format v3:
+  `username.role.sessionId.hmac` (4 parts).
+- Multi-user same-tenant + true multi-tenant remain P1/P2 (waiting for
+  first paying customer). The 2nd-user-with-isolated-data flow
+  (Parte B in stint 61 plan) is parked until Diego has a beta tester.
 - HMAC session tokens (`AUTH_SECRET`). Signed approval tokens for
   the client portal (separate HMAC).
 - RLS on every public table (migration 006). `service_role` and

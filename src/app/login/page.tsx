@@ -7,6 +7,9 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
 export default function LoginPage() {
+  // Stint 61 — username + password. Username is sent lower-cased so users
+  // don't have to remember the exact case of their AUTH_USERS entry.
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -19,11 +22,11 @@ export default function LoginPage() {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ username: username.trim().toLowerCase(), password }),
     });
     setLoading(false);
     if (res.ok) router.push('/');
-    else setError('Incorrect password');
+    else setError('Invalid credentials');
   }
 
   return (
@@ -53,11 +56,22 @@ export default function LoginPage() {
             </div>
           )}
           <Input
+            type="text"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            placeholder="Username"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoFocus
+          />
+          <Input
             type="password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             placeholder="Password"
-            autoFocus
+            autoComplete="current-password"
           />
           <Button type="submit" variant="primary" loading={loading} className="w-full justify-center h-9">
             Sign in

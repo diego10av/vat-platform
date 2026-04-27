@@ -1,17 +1,21 @@
 // Cookie-based session auth using HMAC-SHA256 via the Web Crypto API, so
 // the same code works in both Node (API routes) and Edge (middleware).
 //
-// Cookie format (v2, introduced stint 11 — 2026-04-19):
+// Cookie format (v3, introduced stint 61 — 2026-04-27):
 //
-//   {role}.{sessionId}.{hmacHex}
+//   {username}.{role}.{sessionId}.{hmacHex}
 //
-// where {role} is one of 'admin' | 'reviewer' | 'junior' | 'client' and
-// {hmacHex} is the HMAC-SHA256 of "{role}.{sessionId}" under AUTH_SECRET.
+// where {username} matches an entry in AUTH_USERS, {role} is one of
+// 'admin' | 'reviewer' | 'junior' | 'client', and {hmacHex} is the
+// HMAC-SHA256 of "{username}.{role}.{sessionId}" under AUTH_SECRET.
 //
-// Backward compatibility: cookies without a role prefix (i.e. just
-// "{sessionId}.{hmac}") are accepted as role='admin' — that's what
-// every cookie issued before stint 11 is. On next login the cookie is
-// re-issued in the new format.
+// Backward compatibility:
+//   • 3-part cookie (stint 11): "{role}.{sessionId}.{hmac}" → kept valid,
+//     username defaults to 'diego' so legacy sessions don't break during
+//     the username rollout deploy.
+//   • 2-part cookie (legacy pre-stint-11): "{sessionId}.{hmac}" → kept
+//     valid, role defaults to 'admin', username to 'diego'.
+// On next login both legacy formats are reissued in v3.
 //
 // Previous design stored AUTH_SECRET as the cookie value. A leak would
 // have compromised the platform permanently. Now the secret never
@@ -26,6 +30,10 @@ export type Role = 'admin' | 'reviewer' | 'junior' | 'client';
 const VALID_ROLES: readonly Role[] = ['admin', 'reviewer', 'junior', 'client'] as const;
 const isRole = (x: unknown): x is Role =>
   typeof x === 'string' && (VALID_ROLES as readonly string[]).includes(x);
+
+// Default username assumed for legacy cookies issued before stint 61.
+// Hardcoded because legacy single-tenant only ever had one human user.
+const LEGACY_USERNAME = 'diego';
 
 async function hmacKey(): Promise<CryptoKey> {
   const secret = process.env.AUTH_SECRET;
@@ -71,14 +79,33 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 /**
- * Issue a fresh session cookie for the given role. Defaults to 'admin'
- * for call sites that haven't been updated yet (back-compat).
+ * Validate that a username string is safe to put in a cookie payload.
+ * Allow letters, digits, dot, hyphen, underscore — same restrictive set
+ * as a Postgres identifier-ish. NOT a security boundary (the cookie is
+ * signed regardless), just a sanity check that prevents collisions with
+ * the cookie separator '.'.
+ */
+function isSafeUsername(u: unknown): u is string {
+  return typeof u === 'string'
+    && u.length > 0
+    && u.length <= 32
+    && /^[a-z0-9_-]+$/i.test(u);
+}
+
+/**
+ * Issue a fresh session cookie for the given (username, role) pair.
+ * Defaults to 'diego' / 'admin' for call sites that haven't been updated
+ * (back-compat with stint-11 single-user deploys).
  */
 export async function issueSessionCookie(
+  username: string = LEGACY_USERNAME,
   role: Role = 'admin',
 ): Promise<{ name: string; value: string; maxAge: number }> {
+  if (!isSafeUsername(username)) {
+    throw new Error(`unsafe username: ${username}`);
+  }
   const sessionId = randomSessionId();
-  const payload = `${role}.${sessionId}`;
+  const payload = `${username}.${role}.${sessionId}`;
   const signature = await signPayload(payload);
   return {
     name: COOKIE_NAME,
@@ -89,48 +116,82 @@ export async function issueSessionCookie(
 
 export interface SessionInfo {
   valid: boolean;
+  username: string;
   role: Role;
   sessionId: string | null;
 }
 
 /**
- * Verify the session cookie. Returns the role (admin default for
- * legacy 2-part cookies) and whether the HMAC checks out. Never
- * throws.
+ * Verify the session cookie. Returns the (username, role) pair plus
+ * whether the HMAC checks out. Never throws.
+ *
+ * Three formats supported:
+ *   • 4-part v3 (current):   username.role.sessionId.signature
+ *   • 3-part v2 (stint 11):  role.sessionId.signature  → username='diego'
+ *   • 2-part v1 (pre-11):    sessionId.signature       → username='diego', role='admin'
  */
 export async function verifySession(raw: string | undefined | null): Promise<SessionInfo> {
-  if (!raw) return { valid: false, role: 'admin', sessionId: null };
+  if (!raw) return { valid: false, username: LEGACY_USERNAME, role: 'admin', sessionId: null };
   const parts = raw.split('.');
 
-  // Legacy 2-part format: sessionId.signature — treat role='admin'
+  // Legacy 2-part: sessionId.signature → role='admin', username='diego'
   if (parts.length === 2) {
     const [sessionId, sig] = parts;
-    if (!sessionId || !sig) return { valid: false, role: 'admin', sessionId: null };
-    if (revoked.has(sessionId)) return { valid: false, role: 'admin', sessionId };
+    if (!sessionId || !sig) return { valid: false, username: LEGACY_USERNAME, role: 'admin', sessionId: null };
+    if (revoked.has(sessionId)) return { valid: false, username: LEGACY_USERNAME, role: 'admin', sessionId };
     let expected: string;
-    try { expected = await signPayload(sessionId); } catch { return { valid: false, role: 'admin', sessionId: null }; }
-    return { valid: timingSafeEqual(sig, expected), role: 'admin', sessionId };
+    try { expected = await signPayload(sessionId); } catch { return { valid: false, username: LEGACY_USERNAME, role: 'admin', sessionId: null }; }
+    return {
+      valid: timingSafeEqual(sig, expected),
+      username: LEGACY_USERNAME,
+      role: 'admin',
+      sessionId,
+    };
   }
 
-  // New 3-part format: role.sessionId.signature
+  // Stint-11 3-part: role.sessionId.signature → username='diego'
   if (parts.length === 3) {
     const [role, sessionId, sig] = parts;
     if (!role || !sessionId || !sig || !isRole(role)) {
-      return { valid: false, role: 'admin', sessionId: null };
+      return { valid: false, username: LEGACY_USERNAME, role: 'admin', sessionId: null };
     }
-    if (revoked.has(sessionId)) return { valid: false, role, sessionId };
+    if (revoked.has(sessionId)) return { valid: false, username: LEGACY_USERNAME, role, sessionId };
     let expected: string;
     try { expected = await signPayload(`${role}.${sessionId}`); }
-    catch { return { valid: false, role, sessionId: null }; }
-    return { valid: timingSafeEqual(sig, expected), role, sessionId };
+    catch { return { valid: false, username: LEGACY_USERNAME, role, sessionId: null }; }
+    return {
+      valid: timingSafeEqual(sig, expected),
+      username: LEGACY_USERNAME,
+      role,
+      sessionId,
+    };
   }
 
-  return { valid: false, role: 'admin', sessionId: null };
+  // Stint-61 v3: username.role.sessionId.signature
+  if (parts.length === 4) {
+    const [username, role, sessionId, sig] = parts;
+    if (!username || !role || !sessionId || !sig
+        || !isSafeUsername(username) || !isRole(role)) {
+      return { valid: false, username: LEGACY_USERNAME, role: 'admin', sessionId: null };
+    }
+    if (revoked.has(sessionId)) return { valid: false, username, role, sessionId };
+    let expected: string;
+    try { expected = await signPayload(`${username}.${role}.${sessionId}`); }
+    catch { return { valid: false, username, role, sessionId: null }; }
+    return {
+      valid: timingSafeEqual(sig, expected),
+      username,
+      role,
+      sessionId,
+    };
+  }
+
+  return { valid: false, username: LEGACY_USERNAME, role: 'admin', sessionId: null };
 }
 
 /**
  * Back-compat boolean wrapper for callers that only need a yes/no.
- * @deprecated Use verifySession() to also read the role.
+ * @deprecated Use verifySession() to also read the role + username.
  */
 export async function verifySessionCookie(raw: string | undefined | null): Promise<boolean> {
   const info = await verifySession(raw);
@@ -139,11 +200,59 @@ export async function verifySessionCookie(raw: string | undefined | null): Promi
 
 export function revokeSession(raw: string): void {
   const parts = raw.split('.');
-  const sessionId = parts.length === 2 ? parts[0] : parts.length === 3 ? parts[1] : null;
+  let sessionId: string | null = null;
+  if (parts.length === 2) sessionId = parts[0];
+  else if (parts.length === 3) sessionId = parts[1];
+  else if (parts.length === 4) sessionId = parts[2];
   if (sessionId) revoked.add(sessionId);
 }
 
 export const AUTH_COOKIE_NAME = COOKIE_NAME;
+
+// ─────────────────── Username + password directory ───────────────────
+//
+// Stint 61 — username/password auth.
+//
+// Configured via two env vars:
+//
+//   AUTH_USERS = "diego:admin,demo:junior"
+//     Comma-separated list of "<username>:<role>" pairs. Defines who can
+//     log in and what role they get. Username must match isSafeUsername().
+//
+//   AUTH_PASS_<UPPERCASE_USERNAME>
+//     Per-username password env var. E.g. AUTH_PASS_DIEGO, AUTH_PASS_DEMO.
+//     Compared against submitted password using timingSafeEqual.
+//
+// Back-compat: while AUTH_USERS is unset (or doesn't include 'diego'),
+// the login route falls back to the stint-11 single-password model
+// (AUTH_PASSWORD / AUTH_PASSWORD_REVIEWER / AUTH_PASSWORD_JUNIOR) so
+// Diego doesn't get locked out during the rollout deploy.
+//
+// To rotate Diego's password: change AUTH_PASS_DIEGO in Vercel env vars
+// → redeploy → next login uses the new password. Old session cookies
+// stay valid until they expire (30 days) or until rotated via the
+// admin /api/auth/logout-all endpoint (TODO future).
+
+interface AuthUserEntry { username: string; role: Role }
+
+/**
+ * Parse the AUTH_USERS env var. Returns an empty array if unset or
+ * malformed. Caller should fall back to legacy single-password auth
+ * when this returns empty.
+ */
+export function parseAuthUsers(): AuthUserEntry[] {
+  const raw = process.env.AUTH_USERS;
+  if (!raw) return [];
+  const out: AuthUserEntry[] = [];
+  for (const entry of raw.split(',')) {
+    const trimmed = entry.trim();
+    if (!trimmed) continue;
+    const [username, role] = trimmed.split(':').map(s => s.trim());
+    if (!isSafeUsername(username) || !isRole(role)) continue;
+    out.push({ username, role });
+  }
+  return out;
+}
 
 // ─────────────────── Route-level role gating ───────────────────
 // Used by middleware.ts to decide whether a given role can visit
