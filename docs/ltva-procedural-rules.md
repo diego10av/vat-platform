@@ -33,16 +33,21 @@ stay in sync with the source.
 `vat_annual` active. The reverse IS allowed (annual-only means small
 volume, no periodic obligation).
 
-**Enforcement points**:
+**Enforcement points** (defence in depth — UI + API both guard):
 - `NewEntityModal.tsx` — VAT checkbox group locks `vat_annual` on
   while `vat_quarterly` or `vat_monthly` is selected; tooltip cites
   this rule.
 - `AddEntityRow` invocations on `/tax-ops/vat/quarterly` and
   `/tax-ops/vat/monthly` pages pass `additionalObligations=[vat_annual]`
   so the per-family quick-add path also respects the rule.
-- (TODO) `/api/tax-ops/obligations` POST should refuse a `vat_monthly`
-  or `vat_quarterly` insert if the entity has no active `vat_annual`,
-  with a clear 409 + auto-suggest. Tracked as future hardening.
+- `/api/tax-ops/obligations` POST — when `tax_type ∈
+  {vat_quarterly, vat_monthly}` and `service_kind = 'filing'`, the
+  endpoint also INSERTs `vat_annual` for the same entity (idempotent
+  via `ON CONFLICT (entity_id, tax_type, period_pattern)`). The
+  companion audit_log entry carries `auto_companion: true,
+  ltva_basis: "Art. 64bis + AED Circ. 765bis"` so the trail is
+  unambiguous about which rows the user typed and which the rule
+  auto-created. Stint 51.H.
 
 ---
 
