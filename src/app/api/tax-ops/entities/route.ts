@@ -138,16 +138,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'legal_name_required' }, { status: 400 });
   }
 
-  // Stint 50.C — pre-check for duplicates against the same normalization rule
-  // used by the UNIQUE partial index `tax_entities_norm_unique` (migration
-  // 064). Returns 409 + the existing entity id so the frontend can offer
-  // "use existing" instead of surfacing a raw 500 from the constraint
-  // violation.
+  // Stint 50.C/D — pre-check for duplicates against the same normalization
+  // rule used by the UNIQUE partial index `tax_entities_norm_unique`
+  // (migration 065 — stricter than mig 064). Returns 409 + the existing
+  // entity id so the frontend can offer "use existing" instead of
+  // surfacing a raw 500 from the constraint violation.
+  // Normalization: TRANSLATE strips Latin-1 accents, REGEXP_REPLACE
+  // collapses all non-alphanumeric, LOWER folds case. Catches "S.à r.l."
+  // vs "SARL", trailing punctuation, mixed case.
+  const NORM_EXPR = `LOWER(REGEXP_REPLACE(
+    TRANSLATE(%s,
+      'àáâãäåèéêëìíîïòóôõöùúûüñçÀÁÂÃÄÅÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜÑÇ',
+      'aaaaaaeeeeiiiiooooouuuuncAAAAAAEEEEIIIIOOOOOUUUUNC'),
+    '[^a-zA-Z0-9]+', '', 'g'
+  ))`;
   const existing = await query<{ id: string; legal_name: string }>(
     `SELECT id, legal_name FROM tax_entities
       WHERE is_active = TRUE
-        AND LOWER(REGEXP_REPLACE(legal_name, '[,.()]', '', 'g'))
-            = LOWER(REGEXP_REPLACE($1, '[,.()]', '', 'g'))
+        AND ${NORM_EXPR.replace('%s', 'legal_name')}
+            = ${NORM_EXPR.replace('%s', '$1')}
         AND COALESCE(client_group_id, '__no_group__') = COALESCE($2, '__no_group__')
       LIMIT 1`,
     [body.legal_name.trim(), body.client_group_id ?? null],

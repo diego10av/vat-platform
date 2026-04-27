@@ -12,8 +12,10 @@
 //
 // The dry-run is mandatory before --apply — Diego reviews the winner
 // per group + the count of obligations being moved + flags any
-// conflicts before any writes happen. Soft-delete on losers (no hard
-// DELETE) preserves audit history; the merge is reversible.
+// conflicts before any writes happen. Loser is HARD-DELETEd (Diego's
+// directive in stint 50.D — he doesn't want soft-deleted clutter).
+// The audit log entry per merge captures winner_id + loser_id + diff
+// for full traceability before the row is removed.
 // ════════════════════════════════════════════════════════════════════════
 
 import { query, tx, execTx, logAuditTx } from '../src/lib/db';
@@ -103,7 +105,18 @@ async function buildPlan(): Promise<MergePlan[]> {
       SELECT
         e.id,
         e.legal_name,
-        LOWER(REGEXP_REPLACE(REGEXP_REPLACE(e.legal_name, '[,.()]', '', 'g'), '\\s+', ' ', 'g')) AS norm_name,
+        -- Aggressive normalization: strip accents (TRANSLATE) and ALL
+        -- non-alphanumeric chars. Catches "S.à r.l." vs "SARL", trailing
+        -- ";", double spaces, mixed case. III/IV/II remain distinct because
+        -- the digits/roman-numeral letters survive.
+        LOWER(REGEXP_REPLACE(
+          TRANSLATE(
+            e.legal_name,
+            'àáâãäåèéêëìíîïòóôõöùúûüñçÀÁÂÃÄÅÈÉÊËÌÍÎÏÒÓÔÕÖÙÚÛÜÑÇ',
+            'aaaaaaeeeeiiiiooooouuuuncAAAAAAEEEEIIIIOOOOOUUUUNC'
+          ),
+          '[^a-zA-Z0-9]+', '', 'g'
+        )) AS norm_name,
         e.client_group_id,
         g.name AS group_name,
         e.vat_number,
@@ -216,14 +229,14 @@ function printPlan(plans: MergePlan[]) {
         totalArchives += lp.archive_dup.length;
       }
       if (lp.move.length === 0 && lp.archive_dup.length === 0) {
-        console.log(`            → soft-delete (no obligations to move)`);
+        console.log(`            → DELETE (no obligations to move)`);
       }
     });
     console.log('');
   });
 
   console.log('═══ Summary ═══');
-  console.log(`   ${totalEntities} → ${plans.length} entities (${totalSoftDeletes} soft-deleted)`);
+  console.log(`   ${totalEntities} → ${plans.length} entities (${totalSoftDeletes} HARD-DELETEd)`);
   console.log(`   ${totalMoves} obligations moved · ${totalArchives} duplicate obligations archived`);
   console.log(`   Filings follow their obligations (no rewriting needed).`);
   if (!APPLY) {
@@ -286,22 +299,10 @@ async function applyPlan(plans: MergePlan[]) {
         //     entry below captures the winner↔loser link, so the
         //     loser's history remains queryable via target_id.)
 
-        // 5. Soft-delete loser + record the merge in its notes for posterity
-        const tag = `[merged into ${winner.id} on ${new Date().toISOString().slice(0, 10)}]`;
-        const finalLoserNotes = loser.notes
-          ? `${loser.notes}\n${tag}`
-          : tag;
-        await execTx(
-          client,
-          `UPDATE tax_entities
-              SET is_active = FALSE,
-                  notes = $1,
-                  updated_at = NOW()
-            WHERE id = $2`,
-          [finalLoserNotes, loser.id],
-        );
-
-        // 6. Audit log entry per merge
+        // 5. Audit log entry FIRST (before DELETE so we still have the
+        //     loser's row to copy fields from if the trigger inspects it).
+        //     Captures loser_id + winner_id + diff so the merge is fully
+        //     traceable even after the loser row is gone.
         await logAuditTx(client, {
           userId: 'founder',
           action: 'tax_entity_merged',
@@ -317,6 +318,24 @@ async function applyPlan(plans: MergePlan[]) {
             contacts_merged: mergedContacts.length,
           }),
         });
+
+        // 6. HARD-DELETE the loser. Diego's directive (stint 50.D):
+        //    "directamente, los duplicados, elimínamelos todos. no me las
+        //    dejes como inactivas". Safe because:
+        //    - tax_obligations.entity_id ON DELETE CASCADE — but we already
+        //      moved every active obligation away from the loser in step 1,
+        //      so the cascade has nothing to cascade.
+        //    - tax_ops_tasks.{entity_id, related_entity_id} ON DELETE SET
+        //      NULL — tasks lose the back-link, which is acceptable.
+        //    - audit_log.target_id is plain TEXT (not FK) — historical
+        //      entries remain queryable but reference a non-existent id.
+        //      The tax_entity_merged audit entry above embeds the loser_id
+        //      in new_value JSON so the trail stays intact.
+        await execTx(
+          client,
+          `DELETE FROM tax_entities WHERE id = $1`,
+          [loser.id],
+        );
       }
 
       // 7. Update winner with merged metadata + contacts.
