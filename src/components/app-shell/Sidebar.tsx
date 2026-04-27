@@ -21,6 +21,7 @@ import {
   WalletIcon, CoinsIcon, LibraryBigIcon, FolderIcon, CheckSquareIcon,
   BarChart3Icon, ShieldCheckIcon, SettingsIcon, ChevronRightIcon,
   TargetIcon, CircleIcon, PercentIcon, CalculatorIcon, ScrollTextIcon,
+  ChevronUpIcon, ChevronDownIcon, LogOutIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -556,8 +557,9 @@ function UserMenu({ role }: { role: Role }) {
             role="menuitem"
             onClick={handleSignOut}
             disabled={signingOut}
-            className="w-full text-left px-3 py-2 text-sm text-ink hover:bg-surface-alt disabled:opacity-50 disabled:cursor-wait"
+            className="w-full flex items-center gap-2 text-left px-3 py-2 text-sm text-ink hover:bg-surface-alt disabled:opacity-50 disabled:cursor-wait"
           >
+            <LogOutIcon size={13} className="shrink-0 text-ink-muted" />
             {signingOut ? 'Signing out…' : 'Sign out'}
           </button>
         </div>
@@ -567,14 +569,24 @@ function UserMenu({ role }: { role: Role }) {
         onClick={() => setOpen(o => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="w-full flex flex-col px-3 py-1.5 rounded-md hover:bg-surface-alt transition-colors text-left"
+        className="w-full flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-surface-alt transition-colors text-left group"
       >
-        <div className="text-sm font-medium text-ink truncate leading-tight">
-          {display}
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-ink truncate leading-tight">
+            {display}
+          </div>
+          <div className="text-2xs text-ink-muted truncate leading-tight mt-0.5">
+            {tagline}
+          </div>
         </div>
-        <div className="text-2xs text-ink-muted truncate leading-tight mt-0.5">
-          {tagline}
-        </div>
+        {/* Stint 62 — chevron icon for affordance. Pre-stint-62 the
+            UserMenu was a div with cursor-pointer but no visual hint that
+            anything happened on click — Diego: "no lo veo donde lo has
+            puesto". The chevron rotates between up (closed: menu opens
+            upward) and down (open: indicates close). */}
+        {open
+          ? <ChevronDownIcon size={13} className="shrink-0 text-ink-muted" />
+          : <ChevronUpIcon   size={13} className="shrink-0 text-ink-muted group-hover:text-ink transition-colors" />}
       </button>
     </div>
   );

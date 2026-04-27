@@ -29,7 +29,16 @@ interface MatchResult { username: string; role: Role }
 
 /**
  * Match (username, password) against AUTH_USERS / AUTH_PASS_<USER> env
- * vars (stint-61 model). Returns null when no entry matches.
+ * vars. Returns null when no entry matches.
+ *
+ * Stint 62 (2026-04-27) removed the stint-11 single-password legacy
+ * fallback (AUTH_PASSWORD / _REVIEWER / _JUNIOR). After Diego confirmed
+ * the new model works in stint 61.A, the legacy env vars are no longer
+ * read; he can safely delete them from Vercel env vars.
+ *
+ * Existing session cookies issued under the legacy model (2-part or
+ * 3-part formats) remain valid until expiry — verifySession() in
+ * lib/auth.ts still accepts them. Only LOGIN is locked to the new model.
  */
 function matchUserPass(submittedUser: string, submittedPass: string): MatchResult | null {
   const entries = parseAuthUsers();
@@ -42,36 +51,6 @@ function matchUserPass(submittedUser: string, submittedPass: string): MatchResul
     }
     // Username matched but password didn't — keep looping in case there
     // are duplicate username entries (shouldn't happen, but defensive).
-  }
-  return null;
-}
-
-/**
- * Stint-11 fallback: pre-username model where the only input was a
- * password and the role was inferred from which env var matched.
- *
- *   AUTH_PASSWORD           → admin
- *   AUTH_PASSWORD_REVIEWER  → reviewer
- *   AUTH_PASSWORD_JUNIOR    → junior
- *
- * Used when AUTH_USERS is unset OR the submitted username doesn't match
- * any entry there. Keeps Diego logged in during the rollout deploy:
- * the form already sends `username='diego'` after stint 61, but env
- * vars for the new model take a moment to propagate; meanwhile the old
- * AUTH_PASSWORD continues to work.
- */
-function matchLegacyPass(submittedPass: string): MatchResult | null {
-  const candidates: Array<[string | undefined, Role]> = [
-    [process.env.AUTH_PASSWORD, 'admin'],
-    [process.env.AUTH_PASSWORD_REVIEWER, 'reviewer'],
-    [process.env.AUTH_PASSWORD_JUNIOR, 'junior'],
-  ];
-  for (const [expected, role] of candidates) {
-    if (expected && timingSafeEqualString(submittedPass, expected)) {
-      // Legacy auth had no username concept — emit cookies as 'diego' so
-      // the new code path treats them uniformly.
-      return { username: 'diego', role };
-    }
   }
   return null;
 }
@@ -91,18 +70,7 @@ export async function POST(request: NextRequest) {
   const username = typeof body.username === 'string' ? body.username.trim() : '';
   const password = typeof body.password === 'string' ? body.password : '';
 
-  // Try the stint-61 model first (username + per-user password env var).
-  // If that fails, try the stint-11 legacy fallback so Diego doesn't get
-  // locked out while Vercel env vars roll out. Once AUTH_USERS is fully
-  // configured and Diego has rotated to the new password, the legacy
-  // env vars can be deleted (stint 62 cleanup).
-  let match: MatchResult | null = null;
-  if (username) {
-    match = matchUserPass(username, password);
-  }
-  if (!match) {
-    match = matchLegacyPass(password);
-  }
+  const match = username ? matchUserPass(username, password) : null;
   if (!match) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
   }

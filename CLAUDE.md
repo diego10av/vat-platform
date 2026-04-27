@@ -443,12 +443,14 @@ How we iterate. See `docs/PROTOCOLS.md` for the long form.
 
 ## 6 · Security posture
 
-- **Username + password auth** (stint 61, 2026-04-27). Configured via
-  `AUTH_USERS="user1:role1,user2:role2"` + per-user `AUTH_PASS_<USER>`
-  env vars. Backward-compat with stint-11 single-password
-  (`AUTH_PASSWORD` / `_REVIEWER` / `_JUNIOR`) until Diego rotates and
-  stint 62 cleanup removes the legacy fallback. Cookie format v3:
-  `username.role.sessionId.hmac` (4 parts).
+- **Username + password auth** (stint 61 + 62, 2026-04-27). Configured
+  via `AUTH_USERS="user1:role1,user2:role2"` + per-user
+  `AUTH_PASS_<USER>` env vars. Stint 62 removed the stint-11
+  single-password legacy fallback — `AUTH_PASSWORD` / `_REVIEWER` /
+  `_JUNIOR` env vars are no longer read and can be deleted from
+  Vercel. Cookie format v3: `username.role.sessionId.hmac` (4 parts).
+  Existing legacy 2- and 3-part cookies stay valid via verifySession()
+  until they naturally expire (30d).
 - Multi-user same-tenant + true multi-tenant remain P1/P2 (waiting for
   first paying customer). The 2nd-user-with-isolated-data flow
   (Parte B in stint 61 plan) is parked until Diego has a beta tester.
