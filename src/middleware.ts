@@ -45,8 +45,20 @@ const PUBLIC_PREFIXES = ['/portal/', '/api/portal/', '/marketing/', '/_landing/'
 // leaked onto the public landing. Fix: middleware tags every public-
 // surface response with x-cifra-no-shell=1; AppShell reads it via
 // next/headers and short-circuits.
-function withNoShellHeader(): { request: { headers: Headers } } {
-  return { request: { headers: new Headers([['x-cifra-no-shell', '1']]) } };
+//
+// CRITICAL — Stint 64.E hotfix: the helper must CLONE the existing
+// request headers, not start from scratch. Starting from an empty
+// Headers([['x-cifra-no-shell', '1']]) replaced ALL the original
+// request headers downstream, including Content-Type and Cookie.
+// That broke /api/auth/login: request.json() saw a body with no
+// Content-Type, parsed empty {}, matchUserPass got '' username + ''
+// password, returned null → 401 Invalid credentials. Diego could not
+// log in. Fix: new Headers(request.headers) preserves everything,
+// then we just SET the extra signal on top.
+function withNoShellHeader(request: NextRequest): { request: { headers: Headers } } {
+  const headers = new Headers(request.headers);
+  headers.set('x-cifra-no-shell', '1');
+  return { request: { headers } };
 }
 
 function handleRootDomain(request: NextRequest): NextResponse {
@@ -65,12 +77,12 @@ function handleRootDomain(request: NextRequest): NextResponse {
   if (pathname === '/' || pathname === '') {
     const url = request.nextUrl.clone();
     url.pathname = '/marketing';
-    return NextResponse.rewrite(url, withNoShellHeader());
+    return NextResponse.rewrite(url, withNoShellHeader(request));
   }
 
   // /marketing (either the index or nested) serves as-is, no shell.
   if (pathname === '/marketing' || pathname.startsWith('/marketing/')) {
-    return NextResponse.next(withNoShellHeader());
+    return NextResponse.next(withNoShellHeader(request));
   }
 
   // Anything else on the root domain (e.g. /login, /clients, /api/*)
@@ -97,8 +109,8 @@ export async function middleware(request: NextRequest) {
   // Stint 64.D — also tag /login, /portal, /marketing on the app
   // subdomain with x-cifra-no-shell so the public surfaces stay clean
   // even when accessed via app.cifracompliance.com.
-  if (PUBLIC_PATHS.has(pathname)) return NextResponse.next(withNoShellHeader());
-  if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) return NextResponse.next(withNoShellHeader());
+  if (PUBLIC_PATHS.has(pathname)) return NextResponse.next(withNoShellHeader(request));
+  if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) return NextResponse.next(withNoShellHeader(request));
 
   const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = await verifySession(cookie);
