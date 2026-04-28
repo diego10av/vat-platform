@@ -15,9 +15,14 @@ import { OfflineBanner } from './OfflineBanner';
 import { ChatDrawer } from '@/components/chat/ChatDrawer';
 import { FeedbackWidget } from '@/components/feedback/FeedbackWidget';
 
-// Routes that render without the shell (login, portal…).
+// Routes that render without the shell (login, portal, public landing).
 // Public-facing pages use their own minimal chrome, not the operator UI.
-const BARE_ROUTES = ['/login', '/portal'];
+//
+// Stint 64.B — added '/marketing'. The marketing layout brings its own
+// sticky top-nav with logo + Sign in; rendering AppShell on top of it
+// shows the operator sidebar to anonymous visitors of cifracompliance.com,
+// which is wrong (private app chrome leaking into public surface).
+const BARE_ROUTES = ['/login', '/portal', '/marketing'];
 
 interface Declaration { id: string; status: string; }
 interface AedLetter { id: string; urgency: string | null; status: string; }
