@@ -17,6 +17,8 @@ import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
 import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
+// Stint 63.L — hover preview on opportunity name.
+import { OpportunityHoverPreview } from '@/components/crm/OpportunityHoverPreview';
 import { crmLoadList } from '@/lib/useCrmFetch';
 import { OPPORTUNITY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -353,9 +355,11 @@ function OpportunitiesPageContent() {
                       className="h-4 w-4 accent-brand-500 cursor-pointer"
                     />
                   </td>
-                  {/* Name → link to detail. */}
+                  {/* Name → link to detail, wrapped in hover preview. */}
                   <td className="px-3 py-2">
-                    <Link href={`/crm/opportunities/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.name}</Link>
+                    <OpportunityHoverPreview opportunityId={r.id}>
+                      <Link href={`/crm/opportunities/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.name}</Link>
+                    </OpportunityHoverPreview>
                   </td>
                   {/* Company → link, not editable inline (changing the
                       parent company is a heavy action). */}

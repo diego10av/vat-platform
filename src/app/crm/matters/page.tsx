@@ -16,6 +16,8 @@ import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
 import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
+// Stint 63.L — hover preview on matter reference.
+import { MatterHoverPreview } from '@/components/crm/MatterHoverPreview';
 import { crmLoadList } from '@/lib/useCrmFetch';
 import { MATTER_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -282,9 +284,11 @@ function MattersPageContent() {
                       className="h-4 w-4 accent-brand-500 cursor-pointer"
                     />
                   </td>
-                  {/* Reference → link, with conflict-check warning chip. */}
+                  {/* Reference → link, wrapped in hover preview, with conflict-check warning chip. */}
                   <td className="px-3 py-2">
-                    <Link href={`/crm/matters/${r.id}`} className="font-medium text-brand-700 hover:underline font-mono">{r.matter_reference}</Link>
+                    <MatterHoverPreview matterId={r.id}>
+                      <Link href={`/crm/matters/${r.id}`} className="font-medium text-brand-700 hover:underline font-mono">{r.matter_reference}</Link>
+                    </MatterHoverPreview>
                     {!r.conflict_check_done && r.status === 'active' && (
                       <span className="ml-2 text-2xs uppercase tracking-wide text-danger-700 bg-danger-50 border border-danger-200 rounded px-1 py-0.5" title="Conflict check pending">No conflict check</span>
                     )}

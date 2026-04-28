@@ -15,6 +15,8 @@ import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
 import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
+// Stint 63.L — hover preview on contact name.
+import { ContactHoverPreview } from '@/components/crm/ContactHoverPreview';
 import { crmLoadList } from '@/lib/useCrmFetch';
 import { CONTACT_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -285,10 +287,13 @@ function ContactsPageContent() {
                         className="h-4 w-4 accent-brand-500 cursor-pointer"
                       />
                     </td>
-                    {/* Name — Link (renaming a person in the list view is
-                        an edge case better handled in detail). */}
+                    {/* Name — Link wrapped in hover preview (renaming a
+                        person in the list view is an edge case better
+                        handled in detail). */}
                     <td className="px-3 py-2">
-                      <Link href={`/crm/contacts/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.full_name}</Link>
+                      <ContactHoverPreview contactId={r.id}>
+                        <Link href={`/crm/contacts/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.full_name}</Link>
+                      </ContactHoverPreview>
                     </td>
                     {/* Job title — inline editable text. */}
                     <td className="px-3 py-2 max-w-[180px]">
