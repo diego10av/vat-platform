@@ -31,6 +31,7 @@ export default function VatQuarterlyPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [associateFilter, setAssociateFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(''); // Stint 64
   // Stint 48 — sub-period filter: 'all' shows Q1-Q4, '2026-Q2' collapses
   // the matrix to that single quarter.
   const [periodFilter, setPeriodFilter] = useState('all');
@@ -52,6 +53,7 @@ export default function VatQuarterlyPage() {
     partner: partnerFilter,
     associate: associateFilter,
     periodLabels: visiblePeriodLabels,
+    query: searchQuery,
   });
 
   const columns: MatrixColumn[] = [
@@ -98,6 +100,8 @@ export default function VatQuarterlyPage() {
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
         entitiesForFilters={data?.entities ?? []}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
         periodOptions={periodOptions}
         periodFilter={periodFilter}
         onPeriodFilterChange={setPeriodFilter}

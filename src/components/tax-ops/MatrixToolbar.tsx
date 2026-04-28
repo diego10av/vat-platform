@@ -10,7 +10,7 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { DownloadIcon, PlusIcon } from 'lucide-react';
+import { DownloadIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react';
 import { useToast } from '@/components/Toaster';
 import { FILING_STATUSES, filingStatusLabel } from './FilingStatusBadge';
 import { useTaxTeamMembers, ownershipNamesInCells } from './useMatrixData';
@@ -66,6 +66,24 @@ interface Props {
   periodFilter?: string;
   onPeriodFilterChange?: (next: string) => void;
   periodLabel?: string;        // "Quarter" / "Month" — dropdown label
+  /**
+   * Stint 64 — search input on the toolbar. Pages pass a free-text
+   * query that filters the matrix by entity legal_name (case-insensitive
+   * substring match — see `filterEntities` in useMatrixData). Diego:
+   * "haya un search, poniendo el nombre de la entidad o lo que sea,
+   * porque si tengo 100 entidades a lo mejor no la encuentro pero si
+   * me sé el nombre, pongo el nombre y voy a ella directamente."
+   */
+  searchQuery?: string;
+  onSearchQueryChange?: (next: string) => void;
+  /**
+   * Stint 64 — slot for filters that should appear BETWEEN year and
+   * status (currently used by VAT annual to position its Subtype filter
+   * next to the year, where Diego expects it). Different from
+   * `extraChildren` which renders AFTER the status/partner/associate
+   * filters.
+   */
+  extraFiltersAfterYear?: React.ReactNode;
 }
 
 export function MatrixToolbar({
@@ -78,6 +96,8 @@ export function MatrixToolbar({
   associateFilter, onAssociateFilterChange,
   entitiesForFilters,
   periodOptions, periodFilter, onPeriodFilterChange, periodLabel = 'Period',
+  searchQuery, onSearchQueryChange,
+  extraFiltersAfterYear,
 }: Props) {
   const [busy, setBusy] = useState(false);
   // Stint 51.G — global "+ New entity" CTA on every matrix toolbar so
@@ -148,6 +168,33 @@ export function MatrixToolbar({
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
+      {/* Stint 64 — entity search. Renders first (most prominent) when
+          wired so Diego can find a specific entity in 100+ row lists
+          without scrolling. Filtering happens in `filterEntities`
+          (useMatrixData) so it composes with status/partner/associate. */}
+      {onSearchQueryChange && (
+        <div className="relative">
+          <SearchIcon size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery ?? ''}
+            onChange={(e) => onSearchQueryChange(e.target.value)}
+            placeholder="Search entity…"
+            aria-label="Search by entity name"
+            className="pl-7 pr-7 py-1 text-sm border border-border rounded-md bg-surface w-[200px]"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => onSearchQueryChange('')}
+              aria-label="Clear search"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-ink-muted hover:text-ink rounded"
+            >
+              <XIcon size={11} />
+            </button>
+          )}
+        </div>
+      )}
       <label className="inline-flex items-center gap-1.5 text-sm">
         <span className="text-ink-muted">Period year:</span>
         <select
@@ -158,6 +205,10 @@ export function MatrixToolbar({
           {years.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
       </label>
+      {/* Stint 64 — slot for page-specific filters that should sit
+          right after the year (e.g. VAT annual's Subtype). Diego's ask:
+          "el subtipo, prefiero que esté entre period year y estatus." */}
+      {extraFiltersAfterYear}
       {/* Stint 48 — period sub-filter for quarterly/monthly matrices.
           Pages pass the available periods; selecting one collapses the
           matrix to a single column. */}

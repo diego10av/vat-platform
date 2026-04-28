@@ -30,6 +30,7 @@ export default function WhtMonthlyPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [associateFilter, setAssociateFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(''); // Stint 64
   const [periodFilter, setPeriodFilter] = useState('all');
   const [editingFilingId, setEditingFilingId] = useState<string | null>(null);
   const toast = useToast();
@@ -48,6 +49,7 @@ export default function WhtMonthlyPage() {
     partner: partnerFilter,
     associate: associateFilter,
     periodLabels: visiblePeriodLabels,
+    query: searchQuery,
   });
 
   const columns: MatrixColumn[] = [
@@ -93,6 +95,8 @@ export default function WhtMonthlyPage() {
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
         entitiesForFilters={data?.entities ?? []}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
         periodOptions={periodOptions}
         periodFilter={periodFilter}
         onPeriodFilterChange={setPeriodFilter}

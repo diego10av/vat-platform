@@ -29,6 +29,7 @@ export default function WhtAnnualPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [associateFilter, setAssociateFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(''); // Stint 64
   const [editingFilingId, setEditingFilingId] = useState<string | null>(null);
   const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
@@ -45,6 +46,7 @@ export default function WhtAnnualPage() {
     partner: partnerFilter,
     associate: associateFilter,
     periodLabels: [periodLabel],
+    query: searchQuery,
   });
   const tolerance = data?.admin_tolerance_days ?? 0;
   const columns: MatrixColumn[] = [
@@ -83,6 +85,8 @@ export default function WhtAnnualPage() {
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
         entitiesForFilters={data?.entities ?? []}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
       />
 
       {error && <CrmErrorBox message={error} onRetry={refetch} />}

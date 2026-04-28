@@ -570,6 +570,13 @@ function RowRender({
   // sticky cells (family + entity) live on `bg-surface` to override the
   // tr's bg, so when we tint the row we have to tint those cells too,
   // otherwise they paint a clean white strip on top of the amber row.
+  //
+  // Stint 64 — fix transparent-on-hover bug. Sticky cells used to use
+  // `hover:bg-surface-alt/50` which is 50% transparent, so when Diego
+  // hovered a row the body cells passing beneath the sticky column
+  // (e.g. "+ Add contact" in the Contacts column) bled through visually.
+  // Now sticky cells get an OPAQUE hover bg; the tr keeps its lighter
+  // /50 hover for the non-sticky cells (so the visual highlight stays).
   const tinted = liquidationVisuals && !!entity.liquidation_date;
   const trClass = [
     tinted
@@ -578,8 +585,8 @@ function RowRender({
     isDragging ? 'opacity-40' : '',
   ].join(' ');
   const stickyBgClass = tinted
-    ? 'bg-amber-50/60 hover:bg-amber-50/80'
-    : 'bg-surface hover:bg-surface-alt/50';
+    ? 'bg-amber-50 hover:bg-amber-100'
+    : 'bg-surface hover:bg-surface-alt';
 
   return (
     <tr

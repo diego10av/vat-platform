@@ -33,6 +33,7 @@ export default function VatAnnualPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [associateFilter, setAssociateFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(''); // Stint 64
   // Stint 48.F1.A — Standard/Simplified subtype filter. 'all' shows both;
   // 'standard' / 'simplified' narrows the combined list.
   const [subtypeFilter, setSubtypeFilter] = useState<'all' | 'standard' | 'simplified'>('all');
@@ -92,6 +93,7 @@ export default function VatAnnualPage() {
     partner: partnerFilter,
     associate: associateFilter,
     periodLabels: [periodLabel],
+    query: searchQuery,
   }).filter(e => {
     if (subtypeFilter === 'all') return true;
     return (e as CombinedEntity).subtype === subtypeFilter;
@@ -120,7 +122,13 @@ export default function VatAnnualPage() {
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
         entitiesForFilters={combined}
-        extraChildren={
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        // Stint 64 — Subtype filter moved from `extraChildren` (which
+        // rendered at the end of the toolbar) to `extraFiltersAfterYear`
+        // (right after the Period year). Diego: "el subtipo lo pondría
+        // entre period year y status, ahí no tiene sentido al final."
+        extraFiltersAfterYear={
           <label className="inline-flex items-center gap-1.5 text-sm">
             <span className="text-ink-muted">Subtype:</span>
             <select

@@ -34,6 +34,7 @@ export default function CitPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [partnerFilter, setPartnerFilter] = useState('all');
   const [associateFilter, setAssociateFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState(''); // Stint 64
   const [editingFilingId, setEditingFilingId] = useState<string | null>(null);
   const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
@@ -114,6 +115,7 @@ export default function CitPage() {
     partner: partnerFilter,
     associate: associateFilter,
     periodLabels: [periodLabel],
+    query: searchQuery,
   });
   const columns: MatrixColumn[] = [
     familyColumn({
@@ -251,6 +253,8 @@ export default function CitPage() {
         associateFilter={associateFilter}
         onAssociateFilterChange={setAssociateFilter}
         entitiesForFilters={current.data?.entities ?? []}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
       />
 
       {current.error && <CrmErrorBox message={current.error} onRetry={refetchAll} />}

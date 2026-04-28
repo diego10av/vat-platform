@@ -191,14 +191,27 @@ export function filterEntities(args: {
   partner?: string;
   associate?: string;
   periodLabels: string[];
+  /** Stint 64 — free-text search by entity legal_name (case-insensitive
+   *  substring). Empty string is treated as no filter. Composes AND
+   *  with status / partner / associate. */
+  query?: string;
 }): MatrixEntity[] {
-  const { entities, status, partner, associate, periodLabels } = args;
+  const { entities, status, partner, associate, periodLabels, query } = args;
   let out = filterEntitiesByStatus(entities, status, periodLabels);
   if (partner && partner !== 'all') {
     out = out.filter(e => matchesOwnership(e, periodLabels, 'partner_in_charge', partner));
   }
   if (associate && associate !== 'all') {
     out = out.filter(e => matchesOwnership(e, periodLabels, 'associates_working', associate));
+  }
+  const q = (query ?? '').trim().toLowerCase();
+  if (q) {
+    out = out.filter(e =>
+      e.legal_name.toLowerCase().includes(q)
+      // Also match against family/group name so "ilanga" finds rows
+      // grouped under the C-INVESTMENTS family if they share the name.
+      || (e.group_name?.toLowerCase().includes(q) ?? false),
+    );
   }
   return out;
 }
