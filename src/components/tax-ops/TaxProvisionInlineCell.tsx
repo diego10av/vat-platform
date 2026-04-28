@@ -153,17 +153,28 @@ export function TaxProvisionInlineCell({
     }
   }
 
-  // State A: not opted in — "+ Opt in" button.
+  // State A: not opted in.
+  // Stint 64.M — Diego: "cuanto más minimalista mejor". Most rows
+  // aren't opted in to provision tracking; this cell renders as a
+  // subtle em-dash by default and only reveals "+ Opt in" on hover.
+  // Removes the bulk of the visual noise across the matrix.
   if (!cell.obligation_id) {
     return (
       <button
         type="button"
         onClick={handleOptIn}
         disabled={busy}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-2xs bg-surface-alt text-ink-muted hover:bg-surface-alt/50 hover:text-ink transition-colors"
+        className="group inline-flex items-center justify-center min-w-[44px] h-5 px-1.5 rounded-full text-2xs text-ink-faint hover:text-ink hover:bg-surface-alt transition-colors disabled:opacity-50"
         title="Click to track a tax-provision calc for this entity. Use when a client sends a draft FS and asks us to compute the provision."
       >
-        {busy ? 'Adding…' : '+ Opt in'}
+        {busy ? (
+          'Adding…'
+        ) : (
+          <>
+            <span className="group-hover:hidden">—</span>
+            <span className="hidden group-hover:inline">+ Opt in</span>
+          </>
+        )}
       </button>
     );
   }

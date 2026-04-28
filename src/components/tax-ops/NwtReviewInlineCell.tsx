@@ -94,17 +94,28 @@ export function NwtReviewInlineCell({
     }
   }
 
-  // State A: not opted in
+  // State A: not opted in.
+  // Stint 64.M — Diego: "cuanto más minimalista mejor". 140 of 160
+  // entities aren't opted in to NWT review, so this cell renders 140
+  // times as a subtle em-dash by default and only reveals "+ Opt in"
+  // on hover. Removes most of the visual noise from the matrix.
   if (!cell.obligation_id) {
     return (
       <button
         type="button"
         onClick={handleOptIn}
         disabled={busy}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-2xs bg-surface-alt text-ink-muted hover:bg-surface-alt/50 hover:text-ink transition-colors"
+        className="group inline-flex items-center justify-center min-w-[44px] h-5 px-1.5 rounded-full text-2xs text-ink-faint hover:text-ink hover:bg-surface-alt transition-colors disabled:opacity-50"
         title="Click to opt this entity into year-end NWT review"
       >
-        {busy ? 'Adding…' : '+ Opt in'}
+        {busy ? (
+          'Adding…'
+        ) : (
+          <>
+            <span className="group-hover:hidden">—</span>
+            <span className="hidden group-hover:inline">+ Opt in</span>
+          </>
+        )}
       </button>
     );
   }

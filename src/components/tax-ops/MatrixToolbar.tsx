@@ -277,13 +277,13 @@ export function MatrixToolbar({
           />
         </label>
       )}
-      {/* Stint 64.L — "Needs follow-up" toggle. Diego: "como hacer
-          seguimiento del estado sin que se me pase nada". Pressing
-          this filters the matrix to entities with at least one stuck
-          cell (amber or red chip) on any tracked column. Hidden when
-          the parent doesn't wire the props (other matrices that don't
-          have follow-up tracking yet). */}
-      {onNeedsFollowUpChange && (
+      {/* Stint 64.L + 64.M — "Needs follow-up" toggle. Filters the
+          matrix to entities with at least one stuck cell (amber or
+          red chip). Diego: "cuanto más minimalista mejor" — the
+          button only renders when there's actually work to chase
+          (count > 0) OR when the user has it pressed and is mid-
+          interaction. On a clean day the toolbar shows nothing here. */}
+      {onNeedsFollowUpChange && (needsFollowUp || (needsFollowUpCount ?? 0) > 0) && (
         <button
           type="button"
           onClick={() => onNeedsFollowUpChange(!needsFollowUp)}
