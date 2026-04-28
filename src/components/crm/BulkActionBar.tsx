@@ -13,16 +13,20 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { useState } from 'react';
-import { Trash2Icon, TagIcon, XIcon } from 'lucide-react';
+import { Trash2Icon, TagIcon, XIcon, PencilIcon } from 'lucide-react';
 import { useToast } from '@/components/Toaster';
 
 export function BulkActionBar({
-  targetType, selectedIds, onDone, onClear,
+  targetType, selectedIds, onDone, onClear, onEditFields,
 }: {
   targetType: 'crm_company' | 'crm_contact' | 'crm_opportunity' | 'crm_matter';
   selectedIds: string[];
   onDone: () => void;
   onClear: () => void;
+  /** Optional — when provided, renders an "Edit fields" button that
+   *  invokes the host page's BulkEditDrawer (each list configures its
+   *  own fields whitelist). Stint 63.E. */
+  onEditFields?: () => void;
 }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -76,6 +80,15 @@ export function BulkActionBar({
           {selectedIds.length} selected
         </span>
         <span className="h-4 w-px bg-white/30" />
+        {onEditFields && (
+          <button
+            onClick={onEditFields}
+            disabled={busy}
+            className="h-7 px-2.5 rounded-md bg-brand-500/90 hover:bg-brand-600 disabled:opacity-40 inline-flex items-center gap-1.5 text-xs font-medium"
+          >
+            <PencilIcon size={12} /> Edit fields
+          </button>
+        )}
         <button
           onClick={handleDelete}
           disabled={busy}

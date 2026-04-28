@@ -14,6 +14,7 @@ import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
 import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
+import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
 import { crmLoadList } from '@/lib/useCrmFetch';
 import { CONTACT_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -78,6 +79,8 @@ function ContactsPageContent() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Stint 63.C — right-click context menu state.
   const [contextMenu, setContextMenu] = useState<{ contact: Contact; x: number; y: number } | null>(null);
+  // Stint 63.E — bulk-edit drawer state.
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const toast = useToast();
 
   // Stint 63.D — sync state → URL with router.replace (filter changes
@@ -355,6 +358,33 @@ function ContactsPageContent() {
         selectedIds={Array.from(selected)}
         onClear={clearSelection}
         onDone={() => { clearSelection(); load(); }}
+        onEditFields={() => setBulkEditOpen(true)}
+      />
+
+      {/* Stint 63.E — bulk-edit drawer. */}
+      <BulkEditDrawer
+        open={bulkEditOpen}
+        onClose={() => setBulkEditOpen(false)}
+        recordType="contact"
+        selectedIds={Array.from(selected)}
+        endpoint="/api/crm/contacts/bulk-update"
+        fields={[
+          {
+            key: 'lifecycle_stage',
+            label: 'Lifecycle stage',
+            type: 'select',
+            options: CONTACT_LIFECYCLES.map(s => ({ value: s, label: LABELS_LIFECYCLE[s] })),
+          },
+          {
+            key: 'engagement_override',
+            label: 'Engagement (override auto-computed)',
+            type: 'select',
+            options: ENGAGEMENT_LEVELS.map(s => ({ value: s, label: LABELS_ENGAGEMENT[s] })),
+          },
+          { key: 'country',  label: 'Country',  type: 'text', placeholder: 'e.g. LU' },
+          { key: 'source',   label: 'Source',   type: 'text', placeholder: 'e.g. Referral, LinkedIn, Event' },
+        ] satisfies BulkEditField[]}
+        onApplied={() => { clearSelection(); load(); }}
       />
 
       {/* Stint 63.C — right-click context menu. */}

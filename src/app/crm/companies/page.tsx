@@ -14,6 +14,7 @@ import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CompanyHoverPreview } from '@/components/crm/CompanyHoverPreview';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
 import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
+import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
 import { COMPANY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
@@ -77,6 +78,8 @@ function CompaniesPageContent() {
   // Stint 63.C — context menu state. Lifted to page level so a single
   // CrmContextMenu instance is shared across all rows.
   const [contextMenu, setContextMenu] = useState<{ company: Company; x: number; y: number } | null>(null);
+  // Stint 63.E — bulk-edit drawer state.
+  const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const toast = useToast();
 
   // Stint 63.D — sync filter state → URL. router.replace (not push)
@@ -386,6 +389,40 @@ function CompaniesPageContent() {
         selectedIds={Array.from(selected)}
         onClear={clearSelection}
         onDone={() => { clearSelection(); load(); }}
+        onEditFields={() => setBulkEditOpen(true)}
+      />
+
+      {/* Stint 63.E — bulk-edit drawer. Whitelist of fields kept in
+          sync with /api/crm/companies/bulk-update ALLOWED_FIELDS. */}
+      <BulkEditDrawer
+        open={bulkEditOpen}
+        onClose={() => setBulkEditOpen(false)}
+        recordType="company"
+        selectedIds={Array.from(selected)}
+        endpoint="/api/crm/companies/bulk-update"
+        fields={[
+          {
+            key: 'classification',
+            label: 'Classification',
+            type: 'select',
+            options: Object.entries(LABELS_CLASSIFICATION).map(([value, label]) => ({ value, label })),
+          },
+          {
+            key: 'industry',
+            label: 'Industry',
+            type: 'select',
+            options: Object.entries(LABELS_INDUSTRY).map(([value, label]) => ({ value, label })),
+          },
+          {
+            key: 'size',
+            label: 'Size',
+            type: 'select',
+            options: Object.entries(LABELS_SIZE).map(([value, label]) => ({ value, label })),
+          },
+          { key: 'country', label: 'Country', type: 'text', placeholder: 'e.g. LU' },
+          { key: 'lead_counsel', label: 'Lead counsel', type: 'text', placeholder: 'e.g. Diego' },
+        ] satisfies BulkEditField[]}
+        onApplied={() => { clearSelection(); load(); }}
       />
 
       {/* Stint 63.C — right-click context menu. Single instance per
