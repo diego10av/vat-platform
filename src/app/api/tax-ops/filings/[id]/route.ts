@@ -181,8 +181,37 @@ export async function PATCH(
     targetId: id,
     newValue: JSON.stringify(changes),
   });
+
+  // Stint 64.L Layer 3d — auto-resolve any open stuck-follow-up
+  // task on this filing when the status moves OUT of a "waiting on
+  // client" state. Diego shouldn't have to close the task manually
+  // when he marks the filing as `working` (he replied, ball's now
+  // in his court) or `finalized` (done). Only fires when the PATCH
+  // includes a `status` field whose new value is NOT a waiting
+  // state. completed_by='auto-resolver' so it's distinguishable
+  // from manual completions in the audit log.
+  if (typeof body.status === 'string' && !STUCK_WAITING_STATES.has(body.status)) {
+    await execute(
+      `UPDATE crm_tasks
+          SET status = 'done', completed_at = NOW(), completed_by = 'auto-resolver',
+              updated_at = NOW()
+        WHERE related_type = 'tax_filing'
+          AND related_id   = $1
+          AND auto_generated = TRUE
+          AND status IN ('open', 'in_progress', 'snoozed')`,
+      [id],
+    );
+  }
   return NextResponse.json({ ok: true });
 }
+
+// Same set the cron uses — keep in sync with src/app/api/cron/stuck-followups/route.ts
+const STUCK_WAITING_STATES = new Set<string>([
+  // Provision waiting states
+  'awaiting_fs', 'sent',
+  // Filing waiting states (NWT review + general)
+  'info_to_request', 'info_requested', 'draft_sent', 'awaiting_client_clarification',
+]);
 
 export async function DELETE(
   _request: NextRequest,

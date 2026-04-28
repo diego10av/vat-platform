@@ -5,7 +5,8 @@
 // editable inline, NWT Review {year} collapsed into a column (was
 // its own page), year-dynamic column labels.
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
@@ -41,6 +42,14 @@ export default function CitPage() {
   const [searchQuery, setSearchQuery] = useState(''); // Stint 64
   const [needsFollowUp, setNeedsFollowUp] = useState(false); // Stint 64.L
   const [editingFilingId, setEditingFilingId] = useState<string | null>(null);
+
+  // Stint 64.L Layer 3 — pre-activate the "Needs follow-up" toggle
+  // when the URL carries ?needs_follow_up=1. The home widget link
+  // uses this so a click jumps straight to the filtered view.
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('needs_follow_up') === '1') setNeedsFollowUp(true);
+  }, [searchParams]);
   const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
 

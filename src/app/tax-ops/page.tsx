@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { TaxOpsHomeWidgets } from '@/components/tax-ops/HomeWidgets';
 import { TasksDueWidget } from '@/components/tax-ops/TasksDueWidget';
+import { StuckFollowUpsWidget } from '@/components/tax-ops/StuckFollowUpsWidget';
 import { RolloverModal } from '@/components/tax-ops/RolloverModal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageContainer } from '@/components/ui/PageContainer';
@@ -111,6 +112,10 @@ export default function TaxOpsHomePage() {
           </span>
         </div>
         <TasksDueWidget />
+        {/* Stint 64.L Layer 3 — surfaces filings stuck waiting on the
+            client. Self-hides when there's nothing to chase, so a
+            caught-up day shows zero noise. */}
+        <StuckFollowUpsWidget />
         <TaxOpsHomeWidgets />
       </section>
 

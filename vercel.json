@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/stuck-followups",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}
