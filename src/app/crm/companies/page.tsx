@@ -13,7 +13,13 @@ import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { COMPANY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
+// Stint 63.A — port Tax-Ops inline-edit primitives. Same components,
+// different endpoint. Closes Diego's "todo debería ser editable" — the
+// table cells become live edit widgets without leaving the list view.
+import { InlineTextCell, InlineTagsCell } from '@/components/tax-ops/inline-editors';
+import { ChipSelect } from '@/components/tax-ops/ChipSelect';
 import {
+  COMPANY_CLASSIFICATIONS, COMPANY_INDUSTRIES, COMPANY_SIZES,
   LABELS_CLASSIFICATION, LABELS_INDUSTRY, LABELS_SIZE,
   type CompanyClassification,
 } from '@/lib/crm-types';
@@ -30,6 +36,15 @@ interface Company {
   tags: string[];
   entity_id: string | null;
 }
+
+// Stint 63.A — chip tones per classification, mirroring the tax-ops
+// pattern (status chips coloured by semantic meaning).
+const CLASSIFICATION_TONES: Record<string, string> = {
+  key_account:    'bg-brand-50 text-brand-800',
+  standard:       'bg-info-50 text-info-800',
+  occasional:     'bg-amber-50 text-amber-800',
+  not_yet_client: 'bg-surface-alt text-ink-faint',
+};
 
 export default function CompaniesPage() {
   const [rows, setRows] = useState<Company[] | null>(null);
@@ -78,6 +93,36 @@ export default function CompaniesPage() {
     }
     toast.success('Company created');
     await load();
+  }
+
+  // Stint 63.A — inline-edit helper. Each editable cell calls this with
+  // a single field/value, hits PUT /api/crm/companies/[id] which only
+  // touches that field (whitelist enforced server-side), and refetches
+  // the list so any audit-log row flushed by the server is reflected.
+  // Optimistic display happens inside InlineCellEditor; on save error
+  // we toast and reload to rollback to server state.
+  async function patchCompany(id: string, field: string, value: unknown): Promise<void> {
+    try {
+      const res = await fetch(`/api/crm/companies/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message ?? `Save failed (${res.status})`);
+      }
+      // Optimistic: patch the row in-place so the UI reflects the change
+      // without the visual flicker of a full reload.
+      setRows(prev => prev?.map(r =>
+        r.id === id ? { ...r, [field]: value as never } : r
+      ) ?? null);
+    } catch (e) {
+      toast.error(`Save failed: ${String(e instanceof Error ? e.message : e)}`);
+      // Rollback by reloading from server.
+      await load();
+      throw e;
+    }
   }
 
   const counts = useMemo(() => {
@@ -174,6 +219,9 @@ export default function CompaniesPage() {
                       className="h-4 w-4 accent-brand-500 cursor-pointer"
                     />
                   </td>
+                  {/* Company name — kept as Link to detail page (the list
+                      isn't the place to rename a company; that's a heavy
+                      action that warrants the detail context). */}
                   <td className="px-3 py-2">
                     <Link href={`/crm/companies/${r.id}`} className="font-medium text-brand-700 hover:underline">
                       {r.company_name}
@@ -184,17 +232,68 @@ export default function CompaniesPage() {
                       </span>
                     )}
                   </td>
+                  {/* Classification — ChipSelect with tone per value. */}
                   <td className="px-3 py-2">
-                    {r.classification ? LABELS_CLASSIFICATION[r.classification as CompanyClassification] ?? r.classification : '—'}
+                    <ChipSelect
+                      value={r.classification ?? ''}
+                      options={[
+                        { value: '', label: '—', tone: 'bg-surface-alt text-ink-faint' },
+                        ...COMPANY_CLASSIFICATIONS.map(v => ({
+                          value: v,
+                          label: LABELS_CLASSIFICATION[v as CompanyClassification],
+                          tone: CLASSIFICATION_TONES[v],
+                        })),
+                      ]}
+                      onChange={next => { void patchCompany(r.id, 'classification', next || null); }}
+                      ariaLabel="Classification"
+                    />
                   </td>
-                  <td className="px-3 py-2 tabular-nums">{r.country ?? '—'}</td>
+                  {/* Country — free-text 2-letter code (LU, FR, BE, etc.). */}
+                  <td className="px-3 py-2 tabular-nums max-w-[80px]">
+                    <InlineTextCell
+                      value={r.country}
+                      onSave={async v => { await patchCompany(r.id, 'country', v); }}
+                      placeholder="—"
+                    />
+                  </td>
+                  {/* Industry — ChipSelect, fixed taxonomy. */}
                   <td className="px-3 py-2">
-                    {r.industry ? LABELS_INDUSTRY[r.industry as keyof typeof LABELS_INDUSTRY] ?? r.industry : '—'}
+                    <ChipSelect
+                      value={r.industry ?? ''}
+                      options={[
+                        { value: '', label: '—', tone: 'bg-surface-alt text-ink-faint' },
+                        ...COMPANY_INDUSTRIES.map(v => ({
+                          value: v,
+                          label: LABELS_INDUSTRY[v as keyof typeof LABELS_INDUSTRY],
+                        })),
+                      ]}
+                      onChange={next => { void patchCompany(r.id, 'industry', next || null); }}
+                      ariaLabel="Industry"
+                    />
                   </td>
+                  {/* Size — ChipSelect, fixed taxonomy. */}
                   <td className="px-3 py-2">
-                    {r.size ? LABELS_SIZE[r.size as keyof typeof LABELS_SIZE] ?? r.size : '—'}
+                    <ChipSelect
+                      value={r.size ?? ''}
+                      options={[
+                        { value: '', label: '—', tone: 'bg-surface-alt text-ink-faint' },
+                        ...COMPANY_SIZES.map(v => ({
+                          value: v,
+                          label: LABELS_SIZE[v as keyof typeof LABELS_SIZE],
+                        })),
+                      ]}
+                      onChange={next => { void patchCompany(r.id, 'size', next || null); }}
+                      ariaLabel="Size"
+                    />
                   </td>
-                  <td className="px-3 py-2 text-ink-muted">{(r.tags ?? []).join(', ') || '—'}</td>
+                  {/* Tags — comma-separated free-text via InlineTagsCell. */}
+                  <td className="px-3 py-2">
+                    <InlineTagsCell
+                      value={r.tags ?? []}
+                      onSave={async v => { await patchCompany(r.id, 'tags', v); }}
+                      placeholder="—"
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>

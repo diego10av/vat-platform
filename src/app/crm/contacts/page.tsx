@@ -15,10 +15,28 @@ import { DateBadge } from '@/components/crm/DateBadge';
 import { crmLoadList } from '@/lib/useCrmFetch';
 import { CONTACT_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
+// Stint 63.A — port Tax-Ops inline editors to CRM contacts table.
+import { InlineTextCell, InlineDateCell } from '@/components/tax-ops/inline-editors';
+import { ChipSelect } from '@/components/tax-ops/ChipSelect';
 import {
   LABELS_LIFECYCLE, LABELS_ENGAGEMENT, CONTACT_LIFECYCLES,
+  ENGAGEMENT_LEVELS,
   type ContactLifecycle, type EngagementLevel,
 } from '@/lib/crm-types';
+
+// Stint 63.A — chip tones per lifecycle/engagement, keeping the visual
+// signal language consistent with companies.
+const LIFECYCLE_TONES: Record<string, string> = {
+  lead:            'bg-info-50 text-info-800',
+  prospect:        'bg-amber-50 text-amber-800',
+  customer:        'bg-success-50 text-success-800',
+  former_customer: 'bg-surface-alt text-ink-faint',
+};
+const ENGAGEMENT_TONES: Record<string, string> = {
+  active:  'bg-success-50 text-success-800',
+  dormant: 'bg-amber-50 text-amber-800',
+  lapsed:  'bg-danger-50 text-danger-700',
+};
 
 interface Contact {
   id: string;
@@ -76,6 +94,29 @@ export default function ContactsPage() {
     }
     toast.success('Contact created');
     await load();
+  }
+
+  // Stint 63.A — inline-edit helper, mirror of patchCompany. Writes one
+  // field at a time, optimistic update on success, rollback on error.
+  async function patchContact(id: string, field: string, value: unknown): Promise<void> {
+    try {
+      const res = await fetch(`/api/crm/contacts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message ?? `Save failed (${res.status})`);
+      }
+      setRows(prev => prev?.map(r =>
+        r.id === id ? { ...r, [field]: value as never } : r
+      ) ?? null);
+    } catch (e) {
+      toast.error(`Save failed: ${String(e instanceof Error ? e.message : e)}`);
+      await load();
+      throw e;
+    }
   }
 
   if (rows === null) return <PageSkeleton />;
@@ -145,7 +186,12 @@ export default function ContactsPage() {
             </thead>
             <tbody>
               {rows.map(r => {
-                const eng = r.engagement_override ?? r.engagement_level;
+                // engagement_override is the user-set value; engagement_level
+                // is server-computed (active/dormant/lapsed by activity heuristic).
+                // The cell shows the override if set, falling back to the
+                // computed level — but the editor writes ONLY engagement_override
+                // (the only writable column on the server).
+                const engDisplay = r.engagement_override ?? r.engagement_level;
                 return (
                   <tr key={r.id} className={`border-t border-border hover:bg-surface-alt/50 ${selected.has(r.id) ? 'bg-brand-50/40' : ''}`}>
                     <td className="px-3 py-2">
@@ -156,15 +202,82 @@ export default function ContactsPage() {
                         className="h-4 w-4 accent-brand-500 cursor-pointer"
                       />
                     </td>
+                    {/* Name — Link (renaming a person in the list view is
+                        an edge case better handled in detail). */}
                     <td className="px-3 py-2">
                       <Link href={`/crm/contacts/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.full_name}</Link>
                     </td>
-                    <td className="px-3 py-2 text-ink-muted">{r.job_title ?? '—'}</td>
-                    <td className="px-3 py-2 tabular-nums">{r.email ?? '—'}</td>
-                    <td className="px-3 py-2">{r.country ?? '—'}</td>
-                    <td className="px-3 py-2">{r.lifecycle_stage ? LABELS_LIFECYCLE[r.lifecycle_stage as ContactLifecycle] : '—'}</td>
-                    <td className="px-3 py-2">{eng ? LABELS_ENGAGEMENT[eng as EngagementLevel] : '—'}</td>
-                    <td className="px-3 py-2"><DateBadge value={r.next_follow_up} mode="urgency" /></td>
+                    {/* Job title — inline editable text. */}
+                    <td className="px-3 py-2 max-w-[180px]">
+                      <InlineTextCell
+                        value={r.job_title}
+                        onSave={async v => { await patchContact(r.id, 'job_title', v); }}
+                        placeholder="—"
+                      />
+                    </td>
+                    {/* Email — inline editable text. */}
+                    <td className="px-3 py-2 tabular-nums max-w-[220px]">
+                      <InlineTextCell
+                        value={r.email}
+                        onSave={async v => { await patchContact(r.id, 'email', v); }}
+                        placeholder="—"
+                      />
+                    </td>
+                    {/* Country — short code (LU, FR, DE…). */}
+                    <td className="px-3 py-2 max-w-[80px]">
+                      <InlineTextCell
+                        value={r.country}
+                        onSave={async v => { await patchContact(r.id, 'country', v); }}
+                        placeholder="—"
+                      />
+                    </td>
+                    {/* Lifecycle — ChipSelect with fixed taxonomy. */}
+                    <td className="px-3 py-2">
+                      <ChipSelect
+                        value={r.lifecycle_stage ?? ''}
+                        options={[
+                          { value: '', label: '—', tone: 'bg-surface-alt text-ink-faint' },
+                          ...CONTACT_LIFECYCLES.map(v => ({
+                            value: v,
+                            label: LABELS_LIFECYCLE[v as ContactLifecycle],
+                            tone: LIFECYCLE_TONES[v],
+                          })),
+                        ]}
+                        onChange={next => { void patchContact(r.id, 'lifecycle_stage', next || null); }}
+                        ariaLabel="Lifecycle stage"
+                      />
+                    </td>
+                    {/* Engagement — write to engagement_override; display
+                        prefers override, falls back to computed level. */}
+                    <td className="px-3 py-2">
+                      <ChipSelect
+                        value={r.engagement_override ?? ''}
+                        options={[
+                          {
+                            value: '',
+                            label: r.engagement_level
+                              ? `auto · ${LABELS_ENGAGEMENT[r.engagement_level as EngagementLevel]}`
+                              : '—',
+                            tone: 'bg-surface-alt text-ink-faint',
+                          },
+                          ...ENGAGEMENT_LEVELS.map(v => ({
+                            value: v,
+                            label: LABELS_ENGAGEMENT[v as EngagementLevel],
+                            tone: ENGAGEMENT_TONES[v],
+                          })),
+                        ]}
+                        onChange={next => { void patchContact(r.id, 'engagement_override', next || null); }}
+                        ariaLabel="Engagement (override)"
+                        placeholder={engDisplay ? LABELS_ENGAGEMENT[engDisplay as EngagementLevel] : '—'}
+                      />
+                    </td>
+                    {/* Follow-up — inline editable date. */}
+                    <td className="px-3 py-2">
+                      <InlineDateCell
+                        value={r.next_follow_up}
+                        onSave={async v => { await patchContact(r.id, 'next_follow_up', v); }}
+                      />
+                    </td>
                   </tr>
                 );
               })}
