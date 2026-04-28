@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { SearchIcon, PlusIcon, ExternalLinkIcon, Trash2Icon, TargetIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -13,9 +13,10 @@ import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CompanyHoverPreview } from '@/components/crm/CompanyHoverPreview';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
+import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { COMPANY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 // Stint 63.A — port Tax-Ops inline-edit primitives. Same components,
 // different endpoint. Closes Diego's "todo debería ser editable" — the
 // table cells become live edit widgets without leaving the list view.
@@ -50,17 +51,56 @@ const CLASSIFICATION_TONES: Record<string, string> = {
 };
 
 export default function CompaniesPage() {
+  // Stint 63.D — Suspense boundary required by Next 16 useSearchParams
+  // when the consumer renders during SSR.
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <CompaniesPageContent />
+    </Suspense>
+  );
+}
+
+function CompaniesPageContent() {
+  // Stint 63.D — URL-persistent filters. State seeded from
+  // searchParams; every mutation calls router.replace so refresh +
+  // shareable deep links + saved views work.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [rows, setRows] = useState<Company[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState('');
-  const [classFilter, setClassFilter] = useState<string>('');
+  const [q, setQ] = useState(searchParams.get('q') ?? '');
+  const [classFilter, setClassFilter] = useState<string>(searchParams.get('classification') ?? '');
   const [newOpen, setNewOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Stint 63.C — context menu state. Lifted to page level so a single
   // CrmContextMenu instance is shared across all rows.
   const [contextMenu, setContextMenu] = useState<{ company: Company; x: number; y: number } | null>(null);
   const toast = useToast();
-  const router = useRouter();
+
+  // Stint 63.D — sync filter state → URL. router.replace (not push)
+  // because filter changes shouldn't bloat the back-history (mirror of
+  // stint 59.D pattern). Skip first render so we don't overwrite the
+  // URL Diego came in with.
+  const firstSync = useRef(true);
+  useEffect(() => {
+    if (firstSync.current) { firstSync.current = false; return; }
+    const qs = new URLSearchParams();
+    if (q) qs.set('q', q);
+    if (classFilter) qs.set('classification', classFilter);
+    const s = qs.toString();
+    router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
+  }, [q, classFilter, router, pathname]);
+
+  // currentQuery is what CrmSavedViews captures when Diego clicks
+  // "Save current as…". Same fields as the URL sync above.
+  const currentQuery = useMemo(() => {
+    const qs = new URLSearchParams();
+    if (q) qs.set('q', q);
+    if (classFilter) qs.set('classification', classFilter);
+    return qs.toString();
+  }, [q, classFilter]);
 
   const toggleOne = (id: string) => setSelected(prev => {
     const n = new Set(prev);
@@ -194,6 +234,11 @@ export default function CompaniesPage() {
             <option key={k} value={k}>{label}{counts[k] ? ` · ${counts[k]}` : ''}</option>
           ))}
         </select>
+        <CrmSavedViews
+          currentQuery={currentQuery}
+          storageKey="cifra.crm.companies.savedViews.v1"
+          defaultLabel="All companies"
+        />
         <div className="ml-auto flex items-center gap-2">
           <ExportButton entity="companies" />
           <span className="text-xs text-ink-muted">{rows.length} companies</span>

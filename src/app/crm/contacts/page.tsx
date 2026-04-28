@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { SearchIcon, PlusIcon, ExternalLinkIcon, MailIcon, Trash2Icon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
@@ -13,6 +13,7 @@ import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
+import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { crmLoadList } from '@/lib/useCrmFetch';
 import { CONTACT_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -56,16 +57,47 @@ interface Contact {
 }
 
 export default function ContactsPage() {
+  return (
+    <Suspense fallback={<PageSkeleton />}>
+      <ContactsPageContent />
+    </Suspense>
+  );
+}
+
+function ContactsPageContent() {
+  // Stint 63.D — URL-persistent filters + saved views.
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [rows, setRows] = useState<Contact[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState('');
-  const [lifecycle, setLifecycle] = useState<string>('');
+  const [q, setQ] = useState(searchParams.get('q') ?? '');
+  const [lifecycle, setLifecycle] = useState<string>(searchParams.get('lifecycle') ?? '');
   const [newOpen, setNewOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // Stint 63.C — right-click context menu state.
   const [contextMenu, setContextMenu] = useState<{ contact: Contact; x: number; y: number } | null>(null);
   const toast = useToast();
-  const router = useRouter();
+
+  // Stint 63.D — sync state → URL with router.replace (filter changes
+  // don't bloat back-history). Skip first render.
+  const firstSync = useRef(true);
+  useEffect(() => {
+    if (firstSync.current) { firstSync.current = false; return; }
+    const qs = new URLSearchParams();
+    if (q) qs.set('q', q);
+    if (lifecycle) qs.set('lifecycle', lifecycle);
+    const s = qs.toString();
+    router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
+  }, [q, lifecycle, router, pathname]);
+
+  const currentQuery = useMemo(() => {
+    const qs = new URLSearchParams();
+    if (q) qs.set('q', q);
+    if (lifecycle) qs.set('lifecycle', lifecycle);
+    return qs.toString();
+  }, [q, lifecycle]);
 
   const toggleOne = (id: string) => setSelected(prev => {
     const n = new Set(prev);
@@ -170,6 +202,11 @@ export default function ContactsPage() {
           <option value="">All lifecycle stages</option>
           {CONTACT_LIFECYCLES.map(s => <option key={s} value={s}>{LABELS_LIFECYCLE[s]}</option>)}
         </select>
+        <CrmSavedViews
+          currentQuery={currentQuery}
+          storageKey="cifra.crm.contacts.savedViews.v1"
+          defaultLabel="All contacts"
+        />
         <div className="ml-auto flex items-center gap-2">
           <ExportButton entity="contacts" />
           <span className="text-xs text-ink-muted">{rows.length} contacts</span>
