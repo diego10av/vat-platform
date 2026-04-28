@@ -15,10 +15,22 @@ import { DateBadge } from '@/components/crm/DateBadge';
 import { crmLoadShape } from '@/lib/useCrmFetch';
 import { INVOICE_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
+// Stint 63 bonus — inline status edit on billing list.
+import { ChipSelect } from '@/components/tax-ops/ChipSelect';
 import {
   LABELS_INVOICE_STATUS, INVOICE_STATUSES, formatEur, formatDate,
-  type InvoiceStatus,
 } from '@/lib/crm-types';
+
+// Tones for invoice status chips.
+const STATUS_TONES: Record<string, string> = {
+  draft:        'bg-surface-alt text-ink',
+  sent:         'bg-info-50 text-info-800',
+  partial:      'bg-amber-50 text-amber-800',
+  paid:         'bg-success-50 text-success-800',
+  overdue:      'bg-danger-100 text-danger-800',
+  cancelled:    'bg-surface-alt text-ink-faint',
+  credit_note:  'bg-surface-alt text-ink-muted',
+};
 
 interface Invoice {
   id: string;
@@ -78,6 +90,22 @@ export default function BillingPage() {
   }, [q, status, year]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Stint 63 bonus — inline status edit. Re-fetches the whole list
+  // because changing a status often shifts totals shown in the KPIs.
+  async function patchStatus(invoiceId: string, nextStatus: string) {
+    try {
+      const res = await fetch(`/api/crm/billing/${invoiceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await load();
+    } catch (e) {
+      toast.error(`Save failed: ${String(e instanceof Error ? e.message : e)}`);
+    }
+  }
 
   async function handleCreate(values: Record<string, unknown>) {
     // Note: company_id is required by API. For stint 26 we don't yet
@@ -186,7 +214,23 @@ export default function BillingPage() {
       {view === 'dashboard' ? (
         <BillingDashboard year={Number(year || new Date().getFullYear())} />
       ) : data.invoices.length === 0 ? (
-        <EmptyState illustration="stack" title="No invoices for this filter" description="Adjust filters or run the Notion import to populate." />
+        (() => {
+          const filtersActive = q !== '' || status !== '' || (year !== '' && year !== String(thisYear));
+          return (
+            <EmptyState
+              illustration="stack"
+              title={filtersActive ? 'No invoices match these filters' : 'No invoices yet'}
+              description={filtersActive
+                ? 'Adjust filters, change the year, or clear them to see all invoices.'
+                : 'Create your first invoice manually, or import from Notion to populate the ledger.'}
+              action={filtersActive ? undefined : (
+                <Button onClick={() => setNewOpen(true)} variant="primary" size="sm" icon={<PlusIcon size={13} />}>
+                  New invoice
+                </Button>
+              )}
+            />
+          );
+        })()
       ) : (
         <div className="border border-border rounded-lg overflow-hidden bg-white">
           <table className="w-full text-sm">
@@ -226,7 +270,20 @@ export default function BillingPage() {
                   <td className="px-3 py-2 text-right tabular-nums">
                     {Number(r.outstanding) > 0 ? <span className="text-amber-700">{formatEur(r.outstanding)}</span> : <span className="text-ink-muted">—</span>}
                   </td>
-                  <td className="px-3 py-2">{LABELS_INVOICE_STATUS[r.status as InvoiceStatus] ?? r.status}</td>
+                  {/* Stint 63 bonus — Status as ChipSelect, lets Diego
+                      mark paid/sent/overdue without opening detail page. */}
+                  <td className="px-3 py-2">
+                    <ChipSelect
+                      value={r.status}
+                      options={INVOICE_STATUSES.map(v => ({
+                        value: v,
+                        label: LABELS_INVOICE_STATUS[v],
+                        tone: STATUS_TONES[v],
+                      }))}
+                      onChange={next => { void patchStatus(r.id, next); }}
+                      ariaLabel="Invoice status"
+                    />
+                  </td>
                 </tr>
               ))}
             </tbody>
