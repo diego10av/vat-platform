@@ -123,7 +123,7 @@ function buildTaxCategoryNavItems(categories: TaxCategory[]): NavItem[] {
           { href: '/tax-ops/vat/monthly',   label: 'Monthly',   icon: CalculatorIcon },
         ],
       },
-      { href: '/tax-ops/cit',              label: 'Corporate tax returns', icon: LandmarkIcon },
+      { href: '/tax-ops/cit',              label: 'Form 500 (CIT · MBT · NWT)', icon: LandmarkIcon },
       { href: '/tax-ops/subscription-tax', label: 'Subscription tax',     icon: PercentIcon },
       { href: '/tax-ops/wht',              label: 'Withholding tax',      icon: WalletIcon },
       { href: '/tax-ops/bcl',              label: 'BCL reporting',        icon: LibraryBigIcon },

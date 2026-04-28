@@ -39,8 +39,8 @@ const CATEGORIES = [
   {
     href: '/tax-ops/cit',
     icon: LandmarkIcon,
-    title: 'Corporate tax returns',
-    description: 'Form 500 — annual CIT + municipal business tax + NWT reviews',
+    title: 'Form 500',
+    description: 'Annual CIT (IRC) + Municipal Business Tax (ICC) + Net Wealth Tax (IF) — single return per entity',
   },
   {
     href: '/tax-ops/bcl',

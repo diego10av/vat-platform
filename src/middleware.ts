@@ -36,6 +36,19 @@ const PUBLIC_PATHS = new Set<string>([
  */
 const PUBLIC_PREFIXES = ['/portal/', '/api/portal/', '/marketing/', '/_landing/'];
 
+// Stint 64.D — request-header signal so the (server-component) AppShell
+// knows when to skip rendering operator chrome (sidebar + topbar). The
+// previous client-side BARE_ROUTES check on usePathname() failed for the
+// root domain rewrite (cifracompliance.com → /marketing): the browser
+// shows '/' but the rewrite serves /marketing's content. usePathname
+// returned '/', BARE_ROUTES matched neither, and the operator AppShell
+// leaked onto the public landing. Fix: middleware tags every public-
+// surface response with x-cifra-no-shell=1; AppShell reads it via
+// next/headers and short-circuits.
+function withNoShellHeader(): { request: { headers: Headers } } {
+  return { request: { headers: new Headers([['x-cifra-no-shell', '1']]) } };
+}
+
 function handleRootDomain(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
@@ -48,15 +61,16 @@ function handleRootDomain(request: NextRequest): NextResponse {
 
   // Root '/' → serve the landing by rewriting to /marketing. The URL in
   // the browser stays as cifracompliance.com (no visible /marketing).
+  // The header signals to AppShell: skip operator chrome.
   if (pathname === '/' || pathname === '') {
     const url = request.nextUrl.clone();
     url.pathname = '/marketing';
-    return NextResponse.rewrite(url);
+    return NextResponse.rewrite(url, withNoShellHeader());
   }
 
-  // /marketing (either the index or nested) serves as-is.
+  // /marketing (either the index or nested) serves as-is, no shell.
   if (pathname === '/marketing' || pathname.startsWith('/marketing/')) {
-    return NextResponse.next();
+    return NextResponse.next(withNoShellHeader());
   }
 
   // Anything else on the root domain (e.g. /login, /clients, /api/*)
@@ -80,8 +94,11 @@ export async function middleware(request: NextRequest) {
   // ─────────────────── Default path: app.* or local dev ───────────────────
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
-  if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) return NextResponse.next();
+  // Stint 64.D — also tag /login, /portal, /marketing on the app
+  // subdomain with x-cifra-no-shell so the public surfaces stay clean
+  // even when accessed via app.cifracompliance.com.
+  if (PUBLIC_PATHS.has(pathname)) return NextResponse.next(withNoShellHeader());
+  if (PUBLIC_PREFIXES.some(p => pathname.startsWith(p))) return NextResponse.next(withNoShellHeader());
 
   const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const session = await verifySession(cookie);

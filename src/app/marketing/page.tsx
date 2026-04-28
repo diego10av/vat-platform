@@ -95,7 +95,7 @@ function Hero() {
           <p className="mt-6 max-w-[680px] text-lg leading-[1.55] text-ink-soft">
             Compliance, clients, entities, invoices — connected.
             Starting with every Luxembourg tax filing your firm owns:
-            VAT, corporate tax, subscription tax, withholding, BCL.
+            VAT, Form 500 (CIT · MBT · NWT), subscription tax, withholding, BCL.
             Deadlines, sign-off cascade, and audit trail, in one workspace.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-5">
@@ -174,8 +174,8 @@ function ProductMockup() {
         {/* Page header strip */}
         <div className="px-5 py-3 border-b border-[#EFEAE2] flex items-center justify-between">
           <div>
-            <div className="text-sm font-semibold text-ink">Corporate tax returns</div>
-            <div className="text-2xs text-ink-muted mt-0.5">Form 500 — annual CIT + municipal business tax · 6 entities</div>
+            <div className="text-sm font-semibold text-ink">Form 500</div>
+            <div className="text-2xs text-ink-muted mt-0.5">Annual CIT · MBT · NWT — one return per entity · 6 entities</div>
           </div>
           <div className="hidden md:flex items-center gap-2">
             <div className="text-2xs text-ink-faint px-2 py-1 rounded border border-[#EFEAE2]">2025</div>
@@ -233,7 +233,7 @@ function ThreeModules() {
       eyebrow: 'Tax-Ops',
       title: 'Every LU filing in one calendar.',
       body:
-        'VAT (annual / quarterly / monthly), corporate tax, NWT, subscription tax for UCITS / SIF / RAIF, director WHT, BCL reporting. Deadlines auto-tracked per LTVA article. Sign-off cascade preparer → reviewer → partner with timestamps. Calendar feed for Google, Apple, Outlook.',
+        'VAT (annual / quarterly / monthly), Form 500 (CIT + Municipal Business Tax + Net Wealth Tax in one return), subscription tax for UCITS / SIF / RAIF, director WHT, BCL reporting. Deadlines auto-tracked per LTVA article. Sign-off cascade preparer → reviewer → partner with timestamps. Calendar feed for Google, Apple, Outlook.',
       bullets: [
         '7 tax types live, statutory deadlines encoded',
         'Multi-stakeholder sign-off with audit log',

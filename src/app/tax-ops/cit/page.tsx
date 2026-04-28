@@ -234,8 +234,8 @@ export default function CitPage() {
   return (
     <div className="space-y-3">
       <PageHeader
-        title="Corporate tax returns"
-        subtitle={`Form 500 — annual CIT + municipal business tax. Assessment ${year - 1} and NWT Review ${year} editable inline. Click any status cell to update.`}
+        title="Form 500"
+        subtitle={`Annual CIT (IRC) · Municipal Business Tax (ICC) · Net Wealth Tax (IF) — one unified return per entity. Assessment ${year - 1} and NWT Review ${year} editable inline. Click any status cell to update.`}
       />
 
       <MatrixToolbar
