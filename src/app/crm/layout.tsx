@@ -19,6 +19,7 @@ import {
   SearchIcon, SettingsIcon, HelpCircleIcon,
 } from 'lucide-react';
 import { GlobalSearch } from '@/components/crm/GlobalSearch';
+import { CrmQuickCreateModal } from '@/components/crm/CrmQuickCreateModal';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
 
 const PRIMARY_TABS = [
@@ -79,6 +80,10 @@ export default function CrmLayout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
       <div>{children}</div>
+      {/* Stint 63.B — global quick-create modal. Press N from any
+          /crm/* page to create a Company / Contact / Opportunity / Task
+          without navigating to its tab first. */}
+      <CrmQuickCreateModal />
     </div>
   );
 }
