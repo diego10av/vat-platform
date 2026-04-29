@@ -21,7 +21,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/Toaster';
 
-type EntityType = 'company' | 'contact' | 'opportunity' | 'task';
+type EntityType = 'contact' | 'company' | 'opportunity' | 'task';
 
 interface TypeConfig {
   value: EntityType;
@@ -32,15 +32,9 @@ interface TypeConfig {
   placeholder: string;
 }
 
+// Stint 64.S — Contacts before Companies, matching the sidebar +
+// top-tab nav order (legal-CRM canon).
 const TYPES: TypeConfig[] = [
-  {
-    value: 'company',
-    label: 'Company',
-    endpoint: '/api/crm/companies',
-    payloadField: 'company_name',
-    detailPathPrefix: '/crm/companies',
-    placeholder: 'e.g. Acme SARL',
-  },
   {
     value: 'contact',
     label: 'Contact',
@@ -48,6 +42,14 @@ const TYPES: TypeConfig[] = [
     payloadField: 'full_name',
     detailPathPrefix: '/crm/contacts',
     placeholder: 'e.g. Maria Schmidt',
+  },
+  {
+    value: 'company',
+    label: 'Company',
+    endpoint: '/api/crm/companies',
+    payloadField: 'company_name',
+    detailPathPrefix: '/crm/companies',
+    placeholder: 'e.g. Acme SARL',
   },
   {
     value: 'opportunity',

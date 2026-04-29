@@ -29,9 +29,11 @@ interface Results {
 
 const EMPTY: Results = { companies: [], contacts: [], opportunities: [], matters: [], invoices: [] };
 
+// Stint 64.S — group order aligned with sidebar + top-tab nav
+// (Contacts before Companies; legal-CRM canon).
 const GROUPS: Array<{ key: keyof Results; title: string; icon: string; hrefFn: (id: string) => string }> = [
-  { key: 'companies',     title: 'Companies',     icon: '🏢', hrefFn: id => `/crm/companies/${id}` },
   { key: 'contacts',      title: 'Contacts',      icon: '👤', hrefFn: id => `/crm/contacts/${id}` },
+  { key: 'companies',     title: 'Companies',     icon: '🏢', hrefFn: id => `/crm/companies/${id}` },
   { key: 'opportunities', title: 'Opportunities', icon: '🎯', hrefFn: id => `/crm/opportunities/${id}` },
   { key: 'matters',       title: 'Matters',       icon: '⚖️', hrefFn: id => `/crm/matters/${id}` },
   { key: 'invoices',      title: 'Invoices',      icon: '💶', hrefFn: id => `/crm/billing/${id}` },

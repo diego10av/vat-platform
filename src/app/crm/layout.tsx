@@ -22,15 +22,30 @@ import { GlobalSearch } from '@/components/crm/GlobalSearch';
 import { CrmQuickCreateModal } from '@/components/crm/CrmQuickCreateModal';
 import { OverflowMenu } from '@/components/ui/OverflowMenu';
 
+// Stint 64.S — order aligned with the left sidebar (stint 64.R)
+// AND the legal-CRM canon (Clio Grow / Lexicata / InterAction /
+// HubSpot / Salesforce all start with Contacts or Accounts).
+//
+// Diego: "todavía contacts y companies están en orden invertido"
+// — referring to THIS top-tab nav, not the side nav (which was
+// already correct since 64.R). Two navs in the same module must
+// agree, otherwise the user has to context-switch between mental
+// models every time they cross from sidebar to top-tab.
+//
+// Order grouped same as the sidebar:
+//   Foundation: Contacts → Companies (people first)
+//   Sales/work: Opportunities → Matters → Activities
+//   Daily ops:  Tasks → Calendar
+//   Output:     Billing
 const PRIMARY_TABS = [
-  { href: '/crm/companies',     label: 'Companies',     icon: BuildingIcon },
   { href: '/crm/contacts',      label: 'Contacts',      icon: UsersIcon },
+  { href: '/crm/companies',     label: 'Companies',     icon: BuildingIcon },
   { href: '/crm/opportunities', label: 'Opportunities', icon: TargetIcon },
   { href: '/crm/matters',       label: 'Matters',       icon: BriefcaseIcon },
   { href: '/crm/activities',    label: 'Activities',    icon: CalendarIcon },
   { href: '/crm/tasks',         label: 'Tasks',         icon: CheckSquareIcon },
-  { href: '/crm/billing',       label: 'Billing',       icon: EuroIcon },
   { href: '/crm/calendar',      label: 'Calendar',      icon: CalendarDaysIcon },
+  { href: '/crm/billing',       label: 'Billing',       icon: EuroIcon },
 ];
 
 const OVERFLOW_ITEMS = [
