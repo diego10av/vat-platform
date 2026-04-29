@@ -22,12 +22,24 @@ export async function GET(
   );
   if (!contact) return apiError('not_found', 'Contact not found.', { status: 404 });
 
+  // Stint 64.Q.5 — companies now carry employment dates. Both
+  // current (ended_at IS NULL) and historical employments are
+  // returned; the UI splits them into two sections.
   const companies = await query(
-    `SELECT c.id, c.company_name, c.classification, cc.role, cc.is_primary
+    `SELECT cc.id AS junction_id,
+            c.id, c.company_name, c.classification,
+            cc.role, cc.is_primary,
+            cc.started_at::text AS started_at,
+            cc.ended_at::text   AS ended_at,
+            cc.notes            AS junction_notes
        FROM crm_contact_companies cc
        JOIN crm_companies c ON c.id = cc.company_id
       WHERE cc.contact_id = $1 AND c.deleted_at IS NULL
-      ORDER BY cc.is_primary DESC, c.company_name ASC`,
+      ORDER BY
+        CASE WHEN cc.ended_at IS NULL THEN 0 ELSE 1 END,
+        cc.is_primary DESC,
+        cc.started_at DESC,
+        c.company_name ASC`,
     [id],
   );
 

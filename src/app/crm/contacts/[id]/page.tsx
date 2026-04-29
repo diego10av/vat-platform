@@ -24,7 +24,20 @@ import {
 
 interface ContactDetail {
   contact: Record<string, unknown>;
-  companies: Array<{ id: string; company_name: string; classification: string | null; role: string; is_primary: boolean }>;
+  // Stint 64.Q.5 — companies now carry employment dates (started_at,
+  // ended_at). The UI splits them into "current" (ended_at IS NULL)
+  // and "history" (ended_at set) sections.
+  companies: Array<{
+    junction_id: string;
+    id: string;
+    company_name: string;
+    classification: string | null;
+    role: string;
+    is_primary: boolean;
+    started_at: string | null;
+    ended_at:   string | null;
+    junction_notes: string | null;
+  }>;
   activities: Array<{ id: string; name: string; activity_type: string; activity_date: string; duration_hours: number | null; billable: boolean; outcome: string | null }>;
 }
 
@@ -256,17 +269,11 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      <Section title={`Companies (${data.companies.length})`}>
-        <Table
-          headers={['Company', 'Classification', 'Role', 'Primary?']}
-          rows={data.companies.map(x => [
-            <Link key={x.id} href={`/crm/companies/${x.id}`} className="text-brand-700 hover:underline">{x.company_name}</Link>,
-            x.classification ?? '—',
-            x.role,
-            x.is_primary ? '✓' : '',
-          ])}
-        />
-      </Section>
+      {/* Stint 64.Q.5 — Employment current vs history. Diego: "si
+          cambian de empresa tener la opción de cambiar el nombre de
+          la empresa pero de poder ver el historial y donde estaban
+          trabajando antes." */}
+      <EmploymentSection contactId={id} companies={data.companies} onChanged={() => load()} />
 
       <Section title={`Activities (${data.activities.length})`}>
         <Table
@@ -283,6 +290,183 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
       </Section>
 
       <RecordHistory targetType="crm_contact" targetId={id} />
+    </div>
+  );
+}
+
+// Stint 64.Q.5 — Employment section. Splits the contact's company
+// junctions into "current" (ended_at IS NULL) + "previous" rows,
+// shows tenure, and gives a Switch firm... button that POSTs to
+// /api/crm/contacts/[id]/companies (closes current, opens new).
+function EmploymentSection({
+  contactId, companies, onChanged,
+}: {
+  contactId: string;
+  companies: ContactDetail['companies'];
+  onChanged: () => void;
+}) {
+  const current = companies.filter(c => !c.ended_at);
+  const past    = companies.filter(c =>  c.ended_at);
+  const [switchOpen, setSwitchOpen] = useState(false);
+
+  return (
+    <Section title={`Employment (${companies.length})`}>
+      <div className="space-y-3">
+        {current.length > 0 ? (
+          <div>
+            <h4 className="text-2xs uppercase tracking-wide font-semibold text-ink-muted mb-1">Current</h4>
+            <Table
+              headers={['Company', 'Role', 'Since', 'Primary?']}
+              rows={current.map(x => [
+                <Link key={x.junction_id} href={`/crm/companies/${x.id}`} className="text-brand-700 hover:underline">{x.company_name}</Link>,
+                x.role,
+                x.started_at ? formatDate(x.started_at) : '—',
+                x.is_primary ? '✓' : '',
+              ])}
+            />
+          </div>
+        ) : (
+          <p className="text-sm text-ink-muted italic">No current firm — independent / between roles.</p>
+        )}
+
+        {past.length > 0 && (
+          <div>
+            <h4 className="text-2xs uppercase tracking-wide font-semibold text-ink-muted mb-1">Previous firms</h4>
+            <Table
+              headers={['Company', 'Role', 'From', 'To']}
+              rows={past.map(x => [
+                <Link key={x.junction_id} href={`/crm/companies/${x.id}`} className="text-ink hover:text-brand-700 hover:underline">{x.company_name}</Link>,
+                x.role,
+                x.started_at ? formatDate(x.started_at) : '—',
+                x.ended_at ? formatDate(x.ended_at) : '—',
+              ])}
+            />
+          </div>
+        )}
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setSwitchOpen(true)}
+            className="text-xs text-brand-700 hover:underline"
+          >
+            {current.length > 0 ? '↻ Switch firm…' : '+ Add current firm…'}
+          </button>
+        </div>
+      </div>
+      {switchOpen && (
+        <SwitchFirmModal
+          contactId={contactId}
+          onClose={() => setSwitchOpen(false)}
+          onDone={() => { setSwitchOpen(false); onChanged(); }}
+        />
+      )}
+    </Section>
+  );
+}
+
+function SwitchFirmModal({
+  contactId, onClose, onDone,
+}: {
+  contactId: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [companies, setCompanies] = useState<Array<{ id: string; company_name: string }>>([]);
+  const [companyId, setCompanyId] = useState('');
+  const [role, setRole] = useState('main_poc');
+  const [startedAt, setStartedAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+
+  useEffect(() => {
+    fetch('/api/crm/companies?limit=500', { cache: 'no-store' })
+      .then(r => r.ok ? r.json() : [])
+      .then((rows: Array<{ id: string; company_name: string }>) => setCompanies(rows ?? []))
+      .catch(() => { /* ignore */ });
+  }, []);
+
+  async function submit() {
+    if (!companyId) { setError('Pick a company'); return; }
+    setBusy(true); setError(null);
+    try {
+      const res = await fetch(`/api/crm/contacts/${contactId}/companies`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company_id: companyId, role, started_at: startedAt, is_primary: true }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b?.error?.message ?? `HTTP ${res.status}`);
+      }
+      toast.success('Firm switched');
+      onDone();
+    } catch (e) {
+      setError(String(e instanceof Error ? e.message : e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-modal bg-ink/50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-surface rounded-lg shadow-xl max-w-md w-full p-4 space-y-3"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-base font-semibold">Switch firm</h3>
+        <p className="text-xs text-ink-muted">
+          The current employment will be closed (ended_at = day before the new start), and a new one will open. The previous firm stays in the history.
+        </p>
+        <label className="block">
+          <span className="text-2xs uppercase font-semibold text-ink-muted block mb-1">New firm</span>
+          <select
+            value={companyId}
+            onChange={(e) => setCompanyId(e.target.value)}
+            className="w-full h-9 px-2 text-sm border border-border rounded-md bg-white"
+          >
+            <option value="">— Pick a company —</option>
+            {companies.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-2xs uppercase font-semibold text-ink-muted block mb-1">Role</span>
+          <input
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="w-full h-9 px-2 text-sm border border-border rounded-md bg-white"
+          />
+        </label>
+        <label className="block">
+          <span className="text-2xs uppercase font-semibold text-ink-muted block mb-1">Started on</span>
+          <input
+            type="date"
+            value={startedAt}
+            onChange={(e) => setStartedAt(e.target.value)}
+            className="w-full h-9 px-2 text-sm border border-border rounded-md bg-white"
+          />
+        </label>
+        {error && <p className="text-xs text-danger-700">{error}</p>}
+        <div className="flex justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="h-8 px-3 text-sm rounded-md border border-border text-ink-soft hover:bg-surface-alt"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={busy || !companyId}
+            className="h-8 px-3 text-sm rounded-md bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50"
+          >
+            {busy ? 'Saving…' : 'Switch firm'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

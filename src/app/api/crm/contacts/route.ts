@@ -48,7 +48,8 @@ export async function GET(request: NextRequest) {
            FROM crm_contact_companies cc
            JOIN crm_companies co ON co.id = cc.company_id AND co.deleted_at IS NULL
           WHERE cc.contact_id = c.id
-          ORDER BY cc.is_primary DESC, cc.created_at DESC
+            AND cc.ended_at IS NULL                  -- stint 64.Q.5: current employer only
+          ORDER BY cc.is_primary DESC, cc.started_at DESC
           LIMIT 1
        ) comp ON TRUE
       WHERE ${conditions.join(' AND ')}
