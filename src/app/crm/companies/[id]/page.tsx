@@ -25,7 +25,18 @@ import {
 
 interface CompanyDetail {
   company: Record<string, unknown>;
-  contacts: Array<{ id: string; full_name: string; email: string | null; job_title: string | null; role: string; is_primary: boolean }>;
+  // Stint 64.U.2 — junction_id + started_at so the contacts table
+  // can edit role + primary inline via PATCH /api/crm/contacts/[id]/companies.
+  contacts: Array<{
+    id: string;
+    full_name: string;
+    email: string | null;
+    job_title: string | null;
+    junction_id: string;
+    role: string;
+    is_primary: boolean;
+    started_at: string | null;
+  }>;
   opportunities: Array<{ id: string; name: string; stage: string; estimated_value_eur: number | null; probability_pct: number | null; weighted_value_eur: number | null; estimated_close_date: string | null }>;
   matters: Array<{ id: string; matter_reference: string; title: string; status: string; practice_areas: string[]; opening_date: string | null; closing_date: string | null }>;
   invoices: Array<{ id: string; invoice_number: string; issue_date: string | null; due_date: string | null; amount_incl_vat: number; outstanding: number; status: string }>;
@@ -190,16 +201,12 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         <div className="mb-5 p-3 bg-surface-alt border border-border rounded text-sm whitespace-pre-wrap">{String(c.notes)}</div>
       )}
 
+      {/* Stint 64.U.2 — Contacts: role + primary editable inline.
+          Diego: "todos aparecen como primary point of contact... debería
+          haber posibilidades de poner diferentes grados". Click the
+          ⭐ to mark primary, or change role inline. */}
       <Section title={`Contacts (${data.contacts.length})`}>
-        <Table
-          headers={['Name', 'Role', 'Email', 'Job title']}
-          rows={data.contacts.map(x => [
-            <Link key={x.id} href={`/crm/contacts/${x.id}`} className="text-brand-700 hover:underline">{x.full_name}</Link>,
-            x.is_primary ? `${x.role} · primary` : x.role,
-            x.email ?? '—',
-            x.job_title ?? '—',
-          ])}
-        />
+        <ContactsTable contacts={data.contacts} onChanged={load} />
       </Section>
 
       <Section title={`Opportunities (${data.opportunities.length})`}>
@@ -280,6 +287,150 @@ function Table({ headers, rows }: { headers: string[]; rows: React.ReactNode[][]
         <tbody>
           {rows.map((r, i) => (
             <tr key={i} className="border-t border-border">{r.map((cell, j) => <td key={j} className="px-3 py-1.5">{cell}</td>)}</tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Stint 64.U.2 — Contacts table on the company detail page.
+// Diego: "no todos deberían aparecer como primary point of contact.
+// Para Roca Juniet, Raúl es el number one contact, el otro es
+// simplemente una persona."
+//
+// Each row exposes:
+//   - ⭐ / ☆ click → toggles is_primary on the junction. Setting one
+//     primary auto-clears the others (single-primary invariant).
+//   - Role chip → click to open dropdown of ROLE_TAGS values.
+//   - Click on full_name → navigates to the contact detail.
+//
+// Both edits hit PATCH /api/crm/contacts/{contact_id}/companies
+// with the junction_id, so the audit log + history-preservation
+// semantics are inherited for free.
+const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'main_poc',         label: 'Main POC' },
+  { value: 'decision_maker',   label: 'Decision maker' },
+  { value: 'billing_contact',  label: 'Billing contact' },
+  { value: 'referrer',         label: 'Referrer' },
+  { value: 'internal',         label: 'Internal' },
+  { value: 'opposing_party',   label: 'Opposing party' },
+];
+
+const ROLE_TONES: Record<string, string> = {
+  main_poc:        'bg-brand-100 text-brand-800',
+  decision_maker:  'bg-amber-100 text-amber-900',
+  billing_contact: 'bg-blue-50 text-blue-800',
+  referrer:        'bg-emerald-50 text-emerald-800',
+  internal:        'bg-surface-alt text-ink-soft',
+  opposing_party:  'bg-danger-50 text-danger-700',
+};
+
+function ContactsTable({
+  contacts, onChanged,
+}: {
+  contacts: CompanyDetail['contacts'];
+  onChanged: () => void;
+}) {
+  const toast = useToast();
+
+  async function patchJunction(
+    contactId: string,
+    junctionId: string,
+    patch: { role?: string; is_primary?: boolean },
+  ) {
+    try {
+      const res = await fetch(`/api/crm/contacts/${contactId}/companies`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ junction_id: junctionId, ...patch }),
+      });
+      if (!res.ok) {
+        const b = await res.json().catch(() => ({}));
+        throw new Error(b?.error?.message ?? `HTTP ${res.status}`);
+      }
+      onChanged();
+    } catch (e) {
+      toast.error(`Save failed: ${String(e instanceof Error ? e.message : e)}`);
+    }
+  }
+
+  async function setPrimary(contactId: string, junctionId: string) {
+    // Single-primary invariant: clear the others, then set this one.
+    // Done in two passes (no transaction needed — last writer wins is
+    // acceptable for this UX, and the company detail re-fetches at the
+    // end which will reflect the truth).
+    for (const c of contacts) {
+      if (c.junction_id === junctionId) continue;
+      if (c.is_primary) {
+        await fetch(`/api/crm/contacts/${c.id}/companies`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ junction_id: c.junction_id, is_primary: false }),
+        });
+      }
+    }
+    await patchJunction(contactId, junctionId, { is_primary: true });
+    toast.success('Primary contact updated');
+  }
+
+  if (contacts.length === 0) {
+    return <div className="text-sm text-ink-muted italic px-3 py-2">No contacts linked yet.</div>;
+  }
+
+  return (
+    <div className="border border-border rounded-md overflow-hidden bg-white">
+      <table className="w-full text-sm">
+        <thead className="bg-surface-alt text-ink-muted">
+          <tr>
+            <th className="text-left px-3 py-1.5 font-medium w-8" title="Primary point of contact">⭐</th>
+            <th className="text-left px-3 py-1.5 font-medium">Name</th>
+            <th className="text-left px-3 py-1.5 font-medium">Role</th>
+            <th className="text-left px-3 py-1.5 font-medium">Job title</th>
+            <th className="text-left px-3 py-1.5 font-medium">Email</th>
+          </tr>
+        </thead>
+        <tbody>
+          {contacts.map(c => (
+            <tr key={c.junction_id} className="border-t border-border hover:bg-surface-alt/50">
+              <td className="px-3 py-1.5">
+                <button
+                  type="button"
+                  onClick={() => { if (!c.is_primary) void setPrimary(c.id, c.junction_id); }}
+                  className={`text-base leading-none ${
+                    c.is_primary
+                      ? 'text-amber-500 cursor-default'
+                      : 'text-ink-faint hover:text-amber-500 cursor-pointer'
+                  }`}
+                  title={c.is_primary ? 'Primary point of contact' : 'Click to make this the primary contact'}
+                  aria-label={c.is_primary ? 'Primary contact' : 'Make primary'}
+                  disabled={c.is_primary}
+                >
+                  {c.is_primary ? '★' : '☆'}
+                </button>
+              </td>
+              <td className="px-3 py-1.5">
+                <Link href={`/crm/contacts/${c.id}`} className="text-brand-700 hover:underline font-medium">
+                  {c.full_name}
+                </Link>
+              </td>
+              <td className="px-3 py-1.5">
+                <select
+                  value={c.role}
+                  onChange={(e) => void patchJunction(c.id, c.junction_id, { role: e.target.value })}
+                  className={`px-1.5 py-0.5 text-xs rounded border border-border bg-white ${ROLE_TONES[c.role] ?? ''}`}
+                  aria-label="Contact role"
+                >
+                  {ROLE_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </td>
+              <td className="px-3 py-1.5 text-ink-soft">{c.job_title ?? '—'}</td>
+              <td className="px-3 py-1.5">
+                {c.email ? <a href={`mailto:${c.email}`} className="text-brand-700 hover:underline">{c.email}</a> : <span className="text-ink-muted">—</span>}
+              </td>
+            </tr>
           ))}
         </tbody>
       </table>

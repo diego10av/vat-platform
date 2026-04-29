@@ -22,12 +22,21 @@ export async function GET(
   );
   if (!company) return apiError('not_found', 'Company not found.', { status: 404 });
 
-  // Pull related contacts via junction.
+  // Stint 64.U.2 — return current contacts (ended_at IS NULL) with
+  // their junction id so the page can edit role + is_primary inline.
+  // Diego: "todos aparecen como primary point of contact... debería
+  // haber posibilidades de poner diferentes grados. Para Roca Juniet,
+  // Raúl es el number one contact, el otro es simplemente una persona."
   const contacts = await query(
-    `SELECT c.id, c.full_name, c.email, c.job_title, cc.role, cc.is_primary
+    `SELECT c.id, c.full_name, c.email, c.job_title,
+            cc.id  AS junction_id,
+            cc.role, cc.is_primary,
+            cc.started_at::text AS started_at
        FROM crm_contact_companies cc
        JOIN crm_contacts c ON c.id = cc.contact_id
-      WHERE cc.company_id = $1 AND c.deleted_at IS NULL
+      WHERE cc.company_id = $1
+        AND cc.ended_at IS NULL
+        AND c.deleted_at IS NULL
       ORDER BY cc.is_primary DESC, c.full_name ASC`,
     [id],
   );
