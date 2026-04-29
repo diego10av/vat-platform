@@ -26,6 +26,11 @@ import { FamilyColorProvider } from './FamilyColorContext';
 import { LiquidationChip, isFinalReturnPeriod } from './LiquidationChip';
 import { EntityActionsMenu } from './EntityActionsMenu';
 import { useDensity } from './use-density';
+import { useContextMenu, type ContextMenuItem } from './ContextMenu';
+import {
+  ExternalLinkIcon, CopyIcon, FolderIcon, ListIcon,
+} from 'lucide-react';
+import { useToast } from '@/components/Toaster';
 
 export interface MatrixCell {
   filing_id: string;
@@ -627,7 +632,45 @@ function RowRender({
     ? 'bg-amber-50 hover:bg-amber-100'
     : 'bg-surface hover:bg-surface-alt';
 
+  // Stint 64.O F4 — per-row right-click context menu.
+  const contextMenu = useContextMenu();
+  const rowToast = useToast();
+  const router2 = useRouter();
+  const contextMenuItems: ContextMenuItem[] = [
+    {
+      label: 'Open entity',
+      icon: <ExternalLinkIcon size={13} />,
+      onClick: () => router2.push(`/tax-ops/entities/${entity.id}`),
+    },
+    {
+      label: 'Open family',
+      icon: <FolderIcon size={13} />,
+      disabled: !entity.group_id,
+      onClick: () => {
+        if (entity.group_id) router2.push(`/tax-ops/families/${entity.group_id}`);
+      },
+    },
+    {
+      label: 'View activity timeline',
+      icon: <ListIcon size={13} />,
+      onClick: () => router2.push(`/tax-ops/entities/${entity.id}#activity`),
+    },
+    {
+      label: 'Copy entity name',
+      icon: <CopyIcon size={13} />,
+      onClick: async () => {
+        try {
+          await navigator.clipboard.writeText(entity.legal_name);
+          rowToast.success('Entity name copied');
+        } catch {
+          rowToast.error('Could not copy — clipboard unavailable');
+        }
+      },
+    },
+  ];
+
   return (
+    <>
     <tr
       className={trClass}
       draggable={draggable}
@@ -683,12 +726,17 @@ function RowRender({
           stickyBgClass,
         ].join(' ')}
         style={{ left: `${entityStickyLeft}px` }}
+        // Stint 64.O F4 — right-click on the entity-name cell opens a
+        // small context menu with the most common per-row actions.
+        // Excel/Notion pattern; Big4 partners use it dozens of times
+        // a day once they discover it.
+        onContextMenu={contextMenu.openAt}
       >
         <div className="flex items-center min-w-0">
           <Link
             href={`/tax-ops/entities/${entity.id}`}
             className="text-ink hover:text-brand-700 font-medium truncate"
-            title={entity.legal_name}
+            title={entity.legal_name + '  ·  Right-click for actions'}
           >
             {entity.legal_name}
           </Link>
@@ -728,6 +776,8 @@ function RowRender({
         <td className="px-2 py-1.5 text-right">{rowAction(entity)}</td>
       )}
     </tr>
+    {contextMenu.render({ items: contextMenuItems })}
+    </>
   );
 }
 
