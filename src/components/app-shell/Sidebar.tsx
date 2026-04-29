@@ -250,29 +250,31 @@ function buildGroups(badges: SidebarBadges, taxCategories: TaxCategory[]): NavGr
           href: '/crm',
           label: 'CRM',
           icon: BriefcaseIcon,
-          // Stint 64.Q.1 — full CRM nav surfaced. Diego: "tienes
-          // Overview y Outreach pero el resto está oculto, estoy
-          // perdido". Order is intentional: Overview first (daily
-          // dashboard), then the data master tables (Companies +
-          // Contacts), the pipeline (Opportunities), engagement
-          // tracking (Matters + Activities + Tasks), then time/money
-          // surfaces (Calendar + Billing). Outreach is parked at the
-          // bottom because stint 64.Q.7 is folding it into
-          // Opportunities — once the merge ships this entry goes away.
+          // Stint 64.Q.8 — sidebar order aligned with /crm Overview's
+          // widget priority (Diego: "el orden debería estar alineado").
+          //
+          // Overview widget order = sidebar order:
+          //   Forecast               →  Opportunities (#1 widget = pipeline money)
+          //   WIP                    →  Matters       (#2 widget = active engagements)
+          //   Key Account Health     →  Companies + Contacts (#3 = relationship master)
+          //   Deals at Risk          →  Opportunities (already up)
+          //   Actions Due            →  Tasks         (#5 widget)
+          //   Upcoming this week     →  Calendar      (#6 widget)
+          //   (no widget)            →  Activities, Billing → end of list
+          //
+          // Outreach folded into Opportunities (stint 64.Q.7). The
+          // /crm/outreach route still exists but redirects to
+          // /crm/opportunities so old bookmarks keep working.
           children: [
             { href: '/crm',               label: 'Overview',      icon: BriefcaseIcon },
-            { href: '/crm/companies',     label: 'Companies',     icon: Building2Icon },
-            { href: '/crm/contacts',      label: 'Contacts',      icon: UsersIcon },
             { href: '/crm/opportunities', label: 'Opportunities', icon: TrendingUpIcon },
             { href: '/crm/matters',       label: 'Matters',       icon: GavelIcon },
-            { href: '/crm/activities',    label: 'Activities',    icon: MessageSquareIcon },
+            { href: '/crm/companies',     label: 'Companies',     icon: Building2Icon },
+            { href: '/crm/contacts',      label: 'Contacts',      icon: UsersIcon },
             { href: '/crm/tasks',         label: 'Tasks',         icon: CheckSquareIcon },
             { href: '/crm/calendar',      label: 'Calendar',      icon: CalendarIcon },
+            { href: '/crm/activities',    label: 'Activities',    icon: MessageSquareIcon },
             { href: '/crm/billing',       label: 'Billing',       icon: ReceiptIcon },
-            // Stint 64.Q.7 — Outreach folded into Opportunities. The
-            // /crm/outreach route still exists but redirects, so old
-            // bookmarks keep working. Sidebar entry removed because
-            // the surface is now part of Opportunities.
           ],
         },
       ],
