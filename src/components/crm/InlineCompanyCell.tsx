@@ -24,6 +24,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { PencilIcon } from 'lucide-react';
 import { SearchableSelect, type SearchableOption } from '@/components/ui/SearchableSelect';
 import { useToast } from '@/components/Toaster';
 
@@ -42,24 +43,42 @@ export function InlineCompanyCell({
   const [editing, setEditing] = useState(false);
 
   if (!editing) {
+    // Stint 64.U.1 — Diego: "cuando clico la empresa, no me lleva a
+    // la página de la empresa". Right call. Inverted the UX so click
+    // on the name navigates (Link), and a small ✎ icon next to it
+    // opens the editor. Matches HubSpot / Linear / Salesforce.
+    if (currentCompanyId && currentCompanyName) {
+      return (
+        <span className="inline-flex items-center gap-1 max-w-full group">
+          <Link
+            href={`/crm/companies/${currentCompanyId}`}
+            className="text-ink truncate hover:text-brand-700 hover:underline"
+            title={`Open ${currentCompanyName}`}
+          >
+            {currentCompanyName}
+          </Link>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="shrink-0 opacity-0 group-hover:opacity-100 text-ink-muted hover:text-brand-700 transition-opacity"
+            title="Switch firm (history preserved)"
+            aria-label="Switch firm"
+          >
+            <PencilIcon size={11} />
+          </button>
+        </span>
+      );
+    }
+    // No current firm — clicking the placeholder enters edit mode
+    // directly (there's nothing to navigate to).
     return (
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="inline-flex items-center gap-1 max-w-full text-left group"
-        title={currentCompanyName
-          ? `${currentCompanyName} — click to change firm (history preserved)`
-          : 'Click to set the contact\'s firm'}
+        className="text-ink-faint italic hover:text-ink-muted hover:not-italic"
+        title="Set the contact's firm"
       >
-        {currentCompanyId ? (
-          <span className="text-ink truncate group-hover:text-brand-700 group-hover:underline">
-            {currentCompanyName}
-          </span>
-        ) : (
-          <span className="text-ink-faint italic group-hover:text-ink-muted group-hover:not-italic">
-            + Set firm
-          </span>
-        )}
+        + Set firm
       </button>
     );
   }

@@ -24,7 +24,7 @@ import { useToast } from '@/components/Toaster';
 import { InlineTextCell, InlineDateCell } from '@/components/tax-ops/inline-editors';
 import { ChipSelect } from '@/components/tax-ops/ChipSelect';
 // Stint 64.T — inline editor for the Company / firm column.
-import { InlineCompanyCell, CompanyLink } from '@/components/crm/InlineCompanyCell';
+import { InlineCompanyCell } from '@/components/crm/InlineCompanyCell';
 import {
   LABELS_LIFECYCLE, LABELS_ENGAGEMENT, CONTACT_LIFECYCLES,
   ENGAGEMENT_LEVELS,
@@ -301,27 +301,17 @@ function ContactsPageContent() {
                         <Link href={`/crm/contacts/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.full_name}</Link>
                       </ContactHoverPreview>
                     </td>
-                    {/* Stint 64.P + 64.T — Company / firm. Inline-
-                        editable: click the cell to assign a firm or
-                        switch (history preserved via the contact-
-                        companies POST endpoint). The small ↗ link next
-                        to the name jumps straight to the company
-                        detail without entering edit mode. */}
+                    {/* Stint 64.P + 64.T + 64.U.1 — Company / firm.
+                        Click the name → navigate to the company. Hover
+                        reveals a ✎ icon → click to switch firm (history
+                        preserved). Empty state: "+ Set firm" button. */}
                     <td className="px-3 py-2 max-w-[220px]">
-                      <div className="flex items-center gap-1">
-                        <div className="flex-1 min-w-0">
-                          <InlineCompanyCell
-                            contactId={r.id}
-                            currentCompanyId={r.primary_company_id}
-                            currentCompanyName={r.primary_company_name}
-                            onChanged={load}
-                          />
-                        </div>
-                        <CompanyLink
-                          companyId={r.primary_company_id}
-                          companyName={r.primary_company_name}
-                        />
-                      </div>
+                      <InlineCompanyCell
+                        contactId={r.id}
+                        currentCompanyId={r.primary_company_id}
+                        currentCompanyName={r.primary_company_name}
+                        onChanged={load}
+                      />
                     </td>
                     {/* Job title — inline editable text. */}
                     <td className="px-3 py-2 max-w-[180px]">
