@@ -493,9 +493,14 @@ export function TaxTypeMatrix({
                    borders. Diego: "como estas dos cosas salen como del
                    mismo color, a veces no es lo más mejor". */
                 showLeadingSpacer={idx > 0}
-                /* Stint 64.O F1 — bulk selection plumbing. */
+                /* Stint 64.O F1 — bulk selection plumbing.
+                   Stint 64.V.3 — hasSelection threaded so each row
+                   knows whether to keep the checkbox visible (it's
+                   hidden by default; only shows on hover or when
+                   selection mode is active). */
                 enableBulkSelection={enableBulkSelection}
                 selectedIds={selected}
+                hasSelection={selected.size > 0}
                 onToggleSelect={toggleSelect}
               />
             );
@@ -515,7 +520,7 @@ function GroupBlock({
   liquidationVisuals, onLiquidationChanged,
   draggable, dragId, onDragStart, onDragOver, onDrop, onDragEnd,
   showLeadingSpacer,
-  enableBulkSelection, selectedIds, onToggleSelect,
+  enableBulkSelection, selectedIds, hasSelection, onToggleSelect,
 }: {
   group: { name: string; items: MatrixEntity[] };
   grouped: boolean;
@@ -545,6 +550,10 @@ function GroupBlock({
   /** Stint 64.O F1 — bulk selection threading. */
   enableBulkSelection?: boolean;
   selectedIds?: Set<string>;
+  /** Stint 64.V.3 — true when any row in the matrix is selected;
+   *  used to keep checkboxes visible across all rows during
+   *  selection mode (instead of only revealing on hover). */
+  hasSelection?: boolean;
   onToggleSelect?: (entityId: string) => void;
 }) {
   // First entity's group_id is the canonical id for this group — use it
@@ -621,6 +630,7 @@ function GroupBlock({
           onDragEnd={onDragEnd}
           enableBulkSelection={enableBulkSelection}
           isSelected={selectedIds?.has(e.id) ?? false}
+          hasSelection={hasSelection ?? false}
           onToggleSelect={onToggleSelect}
         />
       ))}
@@ -647,7 +657,7 @@ function RowRender({
   rowAction, handleCellClick, onStatusChange,
   liquidationVisuals, onLiquidationChanged,
   draggable, isDragging, onDragStart, onDragOver, onDrop, onDragEnd,
-  enableBulkSelection, isSelected, onToggleSelect,
+  enableBulkSelection, isSelected, hasSelection, onToggleSelect,
 }: {
   entity: MatrixEntity;
   columns: MatrixColumn[];
@@ -667,6 +677,9 @@ function RowRender({
   onDragEnd?: () => void;
   enableBulkSelection?: boolean;
   isSelected?: boolean;
+  /** Stint 64.V.3 — keep checkbox visible across all rows when any
+   *  row in the matrix is selected (selection-mode active). */
+  hasSelection?: boolean;
   onToggleSelect?: (entityId: string) => void;
 }) {
   // Stint 43.D15 — row tinting + sticky-cell tinting must match. The
@@ -681,7 +694,10 @@ function RowRender({
   // Now sticky cells get an OPAQUE hover bg; the tr keeps its lighter
   // /50 hover for the non-sticky cells (so the visual highlight stays).
   const tinted = liquidationVisuals && !!entity.liquidation_date;
+  // Stint 64.V.3 — `group` class enables the bulk-select checkbox to
+  // reveal on row hover via `group-hover:opacity-100`.
   const trClass = [
+    'group',
     tinted
       ? 'border-b border-border/70 bg-amber-50/40 hover:bg-amber-50/70'
       : 'border-b border-border/70 hover:bg-surface-alt/50',
@@ -792,17 +808,24 @@ function RowRender({
         onContextMenu={contextMenu.openAt}
       >
         <div className="flex items-center min-w-0 gap-1.5">
-          {/* Stint 64.O F1 — bulk-selection checkbox; only rendered
-              when the page opted in to bulk operations. Stop click
-              propagation so toggling the box doesn't navigate to
-              the entity detail. */}
+          {/* Stint 64.O F1 + 64.V.3 — bulk-selection checkbox. Only
+              rendered when the page opted in to bulk operations.
+              Diego: "no sé para qué sirve, visualmente me choca."
+              Linear / Notion pattern: hidden by default; visible on
+              row hover OR while selection mode is active (any row
+              selected). Stop click propagation so toggling the box
+              doesn't navigate to the entity detail. */}
           {enableBulkSelection && onToggleSelect && (
             <input
               type="checkbox"
               checked={!!isSelected}
               onChange={() => onToggleSelect(entity.id)}
               onClick={(e) => e.stopPropagation()}
-              className="shrink-0 h-3.5 w-3.5 accent-brand-500 cursor-pointer"
+              className={`shrink-0 h-3.5 w-3.5 accent-brand-500 cursor-pointer transition-opacity ${
+                isSelected || hasSelection
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
+              }`}
               aria-label={`Select ${entity.legal_name}`}
             />
           )}
