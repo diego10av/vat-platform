@@ -8,6 +8,7 @@ const UPDATABLE_FIELDS = [
   'engagement_override', 'source', 'consent_status', 'consent_date',
   'consent_source', 'referred_by_contact_id', 'next_follow_up', 'notes',
   'lead_counsel', 'tags', 'birthday', 'client_anniversary',
+  'pinned_notes',  // stint 64.U.3 — sticky reminders on the detail page
 ] as const;
 type UpdatableField = typeof UPDATABLE_FIELDS[number];
 
@@ -53,7 +54,67 @@ export async function GET(
     [id],
   );
 
-  return NextResponse.json({ contact, companies, activities });
+  // Stint 64.U.3 — related deals + matters surfaced in the contact
+  // detail sidebar. A contact can be linked directly via
+  // primary_contact_id, OR via a company they belong to (current or
+  // past). For the MVP we use only the direct link + the
+  // company-of-record (current employer) — partner / decision-maker
+  // attribution can be added later if Diego asks.
+  const opportunities = await query(
+    `SELECT DISTINCT ON (o.id) o.id, o.name, o.stage, o.estimated_value_eur,
+            o.weighted_value_eur, o.estimated_close_date,
+            c.company_name AS client_name
+       FROM crm_opportunities o
+       LEFT JOIN crm_companies c ON c.id = o.company_id
+      WHERE o.deleted_at IS NULL
+        AND (
+          o.primary_contact_id = $1
+          OR o.company_id IN (
+            SELECT company_id FROM crm_contact_companies
+             WHERE contact_id = $1 AND ended_at IS NULL
+          )
+        )
+      ORDER BY o.id,
+        CASE o.stage
+          WHEN 'in_negotiation'  THEN 0
+          WHEN 'proposal_sent'   THEN 1
+          WHEN 'meeting_held'    THEN 2
+          WHEN 'first_touch'     THEN 3
+          WHEN 'warm'            THEN 4
+          WHEN 'cold_identified' THEN 5
+          WHEN 'won'             THEN 6
+          WHEN 'lost'            THEN 7
+          ELSE 8
+        END`,
+    [id],
+  );
+
+  const matters = await query(
+    `SELECT DISTINCT ON (m.id) m.id, m.matter_reference, m.title, m.status,
+            m.practice_areas, m.opening_date, m.closing_date,
+            c.company_name AS client_name
+       FROM crm_matters m
+       LEFT JOIN crm_companies c ON c.id = m.client_company_id
+      WHERE m.deleted_at IS NULL
+        AND (
+          m.primary_contact_id = $1
+          OR m.client_company_id IN (
+            SELECT company_id FROM crm_contact_companies
+             WHERE contact_id = $1 AND ended_at IS NULL
+          )
+        )
+      ORDER BY m.id,
+        CASE m.status
+          WHEN 'active'   THEN 0
+          WHEN 'on_hold'  THEN 1
+          WHEN 'closed'   THEN 2
+          WHEN 'archived' THEN 3
+          ELSE 4
+        END`,
+    [id],
+  );
+
+  return NextResponse.json({ contact, companies, activities, opportunities, matters });
 }
 
 export async function PUT(
