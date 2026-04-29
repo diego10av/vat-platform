@@ -22,6 +22,8 @@ import {
   BarChart3Icon, ShieldCheckIcon, SettingsIcon, ChevronRightIcon,
   TargetIcon, CircleIcon, PercentIcon, CalculatorIcon, ScrollTextIcon,
   ChevronUpIcon, ChevronDownIcon, LogOutIcon,
+  // Stint 64.Q.1 — additional CRM child-route icons.
+  UsersIcon, TrendingUpIcon, GavelIcon, MessageSquareIcon,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -248,9 +250,26 @@ function buildGroups(badges: SidebarBadges, taxCategories: TaxCategory[]): NavGr
           href: '/crm',
           label: 'CRM',
           icon: BriefcaseIcon,
+          // Stint 64.Q.1 — full CRM nav surfaced. Diego: "tienes
+          // Overview y Outreach pero el resto está oculto, estoy
+          // perdido". Order is intentional: Overview first (daily
+          // dashboard), then the data master tables (Companies +
+          // Contacts), the pipeline (Opportunities), engagement
+          // tracking (Matters + Activities + Tasks), then time/money
+          // surfaces (Calendar + Billing). Outreach is parked at the
+          // bottom because stint 64.Q.7 is folding it into
+          // Opportunities — once the merge ships this entry goes away.
           children: [
-            { href: '/crm',          label: 'Overview', icon: BriefcaseIcon },
-            { href: '/crm/outreach', label: 'Outreach', icon: TargetIcon },
+            { href: '/crm',               label: 'Overview',      icon: BriefcaseIcon },
+            { href: '/crm/companies',     label: 'Companies',     icon: Building2Icon },
+            { href: '/crm/contacts',      label: 'Contacts',      icon: UsersIcon },
+            { href: '/crm/opportunities', label: 'Opportunities', icon: TrendingUpIcon },
+            { href: '/crm/matters',       label: 'Matters',       icon: GavelIcon },
+            { href: '/crm/activities',    label: 'Activities',    icon: MessageSquareIcon },
+            { href: '/crm/tasks',         label: 'Tasks',         icon: CheckSquareIcon },
+            { href: '/crm/calendar',      label: 'Calendar',      icon: CalendarIcon },
+            { href: '/crm/billing',       label: 'Billing',       icon: ReceiptIcon },
+            { href: '/crm/outreach',      label: 'Outreach',      icon: TargetIcon },
           ],
         },
       ],
