@@ -13,8 +13,8 @@
 //
 // Three modules surfaced (live today only — no pipeline, no roadmap):
 //   • Tax-Ops — every LU filing tracked: VAT (annual/quarterly/monthly),
-//     CIT, NWT, subscription tax, WHT (director), BCL. Deadlines + sign-
-//     off cascade preparer→reviewer→partner + audit trail.
+//     CIT, NWT, subscription tax, WHT (director). Deadlines + sign-off
+//     cascade preparer→reviewer→partner + audit trail.
 //   • Classifier — 32+ deterministic rules citing LTVA + CJEU + AED
 //     circulars. AI suggests, humans decide, every override logged.
 //   • CRM — service providers, end-clients, fund families. Entities
@@ -96,7 +96,6 @@ function Hero() {
             Compliance, clients, entities, invoices — connected.
             Starting with every Luxembourg tax filing your firm owns:
             VAT, Form 500 (CIT · MBT · NWT), subscription tax, withholding tax.
-            Plus BCL reporting to the Banque centrale de Luxembourg.
             Deadlines, sign-off cascade, and audit trail, in one workspace.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-5">
@@ -237,7 +236,7 @@ function ThreeModules() {
       eyebrow: 'Tax-Ops',
       title: 'Every LU filing in one calendar.',
       body:
-        'VAT (annual / quarterly / monthly), Form 500 (CIT + Municipal Business Tax + Net Wealth Tax in one return), subscription tax for UCITS / SIF / RAIF, director WHT — plus BCL reporting to the Banque centrale de Luxembourg, the only non-tax filing tracked here. Deadlines auto-tracked per LTVA article. Sign-off cascade preparer → reviewer → partner with timestamps. Calendar feed for Google, Apple, Outlook.',
+        'VAT (annual / quarterly / monthly), Form 500 (CIT + Municipal Business Tax + Net Wealth Tax in one return), subscription tax for UCITS / SIF / RAIF, director WHT. Deadlines auto-tracked per LTVA article. Sign-off cascade preparer → reviewer → partner with timestamps. Calendar feed for Google, Apple, Outlook.',
       bullets: [
         '7 tax types live, statutory deadlines encoded',
         'Multi-stakeholder sign-off with audit log',
