@@ -10,37 +10,56 @@ export async function GET(request: NextRequest) {
   const engagement = url.searchParams.get('engagement');
   const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') ?? 200) || 200));
 
-  const conditions: string[] = ['deleted_at IS NULL'];
+  // Stint 64.P — column refs are prefixed with c. because the SELECT
+  // joins crm_contacts with crm_contact_companies via a LATERAL.
+  const conditions: string[] = ['c.deleted_at IS NULL'];
   const params: unknown[] = [];
   if (q) {
     params.push(`%${q}%`);
-    conditions.push(`(full_name ILIKE $${params.length} OR email ILIKE $${params.length})`);
+    conditions.push(`(c.full_name ILIKE $${params.length} OR c.email ILIKE $${params.length})`);
   }
   if (lifecycle) {
     params.push(lifecycle);
-    conditions.push(`lifecycle_stage = $${params.length}`);
+    conditions.push(`c.lifecycle_stage = $${params.length}`);
   }
   if (engagement) {
     params.push(engagement);
-    conditions.push(`COALESCE(engagement_override, engagement_level) = $${params.length}`);
+    conditions.push(`COALESCE(c.engagement_override, c.engagement_level) = $${params.length}`);
   }
   params.push(limit);
 
+  // Stint 64.P — denormalise the current primary company onto each
+  // contact so the list view can show "Company / firm" inline.
+  // The junction table doesn't track end-dates yet (planned in the
+  // strategic audit follow-up), so for now we simply pick the
+  // is_primary=true row, falling back to the most recently created
+  // junction. When a contact changes firm today the previous junction
+  // is overwritten — adding `ended_at` is part of the same audit.
   const rows = await query(
-    `SELECT id, full_name, email, phone, linkedin_url, job_title, country,
-            lifecycle_stage, role_tags, engagement_level, engagement_override,
-            source, lead_score, next_follow_up, last_activity_at,
-            created_at, updated_at
-       FROM crm_contacts
+    `SELECT c.id, c.full_name, c.email, c.phone, c.linkedin_url, c.job_title,
+            c.country, c.lifecycle_stage, c.role_tags, c.engagement_level,
+            c.engagement_override, c.source, c.lead_score, c.next_follow_up,
+            c.last_activity_at, c.created_at, c.updated_at,
+            comp.id           AS primary_company_id,
+            comp.company_name AS primary_company_name
+       FROM crm_contacts c
+       LEFT JOIN LATERAL (
+         SELECT co.id, co.company_name
+           FROM crm_contact_companies cc
+           JOIN crm_companies co ON co.id = cc.company_id AND co.deleted_at IS NULL
+          WHERE cc.contact_id = c.id
+          ORDER BY cc.is_primary DESC, cc.created_at DESC
+          LIMIT 1
+       ) comp ON TRUE
       WHERE ${conditions.join(' AND ')}
       ORDER BY
-        CASE COALESCE(engagement_override, engagement_level)
+        CASE COALESCE(c.engagement_override, c.engagement_level)
           WHEN 'active'  THEN 0
           WHEN 'dormant' THEN 1
           WHEN 'lapsed'  THEN 2
           ELSE 3
         END,
-        full_name ASC
+        c.full_name ASC
       LIMIT $${params.length}`,
     params,
   );

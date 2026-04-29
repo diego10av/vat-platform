@@ -220,6 +220,19 @@ export const CONTACT_FIELDS: FieldSchema[] = [
     maxLength: 150,
   },
   {
+    // Stint 64.P — company picker. The contacts POST endpoint has
+    // accepted `company_id` since stint 64.G (it inserts the
+    // contact-company junction row), but the form schema didn't
+    // expose it — so contacts created via the modal had no firm
+    // attached. Fixed by reusing the entity-select field type
+    // (same primitive as the invoice form's Client picker).
+    name: 'company_id',
+    label: 'Company / firm',
+    type: 'entity-select',
+    entitySource: 'company',
+    help: 'Pick an existing company, or create a new one first via /crm/companies. Required for any contact tied to a firm; leave blank for individuals.',
+  },
+  {
     name: 'job_title',
     label: 'Job title',
     type: 'text',

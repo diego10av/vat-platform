@@ -57,6 +57,9 @@ interface Contact {
   source: string | null;
   lead_score: number | null;
   next_follow_up: string | null;
+  // Stint 64.P — current primary company (denormalised by the API).
+  primary_company_id: string | null;
+  primary_company_name: string | null;
 }
 
 export default function ContactsPage() {
@@ -251,6 +254,7 @@ function ContactsPageContent() {
                   />
                 </th>
                 <th className="text-left px-3 py-2 font-medium">Name</th>
+                <th className="text-left px-3 py-2 font-medium">Company / firm</th>
                 <th className="text-left px-3 py-2 font-medium">Job title</th>
                 <th className="text-left px-3 py-2 font-medium">Email</th>
                 <th className="text-left px-3 py-2 font-medium">Country</th>
@@ -294,6 +298,22 @@ function ContactsPageContent() {
                       <ContactHoverPreview contactId={r.id}>
                         <Link href={`/crm/contacts/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.full_name}</Link>
                       </ContactHoverPreview>
+                    </td>
+                    {/* Stint 64.P — Company / firm. Links to the
+                        company detail. Em-dash for contacts without
+                        a current firm (e.g. independents, retired). */}
+                    <td className="px-3 py-2 max-w-[200px]">
+                      {r.primary_company_id ? (
+                        <Link
+                          href={`/crm/companies/${r.primary_company_id}`}
+                          className="text-ink hover:text-brand-700 hover:underline truncate inline-block max-w-full"
+                          title={r.primary_company_name ?? ''}
+                        >
+                          {r.primary_company_name}
+                        </Link>
+                      ) : (
+                        <span className="text-ink-faint">—</span>
+                      )}
                     </td>
                     {/* Job title — inline editable text. */}
                     <td className="px-3 py-2 max-w-[180px]">
