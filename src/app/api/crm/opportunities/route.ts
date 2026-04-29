@@ -35,11 +35,12 @@ export async function GET(request: NextRequest) {
           WHEN 'in_negotiation'  THEN 0
           WHEN 'proposal_sent'   THEN 1
           WHEN 'meeting_held'    THEN 2
-          WHEN 'initial_contact' THEN 3
-          WHEN 'lead_identified' THEN 4
-          WHEN 'won'             THEN 5
-          WHEN 'lost'            THEN 6
-          ELSE 7
+          WHEN 'first_touch'     THEN 3
+          WHEN 'warm'            THEN 4
+          WHEN 'cold_identified' THEN 5
+          WHEN 'won'             THEN 6
+          WHEN 'lost'            THEN 7
+          ELSE 8
         END,
         o.estimated_close_date ASC NULLS LAST
       LIMIT $${params.length}`,
@@ -49,14 +50,14 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/crm/opportunities — create an opportunity. Requires `name` + `stage`.
-// If `stage` not provided, defaults to 'lead_identified'.
+// Default stage = 'cold_identified' (stint 64.Q.7 — Outreach merged in).
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   if (!name) return apiError('name_required', 'name is required.', { status: 400 });
 
   const id = generateId();
-  const stage = typeof body.stage === 'string' ? body.stage : 'lead_identified';
+  const stage = typeof body.stage === 'string' ? body.stage : 'cold_identified';
   await execute(
     `INSERT INTO crm_opportunities
        (id, name, company_id, primary_contact_id, stage, stage_entered_at,

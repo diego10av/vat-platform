@@ -42,11 +42,12 @@ export async function GET(
           WHEN 'in_negotiation'  THEN 0
           WHEN 'proposal_sent'   THEN 1
           WHEN 'meeting_held'    THEN 2
-          WHEN 'initial_contact' THEN 3
-          WHEN 'lead_identified' THEN 4
-          WHEN 'won'             THEN 5
-          WHEN 'lost'            THEN 6
-          ELSE 7
+          WHEN 'first_touch'     THEN 3
+          WHEN 'warm'            THEN 4
+          WHEN 'cold_identified' THEN 5
+          WHEN 'won'             THEN 6
+          WHEN 'lost'            THEN 7
+          ELSE 8
         END,
         estimated_close_date ASC NULLS LAST`,
     [id],

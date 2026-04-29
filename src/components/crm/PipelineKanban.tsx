@@ -33,14 +33,18 @@ interface OppCard {
   company_id: string | null;
 }
 
+// Stint 64.Q.7 — pipeline merged. Order = real legal-services
+// progression after Outreach was folded in: cold-identified → warm
+// → first-touch → meeting → proposal → negotiation → won/lost.
 const STAGE_ORDER: OpportunityStage[] = [
-  'lead_identified', 'initial_contact', 'meeting_held',
+  'cold_identified', 'warm', 'first_touch', 'meeting_held',
   'proposal_sent', 'in_negotiation', 'won', 'lost',
 ];
 
 const STAGE_TONE: Record<OpportunityStage, { header: string; border: string }> = {
-  lead_identified: { header: 'bg-slate-100 text-slate-700',     border: 'border-slate-300' },
-  initial_contact: { header: 'bg-yellow-100 text-yellow-800',   border: 'border-yellow-300' },
+  cold_identified: { header: 'bg-slate-100 text-slate-700',     border: 'border-slate-300' },
+  warm:            { header: 'bg-blue-100 text-blue-800',       border: 'border-blue-300' },
+  first_touch:     { header: 'bg-yellow-100 text-yellow-800',   border: 'border-yellow-300' },
   meeting_held:    { header: 'bg-orange-100 text-orange-800',   border: 'border-orange-300' },
   proposal_sent:   { header: 'bg-red-100 text-red-800',         border: 'border-red-300' },
   in_negotiation:  { header: 'bg-purple-100 text-purple-800',   border: 'border-purple-300' },

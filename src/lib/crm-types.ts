@@ -16,8 +16,22 @@ export type CompanyIndustry = typeof COMPANY_INDUSTRIES[number];
 export const COMPANY_SIZES = ['large_cap', 'mid_market', 'sme', 'startup'] as const;
 export type CompanySize = typeof COMPANY_SIZES[number];
 
+// Stint 64.Q.7 — pipeline merged. Outreach (cold prospecting) and
+// Opportunities (active deals) used to live in separate tables; the
+// merge folds the cold-side stages into a single canonical pipeline
+// so a prospect graduating from "warm" to "first touch" doesn't
+// have to migrate between systems. Order = real progression in a
+// legal-services sales cycle.
+//
+//   cold_identified — name on a list, no contact yet (was outreach 'identified')
+//   warm            — known to us via referral / event / mutual contact (was outreach 'warm')
+//   first_touch     — first email / call / DM landed (replaces 'initial_contact')
+//   meeting_held    — actual conversation took place
+//   proposal_sent   — proposal / engagement letter delivered
+//   in_negotiation  — terms / fee structure / scope under discussion
+//   won / lost      — terminal
 export const OPPORTUNITY_STAGES = [
-  'lead_identified', 'initial_contact', 'meeting_held',
+  'cold_identified', 'warm', 'first_touch', 'meeting_held',
   'proposal_sent', 'in_negotiation', 'won', 'lost',
 ] as const;
 export type OpportunityStage = typeof OPPORTUNITY_STAGES[number];
@@ -85,8 +99,9 @@ export const LABELS_SIZE: Record<CompanySize, string> = {
 };
 
 export const LABELS_STAGE: Record<OpportunityStage, string> = {
-  lead_identified: '🔵 Lead identified',
-  initial_contact: '🟡 Initial contact',
+  cold_identified: '⚪ Cold — identified',
+  warm:            '🔵 Warm',
+  first_touch:     '🟡 First touch',
   meeting_held:    '🟠 Meeting held',
   proposal_sent:   '🔴 Proposal sent',
   in_negotiation:  '🟣 In negotiation',

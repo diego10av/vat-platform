@@ -89,7 +89,7 @@ export default function HelpPage() {
           </li>
           <li>When you close a bit of billable work, log time. From <Link href="/crm/matters" className="text-brand-700 hover:underline">the matter</Link>, or by creating a meeting activity with the &quot;Also log as billable time entry&quot; checkbox ticked.</li>
           <li>If you had a meeting, log the activity with outcome + notes. It auto-updates the contact&apos;s <code>last_activity_at</code> which drives engagement.</li>
-          <li>If you kicked off a deal, add it as an Opportunity in the <strong>lead_identified</strong> stage. As it progresses, drag it through the kanban.</li>
+          <li>If you kicked off a deal, add it as an Opportunity in <strong>cold_identified</strong> (just a name on a list) or <strong>warm</strong> (you already know the contact). Drag it through the kanban as it progresses: cold → warm → first touch → meeting → proposal → negotiation → won/lost.</li>
         </ol>
       </Section>
 

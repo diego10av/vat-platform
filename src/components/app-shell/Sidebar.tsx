@@ -269,7 +269,10 @@ function buildGroups(badges: SidebarBadges, taxCategories: TaxCategory[]): NavGr
             { href: '/crm/tasks',         label: 'Tasks',         icon: CheckSquareIcon },
             { href: '/crm/calendar',      label: 'Calendar',      icon: CalendarIcon },
             { href: '/crm/billing',       label: 'Billing',       icon: ReceiptIcon },
-            { href: '/crm/outreach',      label: 'Outreach',      icon: TargetIcon },
+            // Stint 64.Q.7 — Outreach folded into Opportunities. The
+            // /crm/outreach route still exists but redirects, so old
+            // bookmarks keep working. Sidebar entry removed because
+            // the surface is now part of Opportunities.
           ],
         },
       ],

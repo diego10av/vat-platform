@@ -30,11 +30,13 @@ import {
   type OpportunityStage,
 } from '@/lib/crm-types';
 
-// Stint 63.A.2 — pipeline stage tones, mirroring the emoji language
-// already in LABELS_STAGE: blue → yellow → orange → red → purple → green/red.
+// Stint 64.Q.7 — pipeline stage tones. Cold-side stages added when
+// the Outreach surface was folded into Opportunities. Order = real
+// progression in a legal-services sales cycle.
 const STAGE_TONES: Record<string, string> = {
-  lead_identified: 'bg-info-50 text-info-800',
-  initial_contact: 'bg-amber-50 text-amber-800',
+  cold_identified: 'bg-surface-alt text-ink-soft',
+  warm:            'bg-info-50 text-info-800',
+  first_touch:     'bg-amber-50 text-amber-800',
   meeting_held:    'bg-amber-100 text-amber-900',
   proposal_sent:   'bg-danger-50 text-danger-800',
   in_negotiation:  'bg-brand-50 text-brand-800',
@@ -277,7 +279,7 @@ function OpportunitiesPageContent() {
         title="New opportunity"
         subtitle="Pipeline entry — will move through stages from Lead Identified to Won/Lost."
         fields={OPPORTUNITY_FIELDS}
-        initial={{ stage: 'lead_identified', probability_pct: 20 }}
+        initial={{ stage: 'cold_identified', probability_pct: 10 }}
         onSave={handleCreate}
       />
       {error && <div className="mb-3"><CrmErrorBox message={error} onRetry={load} /></div>}

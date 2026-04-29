@@ -82,8 +82,8 @@ export const CRM_TOOLS: Anthropic.Tool[] = [
         stage: {
           type: 'string',
           enum: [
-            'lead_identified', 'qualified', 'meeting_held', 'proposal_sent',
-            'negotiation', 'won', 'lost',
+            'cold_identified', 'warm', 'first_touch', 'meeting_held', 'proposal_sent',
+            'in_negotiation', 'won', 'lost',
           ],
         },
         stage_not: {
