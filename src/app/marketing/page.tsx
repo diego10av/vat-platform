@@ -95,7 +95,8 @@ function Hero() {
           <p className="mt-6 max-w-[680px] text-lg leading-[1.55] text-ink-soft">
             Compliance, clients, entities, invoices — connected.
             Starting with every Luxembourg tax filing your firm owns:
-            VAT, Form 500 (CIT · MBT · NWT), subscription tax, withholding, BCL.
+            VAT, Form 500 (CIT · MBT · NWT), subscription tax, withholding tax.
+            Plus BCL reporting to the Banque centrale de Luxembourg.
             Deadlines, sign-off cascade, and audit trail, in one workspace.
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-5">
@@ -149,12 +150,15 @@ function Hero() {
 // the same constraint.
 function ProductMockup() {
   const rows: Array<{ family: string; tone: string; entity: string; status: string; statusTone: string; deadline: string; deadlineTone: string; partner: string }> = [
+    // Stint 64.V.4 — partner column alternates Arturo / Felipe (the
+    // two-partner reference example). Diego: "Arturo y Felipe,
+    // intercámbianlos como los dos socios en el ejemplo."
     { family: 'ACME',      tone: 'bg-blue-100 text-blue-800',       entity: 'Acme Holdings SARL',         status: 'Filed',          statusTone: 'bg-success-50 text-success-800', deadline: '2026-04-30', deadlineTone: 'text-ink-soft',                 partner: 'Arturo' },
-    { family: 'ACME',      tone: 'bg-blue-100 text-blue-800',       entity: 'Acme Sub I SCA',             status: 'Working',        statusTone: 'bg-amber-50 text-amber-800',     deadline: '2026-12-31', deadlineTone: 'text-ink-soft',                 partner: 'Arturo' },
-    { family: 'DELTA',     tone: 'bg-emerald-100 text-emerald-800', entity: 'Delta Fund I SCSp',          status: 'Draft sent',     statusTone: 'bg-info-50 text-info-800',       deadline: '2026-12-31', deadlineTone: 'text-ink-soft',                 partner: 'Arturo' },
+    { family: 'ACME',      tone: 'bg-blue-100 text-blue-800',       entity: 'Acme Sub I SCA',             status: 'Working',        statusTone: 'bg-amber-50 text-amber-800',     deadline: '2026-12-31', deadlineTone: 'text-ink-soft',                 partner: 'Felipe' },
+    { family: 'DELTA',     tone: 'bg-emerald-100 text-emerald-800', entity: 'Delta Fund I SCSp',          status: 'Draft sent',     statusTone: 'bg-info-50 text-info-800',       deadline: '2026-12-31', deadlineTone: 'text-ink-soft',                 partner: 'Felipe' },
     { family: 'DELTA',     tone: 'bg-emerald-100 text-emerald-800', entity: 'Delta Co-Invest SCSp',       status: 'Awaiting info',  statusTone: 'bg-amber-50 text-amber-800',     deadline: 'Today',      deadlineTone: 'text-danger-700 font-semibold', partner: 'Arturo' },
     { family: 'RIVERSIDE', tone: 'bg-purple-100 text-purple-800',   entity: 'Riverside Partners II SCSp', status: 'Client approved',statusTone: 'bg-info-50 text-info-800',       deadline: '2026-12-31', deadlineTone: 'text-ink-soft',                 partner: 'Arturo' },
-    { family: 'HARBOUR',   tone: 'bg-amber-100 text-amber-800',     entity: 'Harbour Capital SARL',       status: 'Filed',          statusTone: 'bg-success-50 text-success-800', deadline: '2026-04-15', deadlineTone: 'text-ink-soft',                 partner: 'Arturo' },
+    { family: 'HARBOUR',   tone: 'bg-amber-100 text-amber-800',     entity: 'Harbour Capital SARL',       status: 'Filed',          statusTone: 'bg-success-50 text-success-800', deadline: '2026-04-15', deadlineTone: 'text-ink-soft',                 partner: 'Felipe' },
   ];
   return (
     <div className="mt-12 md:mt-16 mx-auto max-w-[960px]">
@@ -233,7 +237,7 @@ function ThreeModules() {
       eyebrow: 'Tax-Ops',
       title: 'Every LU filing in one calendar.',
       body:
-        'VAT (annual / quarterly / monthly), Form 500 (CIT + Municipal Business Tax + Net Wealth Tax in one return), subscription tax for UCITS / SIF / RAIF, director WHT, BCL reporting. Deadlines auto-tracked per LTVA article. Sign-off cascade preparer → reviewer → partner with timestamps. Calendar feed for Google, Apple, Outlook.',
+        'VAT (annual / quarterly / monthly), Form 500 (CIT + Municipal Business Tax + Net Wealth Tax in one return), subscription tax for UCITS / SIF / RAIF, director WHT — plus BCL reporting to the Banque centrale de Luxembourg, the only non-tax filing tracked here. Deadlines auto-tracked per LTVA article. Sign-off cascade preparer → reviewer → partner with timestamps. Calendar feed for Google, Apple, Outlook.',
       bullets: [
         '7 tax types live, statutory deadlines encoded',
         'Multi-stakeholder sign-off with audit log',
@@ -253,13 +257,13 @@ function ThreeModules() {
     },
     {
       eyebrow: 'CRM',
-      title: 'Clients, entities, invoices — connected.',
+      title: 'Clients, contacts, pipeline — connected.',
       body:
-        'Service providers, end-clients, fund families. Entities (SOPARFIs, AIFMs, SCSps) linked to obligations. Invoice OCR with Anthropic Claude classifies into LTVA treatment codes. AI suggests, humans decide, every override is logged.',
+        'Contacts with employment history, companies grouped into families, a unified pipeline from cold prospect through won deal, matters tracked end-to-end with billing in the same workspace. Calendar pulls every CRM date AND every tax-ops deadline so nothing slips. Per-row audit log shows who changed what.',
       bullets: [
-        'Multi-stakeholder per entity (preparer / reviewer / partner)',
-        'Invoice OCR + treatment-code classification',
-        'AED letter triage with appeal-deadline tracking',
+        'Employment history preserved when contacts switch firms',
+        'Single unified pipeline (no cold/warm vs deal silos)',
+        'Calendar unified across CRM + tax-ops + future modules',
       ],
     },
   ];
