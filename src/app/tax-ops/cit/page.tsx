@@ -14,7 +14,7 @@ import { useToast } from '@/components/Toaster';
 import { TaxTypeMatrix, type MatrixColumn, type MatrixEntity } from '@/components/tax-ops/TaxTypeMatrix';
 import {
   useMatrixData, applyStatusChange, useClientGroups, filterEntities,
-  makeReorderHandler,
+  makeReorderHandler, useTaxTeamMembers, ownershipNamesInCells,
 } from '@/components/tax-ops/useMatrixData';
 import {
   cellNeedsFollowUp, PROVISION_WAITING_STATES, FILING_WAITING_STATES,
@@ -118,6 +118,10 @@ export default function CitPage() {
     citProvision.refetch();
   }, [current, prior, nwt, citProvision]);
 
+  // Partner options for the bulk reassign popover are built further
+  // down (after periodLabel is in scope).
+  const { members: teamMembers } = useTaxTeamMembers();
+
   async function patchFiling(filingId: string, patch: Record<string, unknown>): Promise<void> {
     const res = await fetch(`/api/tax-ops/filings/${filingId}`, {
       method: 'PATCH',
@@ -153,6 +157,45 @@ export default function CitPage() {
 
   const periodLabel = String(year);
   const tolerance = current.data?.admin_tolerance_days ?? 0;
+
+  // Stint 64.O F1 — bulk-reassign-partner data + handler. Lives here
+  // because it needs `periodLabel` to be in scope when iterating the
+  // selected entities.
+  const bulkPartnerOptions = useMemo(() => {
+    const inCells = ownershipNamesInCells(current.data?.entities ?? [], 'partner_in_charge');
+    const membersByShort = new Map(teamMembers.map(m => [m.short_name, m]));
+    const set = new Set<string>([...inCells, ...teamMembers.map(m => m.short_name)]);
+    return Array.from(set)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b))
+      .map(short => {
+        const m = membersByShort.get(short);
+        return { value: short, label: m?.full_name ? `${short} · ${m.full_name}` : short };
+      });
+  }, [current.data, teamMembers]);
+
+  const handleBulkReassignPartner = useCallback(async ({ entityIds, partnerName }: { entityIds: string[]; partnerName: string }) => {
+    let applied = 0;
+    let skipped = 0;
+    const entitiesById = new Map(
+      (current.data?.entities ?? []).map(e => [e.id, e]),
+    );
+    for (const id of entityIds) {
+      const e = entitiesById.get(id);
+      const cell = e ? getCell(e, periodLabel) : null;
+      if (!cell?.filing_id) { skipped += 1; continue; }
+      try {
+        await patchFiling(cell.filing_id, { partner_in_charge: [partnerName] });
+        applied += 1;
+      } catch {
+        skipped += 1;
+      }
+    }
+    refetchAll();
+    if (skipped > 0) {
+      throw new Error(`${applied} updated, ${skipped} skipped (no filing for ${periodLabel})`);
+    }
+  }, [current.data, periodLabel, refetchAll]);
 
   // Stint 64.L Layer 2 — set of entity_ids that have at least one
   // stuck cell (amber or red follow-up chip). Computed across NWT
@@ -427,6 +470,10 @@ export default function CitPage() {
             />
           )}
           emptyMessage="No entities have an active CIT obligation."
+          /* Stint 64.O F1 — opt in to bulk operations. */
+          enableBulkSelection
+          bulkPartnerOptions={bulkPartnerOptions}
+          onBulkReassignPartner={handleBulkReassignPartner}
         />
       )}
       <FilingEditDrawer

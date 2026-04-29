@@ -188,6 +188,19 @@ interface Props {
    * Drops across family boundaries are rejected client-side.
    */
   onReorderWithinFamily?: (args: { groupName: string; orderedIds: string[] }) => void;
+  /**
+   * Stint 64.O F1 — bulk operations MVP. When set, every row gets a
+   * checkbox and a floating action bar appears at the bottom of the
+   * matrix once 1+ rows are selected. The page implements the actual
+   * mutation by passing `onBulkReassignPartner` (and possibly more
+   * actions later); the matrix only owns selection UI + the action
+   * bar. `bulkPartnerOptions` populates the SearchableSelect inside
+   * the partner-reassign popover; pages typically pass the same list
+   * they already build for the toolbar's partner filter.
+   */
+  enableBulkSelection?: boolean;
+  bulkPartnerOptions?: Array<{ value: string; label: string }>;
+  onBulkReassignPartner?: (args: { entityIds: string[]; partnerName: string }) => Promise<void>;
 }
 
 export function TaxTypeMatrix({
@@ -204,9 +217,26 @@ export function TaxTypeMatrix({
   liquidationVisuals,
   onLiquidationChanged,
   onReorderWithinFamily,
+  enableBulkSelection,
+  bulkPartnerOptions,
+  onBulkReassignPartner,
 }: Props) {
   const router = useRouter();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  // Stint 64.O F1 — bulk-selection state. Empty Set when nothing
+  // selected; entries are entity ids. The action bar at the bottom
+  // is rendered conditionally on size > 0.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggleSelect = useCallback((entityId: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(entityId)) next.delete(entityId);
+      else next.add(entityId);
+      return next;
+    });
+  }, []);
+  const clearSelection = useCallback(() => setSelected(new Set()), []);
 
   // Stint 64.O F7 — read the user's density preference. Applied as a
   // data-attribute on the wrapper; the descendant arbitrary-variant
@@ -372,6 +402,19 @@ export function TaxTypeMatrix({
       className="rounded-md border border-border bg-surface overflow-auto relative data-[density=compact]:[&_tbody_td]:!py-0.5"
       style={{ maxHeight: 'calc(100vh - 220px)' }}
     >
+      {/* Stint 64.O F1 — floating action bar appears at the
+          bottom-right of the matrix wrapper when 1+ rows are
+          selected. Self-contained: pages just opt in via
+          `enableBulkSelection` + supply the action callback. */}
+      {enableBulkSelection && selected.size > 0 && (
+        <BulkActionBar
+          selectedCount={selected.size}
+          selectedIds={Array.from(selected)}
+          onClear={clearSelection}
+          partnerOptions={bulkPartnerOptions ?? []}
+          onReassignPartner={onBulkReassignPartner}
+        />
+      )}
       <table className="min-w-full text-sm border-separate border-spacing-0">
         {/* Stint 64.N — sticky lives on every <th> individually rather
             than on <thead>. Browsers (especially Safari) don't honour
@@ -450,6 +493,10 @@ export function TaxTypeMatrix({
                    borders. Diego: "como estas dos cosas salen como del
                    mismo color, a veces no es lo más mejor". */
                 showLeadingSpacer={idx > 0}
+                /* Stint 64.O F1 — bulk selection plumbing. */
+                enableBulkSelection={enableBulkSelection}
+                selectedIds={selected}
+                onToggleSelect={toggleSelect}
               />
             );
           })}
@@ -468,6 +515,7 @@ function GroupBlock({
   liquidationVisuals, onLiquidationChanged,
   draggable, dragId, onDragStart, onDragOver, onDrop, onDragEnd,
   showLeadingSpacer,
+  enableBulkSelection, selectedIds, onToggleSelect,
 }: {
   group: { name: string; items: MatrixEntity[] };
   grouped: boolean;
@@ -494,6 +542,10 @@ function GroupBlock({
    *  the eye sees a clean break between families. Set true for every
    *  group except the first. */
   showLeadingSpacer?: boolean;
+  /** Stint 64.O F1 — bulk selection threading. */
+  enableBulkSelection?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (entityId: string) => void;
 }) {
   // First entity's group_id is the canonical id for this group — use it
   // when calling groupFooter so "+Add" knows where to attach new entities.
@@ -567,6 +619,9 @@ function GroupBlock({
           onDragOver={onDragOver}
           onDrop={onDrop}
           onDragEnd={onDragEnd}
+          enableBulkSelection={enableBulkSelection}
+          isSelected={selectedIds?.has(e.id) ?? false}
+          onToggleSelect={onToggleSelect}
         />
       ))}
       {!isCollapsed && groupFooter && (
@@ -592,6 +647,7 @@ function RowRender({
   rowAction, handleCellClick, onStatusChange,
   liquidationVisuals, onLiquidationChanged,
   draggable, isDragging, onDragStart, onDragOver, onDrop, onDragEnd,
+  enableBulkSelection, isSelected, onToggleSelect,
 }: {
   entity: MatrixEntity;
   columns: MatrixColumn[];
@@ -609,6 +665,9 @@ function RowRender({
   onDragOver?: (e: React.DragEvent, entity: MatrixEntity) => void;
   onDrop?: (e: React.DragEvent, entity: MatrixEntity) => void;
   onDragEnd?: () => void;
+  enableBulkSelection?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (entityId: string) => void;
 }) {
   // Stint 43.D15 — row tinting + sticky-cell tinting must match. The
   // sticky cells (family + entity) live on `bg-surface` to override the
@@ -732,7 +791,21 @@ function RowRender({
         // a day once they discover it.
         onContextMenu={contextMenu.openAt}
       >
-        <div className="flex items-center min-w-0">
+        <div className="flex items-center min-w-0 gap-1.5">
+          {/* Stint 64.O F1 — bulk-selection checkbox; only rendered
+              when the page opted in to bulk operations. Stop click
+              propagation so toggling the box doesn't navigate to
+              the entity detail. */}
+          {enableBulkSelection && onToggleSelect && (
+            <input
+              type="checkbox"
+              checked={!!isSelected}
+              onChange={() => onToggleSelect(entity.id)}
+              onClick={(e) => e.stopPropagation()}
+              className="shrink-0 h-3.5 w-3.5 accent-brand-500 cursor-pointer"
+              aria-label={`Select ${entity.legal_name}`}
+            />
+          )}
           <Link
             href={`/tax-ops/entities/${entity.id}`}
             className="text-ink hover:text-brand-700 font-medium truncate"
@@ -886,4 +959,125 @@ function buildTooltip(cell: MatrixCell): string {
     parts.push(`Comments: ${snippet}`);
   }
   return parts.join('\n');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// BulkActionBar — stint 64.O F1
+//
+// Floating bar that surfaces at the bottom-right of the matrix wrapper
+// when the user has selected 1+ rows. Mirrors the Linear / Notion /
+// Gmail pattern: action targets are visible at the moment of choice.
+//
+// MVP ships ONE bulk action — "Reassign partner in charge" — because
+// it's the highest-value Big4 use case Diego's likely to hit (a
+// partner leaves the firm, all their entities re-assign in one click).
+// Adding more actions is a matter of dropping more buttons here +
+// callbacks; the selection plumbing is already in place.
+// ════════════════════════════════════════════════════════════════════════
+
+function BulkActionBar({
+  selectedCount, selectedIds, onClear,
+  partnerOptions, onReassignPartner,
+}: {
+  selectedCount: number;
+  selectedIds: string[];
+  onClear: () => void;
+  partnerOptions: Array<{ value: string; label: string }>;
+  onReassignPartner?: (args: { entityIds: string[]; partnerName: string }) => Promise<void>;
+}) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [pickedPartner, setPickedPartner] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+
+  async function handleApply() {
+    if (!pickedPartner || !onReassignPartner) return;
+    setBusy(true);
+    try {
+      await onReassignPartner({ entityIds: selectedIds, partnerName: pickedPartner });
+      toast.success(`Partner reassigned on ${selectedIds.length} ${selectedIds.length === 1 ? 'entity' : 'entities'}`);
+      setPopoverOpen(false);
+      setPickedPartner(null);
+      onClear();
+    } catch (e) {
+      toast.error(`Failed: ${String(e instanceof Error ? e.message : e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="sticky bottom-2 z-[30] flex justify-end pointer-events-none"
+      // The wrapper is sticky inside the overflow:auto matrix container,
+      // so the bar stays visible while the user scrolls the table.
+    >
+      <div className="pointer-events-auto inline-flex items-center gap-2 px-3 py-2 mr-2 mb-2 rounded-lg bg-ink shadow-lg text-white text-sm">
+        <span className="font-medium tabular-nums">{selectedCount} selected</span>
+        <span className="opacity-30">·</span>
+        {onReassignPartner && (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setPopoverOpen(o => !o)}
+              disabled={busy}
+              className="px-2 py-0.5 rounded text-xs bg-white/10 hover:bg-white/20 disabled:opacity-50"
+              aria-haspopup="dialog"
+              aria-expanded={popoverOpen}
+            >
+              Reassign partner ▾
+            </button>
+            {popoverOpen && (
+              <div
+                role="dialog"
+                aria-label="Reassign partner"
+                className="absolute bottom-full right-0 mb-1 w-64 bg-surface text-ink border border-border rounded-md shadow-lg p-2"
+              >
+                <label className="block text-xs text-ink-muted mb-1">Pick partner</label>
+                <select
+                  value={pickedPartner ?? ''}
+                  onChange={(e) => setPickedPartner(e.target.value || null)}
+                  disabled={busy}
+                  className="w-full h-8 px-2 text-sm border border-border rounded-md bg-surface mb-2"
+                >
+                  <option value="">— Select —</option>
+                  {partnerOptions
+                    .filter(o => o.value && o.value !== 'all' && o.value !== '__unassigned')
+                    .map(o => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                </select>
+                <div className="flex items-center justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => { setPopoverOpen(false); setPickedPartner(null); }}
+                    disabled={busy}
+                    className="px-2 py-1 rounded text-xs text-ink-soft hover:bg-surface-alt"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApply}
+                    disabled={busy || !pickedPartner}
+                    className="px-2 py-1 rounded text-xs bg-brand-500 text-white hover:bg-brand-600 disabled:opacity-50"
+                  >
+                    {busy ? 'Applying…' : 'Apply'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={busy}
+          className="px-2 py-0.5 rounded text-xs hover:bg-white/20 disabled:opacity-50"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  );
 }
