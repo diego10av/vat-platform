@@ -25,6 +25,7 @@ import { familyChipClasses, buildFamilyColorMap } from './familyColors';
 import { FamilyColorProvider } from './FamilyColorContext';
 import { LiquidationChip, isFinalReturnPeriod } from './LiquidationChip';
 import { EntityActionsMenu } from './EntityActionsMenu';
+import { useDensity } from './use-density';
 
 export interface MatrixCell {
   filing_id: string;
@@ -202,6 +203,12 @@ export function TaxTypeMatrix({
   const router = useRouter();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
+  // Stint 64.O F7 — read the user's density preference. Applied as a
+  // data-attribute on the wrapper; the descendant arbitrary-variant
+  // selector below collapses body cells to ~half the vertical padding
+  // when 'compact'. Header padding stays comfortable for legibility.
+  const { density } = useDensity();
+
   // Stint 51.D — optimistic local override for drag-and-drop reorder.
   // When the user drops a row, we re-order the local copy immediately so
   // the matrix doesn't flicker while waiting for the server PATCH +
@@ -356,7 +363,8 @@ export function TaxTypeMatrix({
   return (
    <FamilyColorProvider value={familyColorMap}>
     <div
-      className="rounded-md border border-border bg-surface overflow-auto relative"
+      data-density={density}
+      className="rounded-md border border-border bg-surface overflow-auto relative data-[density=compact]:[&_tbody_td]:!py-0.5"
       style={{ maxHeight: 'calc(100vh - 220px)' }}
     >
       <table className="min-w-full text-sm border-separate border-spacing-0">

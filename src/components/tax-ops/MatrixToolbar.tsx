@@ -10,13 +10,14 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { DownloadIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react';
+import { DownloadIcon, PlusIcon, SearchIcon, XIcon, RowsIcon, MenuIcon } from 'lucide-react';
 import { useToast } from '@/components/Toaster';
 import { FILING_STATUSES, filingStatusLabel } from './FilingStatusBadge';
 import { useTaxTeamMembers, ownershipNamesInCells } from './useMatrixData';
 import type { MatrixEntity } from './TaxTypeMatrix';
 import { SearchableSelect, type SearchableOption } from '@/components/ui/SearchableSelect';
 import { NewEntityModal } from './NewEntityModal';
+import { useDensity } from './use-density';
 
 interface Props {
   year: number;
@@ -326,6 +327,11 @@ export function MatrixToolbar({
         {count} {countLabel}
       </div>
       <div className="ml-auto flex items-center gap-2">
+        {/* Stint 64.O F7 — density toggle. Pure visual prefer­ence;
+            persisted in localStorage so partners scanning many rows
+            see the compact view next time they open the matrix.
+            Tooltip explains the trade-off. */}
+        <DensityToggle />
         <button
           type="button"
           onClick={() => setNewEntityOpen(true)}
@@ -383,4 +389,26 @@ function buildOwnershipOptions(
       };
     }),
   ];
+}
+
+// Stint 64.O F7 — small toggle button for matrix density. Self-contained:
+// reads + writes the user pref via useDensity(), so any matrix that uses
+// MatrixToolbar gets the toggle without prop wiring.
+function DensityToggle() {
+  const { density, toggle } = useDensity();
+  const isCompact = density === 'compact';
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={isCompact}
+      className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-border bg-surface text-ink-soft hover:bg-surface-alt/50 hover:text-ink"
+      title={isCompact
+        ? 'Density: compact (denser rows). Click to switch to comfortable.'
+        : 'Density: comfortable (default). Click to switch to compact for scanning many rows.'}
+    >
+      {isCompact ? <RowsIcon size={12} /> : <MenuIcon size={12} />}
+      <span>{isCompact ? 'Compact' : 'Comfortable'}</span>
+    </button>
+  );
 }
