@@ -341,7 +341,7 @@ export function TaxTypeMatrix({
   // order becomes: [Family sticky left:0] [Entity sticky left:170] [rest…].
   const familyCol = columns.find(c => c.key === 'family') ?? null;
   const otherCols = columns.filter(c => c.key !== 'family');
-  const familyColWidth = 170;   // px — matches w-[170px]
+  const familyColWidth = 130;   // Stint 64.X.9 — was 170, narrowed with chip removal
   const entityStickyLeft = familyCol ? familyColWidth : 0;
 
   // Stint 51.C — render-context palette assignment. Walk the entities in
@@ -429,7 +429,7 @@ export function TaxTypeMatrix({
                 // Family header: stuck top + left, highest z so it
                 // wins the top-left corner against both body sticky
                 // cells and other header cells.
-                className="sticky top-0 left-0 z-[25] bg-surface-alt border-b border-r border-border px-2.5 py-2 font-medium min-w-[170px] max-w-[170px]"
+                className="sticky top-0 left-0 z-[25] bg-surface-alt border-b border-r border-border px-2.5 py-2 font-medium min-w-[130px] max-w-[130px]"
               >
                 {familyCol.label}
               </th>
@@ -773,20 +773,25 @@ function RowRender({
           // so when the user scrolls horizontally the Family column
           // never gets visually overlapped by the period cells passing
           // beneath. The bg class below keeps it opaque.
-          'sticky left-0 z-[15] border-r border-border px-2 py-1.5 min-w-[170px] max-w-[170px]',
+          // Stint 64.X.9 — family column was 170px to hold the chip
+          // background + family name. With the chip gone (plain text)
+          // we can tighten to 130px without truncation, freeing 40px
+          // for the more useful Entity column.
+          'sticky left-0 z-[15] border-r border-border px-2 py-1.5 min-w-[130px] max-w-[130px]',
           stickyBgClass,
           draggable ? 'cursor-grab active:cursor-grabbing' : '',
         ].join(' ')}
         title={draggable ? 'Drag the ≡ handle to reorder within this family' : undefined}
         >
           <div className="flex items-center gap-1 min-w-0">
-            {/* Stint 54 — visible drag handle so Diego knows the row
-                can be reordered (was hidden behind a cursor change
-                only). Only rendered when reorder is enabled. */}
+            {/* Stint 64.X.9 — drag handle now reveals on row hover only
+                (Linear / Notion pattern). Visible always was visual
+                noise across 140 rows on /tax-ops/cit. Diego still gets
+                the affordance the moment he hovers a row. */}
             {draggable && (
               <GripVerticalIcon
                 size={11}
-                className="shrink-0 text-ink-faint group-hover:text-ink-muted"
+                className="shrink-0 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity"
                 aria-hidden="true"
               />
             )}
@@ -794,10 +799,11 @@ function RowRender({
               {familyCol.render
                 ? familyCol.render(entity)
                 : (entity.group_name
-                    ? <span className={[
-                        'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium truncate max-w-[150px]',
-                        familyChipClasses(entity.group_name),
-                      ].join(' ')} title={entity.group_name}>
+                    // Stint 64.X.9 — plain text replaces the coloured
+                    // chip; group header above carries the family
+                    // identity. Same change applied to the editable
+                    // FamilyInlineSelect path.
+                    ? <span className="text-xs text-ink-muted truncate max-w-[150px]" title={entity.group_name}>
                         {entity.group_name}
                       </span>
                     : <span className="text-ink-faint italic text-xs">—</span>)

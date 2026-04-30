@@ -768,17 +768,27 @@ export function familyColumn(
   };
 }
 
-/** Chip rendered inside a TaxTypeMatrix — picks its colour from the
- *  per-render FamilyColorContext so adjacent families look distinct.
- *  Stint 51.C. */
+/** Plain family-name text rendered inside a TaxTypeMatrix.
+ *
+ * Stint 64.X.9 — Diego: "delante del nombre de la entidad hay un
+ * pequeño box que te he hablado de él mil veces. No me gusta." The
+ * coloured chip on every row repeated info that the sticky group
+ * header above ("ALTO (4)", "TRILANTIC (2)", …) already carried,
+ * adding 140 colourful boxes of pure noise on /tax-ops/cit. Linear /
+ * Notion / Asana don't repeat the group name on each row — the
+ * group header alone is sufficient. The plain-text version keeps
+ * the family name visible-on-hover-tooltip-only while collapsing
+ * the visual weight to near-zero.
+ *
+ * Earlier stints built this as a `<FamilyChip>` with `useFamilyChip
+ * Classes`. The function name + the colour palette helper stay in
+ * the codebase (still consumed by the family-overview page + the
+ * dropdown picker options) but the per-row chip becomes subtle text.
+ */
 function FamilyChip({ name }: { name: string }) {
-  const cls = useFamilyChipClasses(name);
   return (
     <span
-      className={[
-        'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium truncate max-w-[150px]',
-        cls,
-      ].join(' ')}
+      className="text-xs text-ink-muted truncate max-w-[150px]"
       title={name}
     >
       {name}
@@ -848,14 +858,10 @@ function FamilyInlineSelect({
     onChangedFamily();
   }
 
-  // Stint 48.B3 — `bare` mode on SearchableSelect drops its default
-  // border/bg/min-width so the family chip's bg-{tone}-100 actually
-  // renders. Without bare, the SearchableSelect's `bg-surface` was
-  // winning over the chip color.
-  // Stint 51.C — use the render-context palette so the trigger chip
-  // matches the row chip when collision-rotation kicks in.
-  const contextChip = useFamilyChipClasses(entity.group_name);
-  const chip = entity.group_name ? contextChip : 'bg-surface-alt text-ink-muted';
+  // Stint 64.X.9 — chip background removed (Diego: "no me gusta el
+  // pequeño box"). The trigger renders the family name as plain
+  // text; the dropdown options keep their coloured pills so the
+  // user can still scan-to-pick by colour when changing family.
   return (
     <SearchableSelect
       options={options}
@@ -863,10 +869,7 @@ function FamilyInlineSelect({
       onChange={(v) => void handleChange(v)}
       ariaLabel="Change family"
       bare
-      triggerClassName={[
-        'text-xs font-medium px-1.5 py-0.5 max-w-[170px] truncate',
-        chip,
-      ].join(' ')}
+      triggerClassName="text-xs text-ink-muted hover:text-ink max-w-[170px] truncate px-0 py-0"
     />
   );
 }
