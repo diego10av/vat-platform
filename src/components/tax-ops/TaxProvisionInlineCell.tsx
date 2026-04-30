@@ -45,6 +45,10 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { followUpSignal, PROVISION_WAITING_STATES } from './follow-up';
 import { FollowUpChip } from './FollowUpChip';
+// Stint 64.X.2.b — shared source of truth so the matrix cell + the
+// cross-cutting Filings list / detail / EntityFilingsMatrix all use
+// identical labels + tones. Local PROVISION_STATUS_META removed.
+import { PROVISION_STATUS_META, provisionStatusLabel } from './FilingStatusBadge';
 
 interface ProvisionCellData {
   obligation_id: string | null;
@@ -65,39 +69,11 @@ interface Props {
 }
 
 // ─────────────────────────── Status enum ──────────────────────────────
-
-const PROVISION_STATUS_META: Record<string, { label: string; tone: string; description: string }> = {
-  awaiting_fs: {
-    label: 'Awaiting FS',
-    tone: 'bg-surface-alt text-ink-muted',
-    description: 'Esperando que el cliente nos mande el borrador de los estados financieros para empezar a calcular la provision.',
-  },
-  fs_received: {
-    label: 'FS received',
-    tone: 'bg-amber-50 text-amber-800',
-    description: 'Hemos recibido el borrador de los estados financieros. Próximo paso: empezar a calcular la provision.',
-  },
-  working: {
-    label: 'Calculating',
-    tone: 'bg-amber-100 text-amber-800',
-    description: 'Trabajando en el cálculo de la tax provision a partir del borrador de FS.',
-  },
-  sent: {
-    label: 'Sent — awaiting feedback',
-    tone: 'bg-brand-100 text-brand-800',
-    description: 'Provision enviada al cliente. Esperando confirmación o comentarios. Si pasa una semana sin respuesta, asumir finalizada (Diego edita el status manualmente).',
-  },
-  comments_received: {
-    label: 'Comments received',
-    tone: 'bg-orange-100 text-orange-900',
-    description: 'El cliente ha enviado comentarios sobre la provision — necesita revisión y re-envío. Volver a "Calculating" cuando se empiece la revisión.',
-  },
-  finalized: {
-    label: 'Finalized',
-    tone: 'bg-green-100 text-green-800',
-    description: 'Provision aprobada por el cliente. El siguiente paso de este ciclo es la declaración CIT final cuando llegan los FS finales.',
-  },
-};
+//
+// Stint 64.X.2.b — PROVISION_STATUS_META and provisionStatusLabel
+// moved to FilingStatusBadge.tsx so cross-cutting screens (Filings
+// list, Filing detail, EntityFilingsMatrix) render the same labels.
+// Imported at the top of this file. Local copies removed.
 
 const PROVISION_STATUSES = [
   'awaiting_fs',
@@ -118,10 +94,6 @@ const PROVISION_STATUSES = [
 //                       confirmation or comments
 // NOT counted: fs_received (Diego's queue), working (Diego's queue),
 //   comments_received (Diego's queue), finalized (terminal).
-
-function provisionStatusLabel(s: string): string {
-  return PROVISION_STATUS_META[s]?.label ?? s.replace(/_/g, ' ');
-}
 
 // ─────────────────────────── Component ────────────────────────────────
 

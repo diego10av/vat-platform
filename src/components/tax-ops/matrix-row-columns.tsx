@@ -545,7 +545,9 @@ function ContactsInlineEditor({
           type="button"
           onClick={() => { setDraft(value); setOpen(true); }}
           disabled={disabled}
-          className="text-xs text-ink-muted hover:text-ink disabled:opacity-50 disabled:cursor-not-allowed italic"
+          // Stint 64.X.8 — `whitespace-nowrap` so the placeholder doesn't
+          // truncate as "+ Add conta" inside narrow Contacts columns.
+          className="text-xs text-ink-muted hover:text-ink disabled:opacity-50 disabled:cursor-not-allowed italic whitespace-nowrap"
           title={disabled ? 'Set a status first (creates the filing)' : 'Click to add contacts'}
         >
           + Add contact

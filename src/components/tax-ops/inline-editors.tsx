@@ -124,7 +124,7 @@ export function InlineTagsCell({
       ariaLabel="Edit tags"
       renderDisplay={(v) => (
         v.length === 0
-          ? <span className="text-ink-faint italic text-xs">{placeholder ?? 'Add…'}</span>
+          ? <span className="text-ink-faint italic text-xs whitespace-nowrap">{placeholder ?? 'Add…'}</span>
           : <span className="text-ink-soft text-xs">{v.join(', ')}</span>
       )}
       renderEditor={({ value, setValue, commit, cancel }) => (

@@ -52,7 +52,14 @@ export function DateBadge({
   }
 
   return (
-    <span className={`tabular-nums ${toneClass}`} title={label ? `${label}: ${formatDate(value)}` : undefined}>
+    <span
+      // Stint 64.X.8 — `whitespace-nowrap` so 10-char dates like
+      // "2026-04-25" don't wrap inside narrow matrix columns. The
+      // tabular-nums + nowrap pair gives the Linear/HubSpot tight
+      // numeric look.
+      className={`tabular-nums whitespace-nowrap ${toneClass}`}
+      title={label ? `${label}: ${formatDate(value)}` : undefined}
+    >
       {prefix}{formatDate(value)}
     </span>
   );

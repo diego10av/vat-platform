@@ -96,7 +96,9 @@ export const FILING_STATUSES = [
 // kept identical to that component so a status looks the same wherever
 // it's surfaced.
 
-const PROVISION_STATUS_META: Record<string, { label: string; tone: string; description: string }> = {
+// Stint 64.X.2.b — exported so TaxProvisionInlineCell shares the same
+// source of truth (no more duplicated meta drifting out of sync).
+export const PROVISION_STATUS_META: Record<string, { label: string; tone: string; description: string }> = {
   awaiting_fs: {
     label: 'Awaiting FS',
     tone: 'bg-surface-alt text-ink-muted',
@@ -115,12 +117,12 @@ const PROVISION_STATUS_META: Record<string, { label: string; tone: string; descr
   sent: {
     label: 'Sent — awaiting feedback',
     tone: 'bg-brand-100 text-brand-800',
-    description: 'Provision enviada al cliente. Esperando confirmación o comentarios.',
+    description: 'Provision enviada al cliente. Esperando confirmación o comentarios. Si pasa una semana sin respuesta, asumir finalizada (Diego edita el status manualmente).',
   },
   comments_received: {
     label: 'Comments received',
     tone: 'bg-orange-100 text-orange-900',
-    description: 'El cliente ha enviado comentarios sobre la provision — necesita revisión y re-envío.',
+    description: 'El cliente ha enviado comentarios sobre la provision — necesita revisión y re-envío. Volver a "Calculating" cuando se empiece la revisión.',
   },
   finalized: {
     label: 'Finalized',
@@ -128,6 +130,12 @@ const PROVISION_STATUS_META: Record<string, { label: string; tone: string; descr
     description: 'Provision aprobada por el cliente. El siguiente paso de este ciclo es la declaración CIT final cuando llegan los FS finales.',
   },
 };
+
+/** Stint 64.X.2.b — convenience label helper for callers that don't
+ *  need the full badge component. */
+export function provisionStatusLabel(s: string): string {
+  return PROVISION_STATUS_META[s]?.label ?? s.replace(/_/g, ' ');
+}
 
 export const PROVISION_STATUSES = [
   'awaiting_fs',
@@ -158,7 +166,12 @@ export function FilingStatusBadge({
   const meta = pickMeta(status, serviceKind);
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${meta.tone}`}
+      // Stint 64.X.8 — `whitespace-nowrap` so a 14-char status like
+      // "Info to request" doesn't wrap to 2 lines inside narrow matrix
+      // columns (Diego: tablas chirrían — referencia Linear / HubSpot
+      // tightness). The cell can scroll horizontally if needed; we
+      // never want a status to look like 2-row text.
+      className={`inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${meta.tone}`}
       title={meta.description ? `${meta.label} — ${meta.description}` : meta.label}
     >
       {meta.label}
