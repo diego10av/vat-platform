@@ -463,7 +463,11 @@ export default function CitPage() {
           onLiquidationChanged={refetchAll}
           onReorderWithinFamily={makeReorderHandler(refetchAll)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch: current.refetch, toast })
+            applyStatusChange({
+              entity, column, cell, nextStatus,
+              refetch: current.refetch, toast,
+              taxType: 'cit_annual', periodPattern: 'annual',
+            })
           }
           rowAction={(entity) => (
             <RemoveRowButton

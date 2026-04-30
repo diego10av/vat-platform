@@ -109,7 +109,10 @@ export default function BclSbsPage() {
           columns={columns}
           onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
+            applyStatusChange({
+              entity, column, cell, nextStatus, refetch, toast,
+              taxType: 'bcl_sbs_quarterly', periodPattern: 'quarterly',
+            })
           }
           rowAction={(entity) => (
             <RemoveRowButton

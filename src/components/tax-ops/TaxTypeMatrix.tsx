@@ -927,35 +927,28 @@ function CellRender({
   // Inline-edit enabled path (stint 36): render the status as an
   // InlineStatusCell with onSave wired to onStatusChange. Empty cells
   // still render the dropdown so the user can "set a status" → creates
-  // the filing on save. Disabled when the entity lacks an obligation_id
-  // (no way to place a filing without one).
+  // the filing on save.
   //
-  // Stint 64.X.1 side-effect fix: when an entity appears in the matrix
-  // via `or_kinds` (no primary filing obligation, only provision/review)
-  // and there's no cell for this period, render an em-dash instead of
-  // a misleading "Info to request" placeholder — that placeholder used
-  // to imply work was pending on a filing that doesn't exist for this
-  // entity. Diego saw this on Jacques rows after the or_kinds change.
+  // Stint 64.X.1.c — the cell is ALWAYS editable, even when the entity
+  // has no filing obligation_id (e.g. provision-only entities surfaced
+  // via or_kinds, like Jacques Holding/Invest). The page handler
+  // (applyStatusChange) creates the missing filing obligation
+  // on-demand before placing the filing — Diego's domain reality is
+  // that filing and provision are independent workstreams that can
+  // coexist (mig 071 relaxed the schema accordingly).
   if (onStatusChange) {
-    const disabled = !entity.obligation_id;
-    if (disabled && !cell) {
-      return (
-        <td
-          className={['px-2 py-1.5 align-middle text-ink-faint', column.widthClass ?? '', finalReturnRing].join(' ')}
-          title={('No filing obligation for this period' + finalReturnTooltipSuffix).trim() || undefined}
-        >
-          —
-        </td>
-      );
-    }
     return (
       <td
         className={['px-1.5 py-1 align-middle', column.widthClass ?? '', finalReturnRing].join(' ')}
-        title={(cell ? buildTooltip(cell) : disabled ? 'No obligation — add one on the entity detail page' : 'Click to set a status (creates the filing)') + finalReturnTooltipSuffix}
+        title={(cell
+          ? buildTooltip(cell)
+          : entity.obligation_id
+            ? 'Click to set a status (creates the filing)'
+            : 'Click to set a status (creates the filing obligation + filing)'
+        ) + finalReturnTooltipSuffix}
       >
         <InlineStatusCell
           value={cell?.status ?? 'info_to_request'}
-          disabled={disabled}
           onSave={(next) => onStatusChange({ entity, column, cell, nextStatus: next })}
         />
       </td>

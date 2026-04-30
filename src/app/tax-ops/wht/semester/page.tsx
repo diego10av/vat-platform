@@ -112,7 +112,10 @@ export default function WhtSemesterPage() {
           columns={columns}
           onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
+            applyStatusChange({
+              entity, column, cell, nextStatus, refetch, toast,
+              taxType: 'wht_director_semester', periodPattern: 'semester',
+            })
           }
           rowAction={(entity) => (
             <RemoveRowButton

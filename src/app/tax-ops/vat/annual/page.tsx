@@ -159,7 +159,17 @@ export default function VatAnnualPage() {
           onLiquidationChanged={refetch}
           onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
+            applyStatusChange({
+              entity, column, cell, nextStatus, refetch, toast,
+              // Stint 64.X.1.c — on-demand obligation creation. Today
+              // /tax-ops/vat/annual doesn't pass `or_kinds` so all rows
+              // already have a filing obligation; this default kicks in
+              // only if a future or_kinds expansion lands a row without
+              // one. Defaulting to `vat_annual` (the primary kind) is
+              // safe — Diego can switch a row to `vat_simplified_annual`
+              // explicitly via the entity edit drawer if needed.
+              taxType: 'vat_annual', periodPattern: 'annual',
+            })
           }
           rowAction={(entity) => (
             <RemoveRowButton

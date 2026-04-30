@@ -121,7 +121,10 @@ export default function VatQuarterlyPage() {
           onLiquidationChanged={refetch}
           onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
+            applyStatusChange({
+              entity, column, cell, nextStatus, refetch, toast,
+              taxType: 'vat_quarterly', periodPattern: 'quarterly',
+            })
           }
           rowAction={(entity) => (
             <RemoveRowButton

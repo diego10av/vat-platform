@@ -117,7 +117,10 @@ export default function VatMonthlyPage() {
           onLiquidationChanged={refetch}
           onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
+            applyStatusChange({
+              entity, column, cell, nextStatus, refetch, toast,
+              taxType: 'vat_monthly', periodPattern: 'monthly',
+            })
           }
           rowAction={(entity) => (
             <RemoveRowButton

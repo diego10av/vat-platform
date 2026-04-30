@@ -26,19 +26,26 @@ async function insertObligation(
   serviceKind: 'filing' | 'review' | 'provision',
 ): Promise<string> {
   const id = generateId();
+  // Stint 64.X.1.c (mig 071) — UNIQUE is now on the 4-tuple including
+  // service_kind, so the same entity can hold parallel filing +
+  // provision + review obligations. ON CONFLICT idempotent re-activates
+  // an existing match without overwriting the service_kind, which is
+  // now correctly the disambiguator.
   await execute(
     `INSERT INTO tax_obligations
        (id, entity_id, tax_type, period_pattern, service_kind, is_active)
      VALUES ($1, $2, $3, $4, $5, TRUE)
-     ON CONFLICT (entity_id, tax_type, period_pattern) DO UPDATE
-       SET is_active = TRUE, service_kind = EXCLUDED.service_kind,
-           updated_at = NOW()`,
+     ON CONFLICT (entity_id, tax_type, period_pattern, service_kind) DO UPDATE
+       SET is_active = TRUE, updated_at = NOW()`,
     [id, entityId, taxType, periodPattern, serviceKind],
   );
   const rows = await query<{ id: string }>(
     `SELECT id FROM tax_obligations
-      WHERE entity_id = $1 AND tax_type = $2 AND period_pattern = $3`,
-    [entityId, taxType, periodPattern],
+      WHERE entity_id = $1
+        AND tax_type = $2
+        AND period_pattern = $3
+        AND service_kind = $4`,
+    [entityId, taxType, periodPattern, serviceKind],
   );
   return rows[0]?.id ?? id;
 }

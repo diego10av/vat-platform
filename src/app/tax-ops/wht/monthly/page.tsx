@@ -113,7 +113,10 @@ export default function WhtMonthlyPage() {
           periodLabelsForEdit={data.period_labels}
           onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
+            applyStatusChange({
+              entity, column, cell, nextStatus, refetch, toast,
+              taxType: 'wht_director_monthly', periodPattern: 'monthly',
+            })
           }
           rowAction={(entity) => (
             <RemoveRowButton

@@ -354,6 +354,7 @@ interface ToastLikeForUndo {
 
 export async function applyStatusChange({
   entity, column, cell, nextStatus, refetch, toast,
+  taxType, periodPattern,
 }: {
   entity: MatrixEntity;
   column: MatrixColumn;
@@ -361,6 +362,18 @@ export async function applyStatusChange({
   nextStatus: string;
   refetch: () => void;
   toast?: ToastLikeForUndo;
+  /**
+   * Stint 64.X.1.c — when the entity has no `filing` obligation for
+   * this (tax_type, period_pattern) tuple (e.g. it appeared via
+   * `or_kinds` because only a `provision` obligation exists), the
+   * handler creates the filing obligation on-demand before posting
+   * the filing. Pages must pass the tax_type + period_pattern they
+   * queried with so we know what kind to create. They're optional
+   * here so legacy callers (without obligation creation) keep their
+   * old behaviour, but every active tax-ops page now passes them.
+   */
+  taxType?: string;
+  periodPattern?: string;
 }): Promise<void> {
   const entityLabel = entity.legal_name;
   const colLabel = column.label;
@@ -402,14 +415,45 @@ export async function applyStatusChange({
   // Empty cell — create the filing. We assume the column.key IS the
   // period_label (annual / Q1 / Jan-Dec). onStatusChange is only wired
   // on period columns; custom-rendered columns bypass this codepath.
-  if (!entity.obligation_id) {
-    throw new Error('No obligation on this entity');
+  let obligationId = entity.obligation_id;
+  if (!obligationId) {
+    // Stint 64.X.1.c — entity has no filing obligation for this
+    // (tax_type, period_pattern). Create one on-demand. This path
+    // fires for entities that appear via `or_kinds` (e.g. they only
+    // had a provision obligation) — Diego's mental model is that
+    // filing and provision are independent workstreams that can
+    // coexist on the same entity; mig 071 relaxed the schema to
+    // allow that, this code creates the missing filing obligation.
+    if (!taxType || !periodPattern) {
+      throw new Error(
+        'No obligation on this entity (and tax_type / period_pattern '
+        + 'not passed by the page so we cannot create one on-demand).',
+      );
+    }
+    const oRes = await fetch('/api/tax-ops/obligations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entity_id: entity.id,
+        tax_type: taxType,
+        period_pattern: periodPattern,
+        service_kind: 'filing',
+      }),
+    });
+    if (!oRes.ok) {
+      const body = await oRes.json().catch(() => ({}));
+      throw new Error(body?.error ?? `Failed to create obligation (${oRes.status})`);
+    }
+    const created = await oRes.json().catch(() => ({})) as { id?: string };
+    if (!created?.id) throw new Error('Obligation creation returned no id');
+    obligationId = created.id;
   }
+
   const res = await fetch('/api/tax-ops/filings', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      obligation_id: entity.obligation_id,
+      obligation_id: obligationId,
       period_label: column.key,
       status: nextStatus,
     }),

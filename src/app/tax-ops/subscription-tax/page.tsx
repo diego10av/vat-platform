@@ -115,7 +115,10 @@ export default function SubscriptionTaxPage() {
           columns={columns}
           onReorderWithinFamily={makeReorderHandler(refetch)}
           onStatusChange={({ entity, column, cell, nextStatus }) =>
-            applyStatusChange({ entity, column, cell, nextStatus, refetch, toast })
+            applyStatusChange({
+              entity, column, cell, nextStatus, refetch, toast,
+              taxType: 'subscription_tax_quarterly', periodPattern: 'quarterly',
+            })
           }
           rowAction={(entity) => (
             <RemoveRowButton
