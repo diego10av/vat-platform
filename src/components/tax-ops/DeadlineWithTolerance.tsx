@@ -78,7 +78,9 @@ export function DeadlineWithTolerance({
 
   return (
     <span
-      className={`tabular-nums ${toneClass}`}
+      // Stint 64.X.8 — `whitespace-nowrap` so a deadline like
+      // "2026-12-31" doesn't wrap inside narrow Deadline columns.
+      className={`tabular-nums whitespace-nowrap ${toneClass}`}
       title={title ?? (label ? `${label}: ${formatDate(value)}` : undefined)}
     >
       {prefix}{formatDate(value)}{suffix}

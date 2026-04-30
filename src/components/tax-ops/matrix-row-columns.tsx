@@ -952,7 +952,7 @@ export function lastFiledAtColumn(periodLabels: string[]): MatrixColumn {
         if (cell?.filed_at) {
           return (
             <span
-              className="text-xs text-ink-soft tabular-nums"
+              className="text-xs text-ink-soft tabular-nums whitespace-nowrap"
               title={`${periodLabels[i]} · filed ${cell.filed_at}`}
             >
               {cell.filed_at.slice(5)}
