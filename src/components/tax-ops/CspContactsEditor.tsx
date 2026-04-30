@@ -1,16 +1,46 @@
 'use client';
 
-// CSP contacts editor — list of {name, email, role} objects with
+// CSP contacts editor — list of {name, email, role, kind} objects with
 // +/- row controls. Used on filing detail (override) and entity
 // detail (defaults).
+//
+// Stint 64.X.6 — added optional `kind` so each contact carries its
+// classification per Big-4 best practice. Diego: "los contactos
+// pueden ser clientes, peers, etc — no sólo CSP." Backwards-compat:
+// missing kind treated as 'csp' (the historical default that the
+// schema field name implies). The editor exposes a dropdown so Diego
+// can override per row. The matrix contacts column reads the kind
+// to render a small classification chip next to the name.
 
 import { useState } from 'react';
 import { PlusIcon, Trash2Icon } from 'lucide-react';
+
+export type ContactKind = 'client' | 'csp' | 'peer' | 'internal' | 'other';
+
+export const CONTACT_KINDS: ContactKind[] = ['client', 'csp', 'peer', 'internal', 'other'];
+
+export const CONTACT_KIND_LABEL: Record<ContactKind, string> = {
+  client:   'Client',
+  csp:      'CSP',
+  peer:     'Peer',
+  internal: 'Internal',
+  other:    'Other',
+};
+
+export const CONTACT_KIND_TONE: Record<ContactKind, string> = {
+  client:   'bg-brand-50 text-brand-700 border border-brand-100',
+  csp:      'bg-amber-50 text-amber-800 border border-amber-100',
+  peer:     'bg-emerald-50 text-emerald-700 border border-emerald-100',
+  internal: 'bg-info-50 text-info-700 border border-info-100',
+  other:    'bg-surface-alt text-ink-muted border border-border',
+};
 
 export interface CspContact {
   name: string;
   email?: string;
   role?: string;
+  /** Stint 64.X.6 — classification per Big-4 convention. */
+  kind?: ContactKind;
 }
 
 export function CspContactsEditor({
@@ -81,6 +111,19 @@ export function CspContactsEditor({
             placeholder="Role"
             className="w-[110px] px-2 py-1 text-sm border border-border rounded-md bg-surface"
           />
+          {/* Stint 64.X.6 — kind dropdown. Defaults to 'csp' for
+              consistency with historical data, but Diego can switch
+              to client / peer / internal / other per row. */}
+          <select
+            value={c.kind ?? 'csp'}
+            onChange={e => update(i, { kind: e.target.value as ContactKind })}
+            aria-label="Contact kind"
+            className="w-[100px] px-1.5 py-1 text-xs border border-border rounded-md bg-surface"
+          >
+            {CONTACT_KINDS.map(k => (
+              <option key={k} value={k}>{CONTACT_KIND_LABEL[k]}</option>
+            ))}
+          </select>
           <button
             onClick={() => remove(i)}
             aria-label="Remove contact"

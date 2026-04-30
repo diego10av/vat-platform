@@ -12,7 +12,10 @@ import { InlineTagsCell, InlineTextCell, InlineDateCell, InlinePriceCell } from 
 import { DeadlineWithTolerance } from './DeadlineWithTolerance';
 import { familyChipClasses } from './familyColors';
 import { useFamilyChipClasses } from './FamilyColorContext';
-import { CspContactsEditor, type CspContact } from './CspContactsEditor';
+import {
+  CspContactsEditor, CONTACT_KIND_LABEL, CONTACT_KIND_TONE,
+  type CspContact,
+} from './CspContactsEditor';
 import { SearchableSelect, type SearchableOption } from '@/components/ui/SearchableSelect';
 
 // Patch helper — works off the cell's filing_id. When the cell is empty,
@@ -552,16 +555,27 @@ function ContactsInlineEditor({
           type="button"
           onClick={() => { setDraft(value); setOpen(true); }}
           className="inline-flex items-center gap-1 flex-wrap max-w-full hover:bg-brand-50/50 rounded px-0.5"
-          title={value.map(c => `${c.name}${c.email ? ` (${c.email})` : ''}${c.role ? ` · ${c.role}` : ''}`).join('\n')}
+          title={value.map(c => {
+            const k = c.kind ?? 'csp';
+            const label = CONTACT_KIND_LABEL[k] ?? k;
+            return `${c.name} [${label}]${c.email ? ` (${c.email})` : ''}${c.role ? ` · ${c.role}` : ''}`;
+          }).join('\n')}
         >
-          {value.slice(0, 2).map((c, i) => (
-            <span
-              key={i}
-              className="inline-flex items-center px-1.5 py-0.5 rounded-full text-2xs bg-brand-50 text-brand-700 truncate max-w-[100px]"
-            >
-              {c.name || '—'}
-            </span>
-          ))}
+          {value.slice(0, 2).map((c, i) => {
+            // Stint 64.X.6 — kind drives the chip tone so Diego can tell
+            // at a glance whether a row is talking to a Client / CSP /
+            // Peer without opening the popover.
+            const kind = (c.kind ?? 'csp') as keyof typeof CONTACT_KIND_TONE;
+            const tone = CONTACT_KIND_TONE[kind] ?? CONTACT_KIND_TONE.csp;
+            return (
+              <span
+                key={i}
+                className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-2xs truncate max-w-[100px] ${tone}`}
+              >
+                {c.name || '—'}
+              </span>
+            );
+          })}
           {value.length > 2 && (
             <span className="text-2xs text-ink-muted">+{value.length - 2}</span>
           )}
