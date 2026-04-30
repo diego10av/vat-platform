@@ -53,7 +53,19 @@ export default function CitPage() {
   const toast = useToast();
   const { groups, refetch: refetchGroups } = useClientGroups();
 
-  const current = useMatrixData({ tax_type: 'cit_annual', year, period_pattern: 'annual' });
+  // Stint 64.X.1 — `or_kinds` so entities with ONLY provision or
+  // ONLY review (NWT review) obligations still show as rows. Diego:
+  // "Jacques han desaparecido cuando he clicado en que las 2025 tax
+  // provisions se han enviado al cliente". They were never lost —
+  // just invisible because the matrix had been filtering rows on
+  // `service_kind='filing'` only. Now any cit_annual obligation
+  // (filing OR provision OR review) qualifies the entity for a row.
+  // Status cell stays empty for rows without a filing obligation,
+  // which is the right signal: "no main return tracked yet here".
+  const current = useMatrixData({
+    tax_type: 'cit_annual', year, period_pattern: 'annual',
+    or_kinds: ['provision', 'review'],
+  });
   const prior = useMatrixData({ tax_type: 'cit_annual', year: year - 1, period_pattern: 'annual' });
   // Stint 64.N — NWT Review column tracks the {year+1} period, not
   // {year}. Diego: "la siguiente columna quiero que sea netwell tax

@@ -26,6 +26,14 @@ export interface MatrixQuery {
   // Stint 64.J adds 'provision' for the new CIT tax-provision column.
   service_kind?: 'filing' | 'review' | 'provision';
   show_inactive?: boolean;
+  /**
+   * Stint 64.X.1 — additional service_kinds whose obligation existence
+   * also includes the entity in the result set, even without a primary
+   * `service_kind` obligation. Used by /tax-ops/cit so entities with
+   * only provision (or only review) still appear as rows. The Status
+   * cell stays empty when no primary obligation exists.
+   */
+  or_kinds?: Array<'filing' | 'review' | 'provision'>;
 }
 
 export function useMatrixData(q: MatrixQuery | null): {
@@ -50,6 +58,7 @@ export function useMatrixData(q: MatrixQuery | null): {
     if (q.period_pattern) qs.set('period_pattern', q.period_pattern);
     if (q.service_kind) qs.set('service_kind', q.service_kind);
     if (q.show_inactive) qs.set('show_inactive', '1');
+    if (q.or_kinds && q.or_kinds.length > 0) qs.set('or_kinds', q.or_kinds.join(','));
 
     setIsLoading(true);
     setError(null);
@@ -68,7 +77,7 @@ export function useMatrixData(q: MatrixQuery | null): {
         if (!cancelled) setIsLoading(false);
       });
     return () => { cancelled = true; };
-  }, [q?.tax_type, q?.year, q?.period_pattern, q?.service_kind, q?.show_inactive, tick]);
+  }, [q?.tax_type, q?.year, q?.period_pattern, q?.service_kind, q?.show_inactive, q?.or_kinds?.join(','), tick]);
 
   return { data, error, isLoading, refetch };
 }

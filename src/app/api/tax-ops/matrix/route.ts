@@ -118,6 +118,19 @@ export async function GET(request: NextRequest) {
   const period_pattern = url.searchParams.get('period_pattern') ?? (tax_type ? PATTERN_OF(tax_type) : 'annual');
   const service_kind = url.searchParams.get('service_kind') ?? 'filing';
   const showInactive = url.searchParams.get('show_inactive') === '1';
+  // Stint 64.X.1 — extra service kinds whose existence ALSO causes the
+  // entity to appear as a row, even when it has NO primary obligation
+  // of `service_kind`. Diego: "Jacques han desaparecido cuando he
+  // clicado en que las 2025 tax provisions se han enviado al cliente".
+  // Cause: entities with only `provision` (no `filing`) were absent
+  // from /tax-ops/cit. Now the CIT page passes or_kinds=provision,review
+  // so any entity with EITHER a CIT filing OR a CIT provision OR a NWT
+  // review (= currently shown columns) appears as a row. obligation_id
+  // still refers to the primary `service_kind` obligation; when the row
+  // has only an or_kind match, obligation_id stays null and the Status
+  // cell renders empty (Diego can create a filing inline if he wants).
+  const orKindsRaw = url.searchParams.get('or_kinds') ?? '';
+  const orKinds = orKindsRaw.split(',').map(s => s.trim()).filter(Boolean);
 
   if (!tax_type || !yearStr) {
     return NextResponse.json({ error: 'tax_type_and_year_required' }, { status: 400 });
@@ -178,7 +191,45 @@ export async function GET(request: NextRequest) {
        -- fall back to alphabetical legal_name when no custom order set.
        ORDER BY g.name ASC NULLS LAST, e.display_order ASC NULLS LAST, e.legal_name ASC
       `
-    : `
+    : orKinds.length > 0
+      ? `
+      -- Stint 64.X.1 — UNION of (entity has primary obligation) +
+      -- (entity has any or_kind obligation). obligation_id still
+      -- prefers the primary service_kind so the Status cell of the
+      -- main matrix keeps pointing at filing data; when only or_kinds
+      -- match, obligation_id is null and Status renders empty.
+      SELECT e.id, e.legal_name, e.liquidation_date::text AS liquidation_date,
+             e.csp_contacts AS csp_contacts,
+             g.id AS group_id, g.name AS group_name,
+             (SELECT o.id FROM tax_obligations o
+               WHERE o.entity_id = e.id
+                 AND o.tax_type = $1
+                 AND o.period_pattern = $2
+                 AND o.service_kind = $3
+                 AND o.is_active = TRUE
+               LIMIT 1) AS obligation_id,
+             (SELECT o.form_code FROM tax_obligations o
+               WHERE o.entity_id = e.id
+                 AND o.tax_type = $1
+                 AND o.period_pattern = $2
+                 AND o.service_kind = $3
+                 AND o.is_active = TRUE
+               LIMIT 1) AS form_code
+        FROM tax_entities e
+        LEFT JOIN tax_client_groups g ON g.id = e.client_group_id
+       WHERE (e.is_active = TRUE
+              OR (e.liquidation_date IS NOT NULL AND e.liquidation_date >= make_date($4::int, 1, 1)))
+         AND EXISTS (
+           SELECT 1 FROM tax_obligations o
+            WHERE o.entity_id = e.id
+              AND o.tax_type = $1
+              AND o.period_pattern = $2
+              AND (o.service_kind = $3 OR o.service_kind = ANY($5::text[]))
+              AND o.is_active = TRUE
+         )
+       ORDER BY g.name ASC NULLS LAST, e.display_order ASC NULLS LAST, e.legal_name ASC
+      `
+      : `
       SELECT e.id, e.legal_name, e.liquidation_date::text AS liquidation_date,
              e.csp_contacts AS csp_contacts,
              g.id AS group_id, g.name AS group_name,
@@ -205,7 +256,14 @@ export async function GET(request: NextRequest) {
     group_id: string | null; group_name: string | null;
     obligation_id: string | null;
     form_code: string | null;
-  }>(entityQuery, [tax_type, period_pattern, service_kind, year]);
+  }>(
+    entityQuery,
+    // The or_kinds branch references $5; both other branches stop at $4.
+    // Passing the extra arg unconditionally is harmless when ignored.
+    orKinds.length > 0 && !showInactive
+      ? [tax_type, period_pattern, service_kind, year, orKinds]
+      : [tax_type, period_pattern, service_kind, year],
+  );
 
   // Load every filing for these (obligation, period_label) pairs in one round-trip.
   const obligationIds = entities.map(e => e.obligation_id).filter((x): x is string => !!x);
