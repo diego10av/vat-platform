@@ -3,6 +3,18 @@
 // Small status chip for tax filings. Colors chosen to be legible at a
 // glance in grid rows — not decorative.
 //
+// Stint 64.X.2 — provision filings have a DIFFERENT status enum
+// (awaiting_fs / fs_received / working / sent / comments_received /
+// finalized) with different semantics from filings (info_to_request /
+// info_requested / working / draft_sent / client_approved / filed).
+// Most call sites know which kind they're dealing with — the matrix
+// Status column is filing-only, the TaxProvisionInlineCell renders
+// provisions internally. But the cross-cutting Filings list at
+// `/tax-ops/filings` and the entity detail's filings matrix mix both
+// kinds; for those, callers pass `serviceKind` and the badge routes
+// the label/tone accordingly. Default behaviour (no serviceKind) is
+// the historical filing labels so existing call sites don't change.
+//
 // Status enum v4 (stint 49):
 //   - new info_requested between info_to_request and working
 //     (Diego: "puedo tener que pedir la información, pero si la he
@@ -76,8 +88,74 @@ export const FILING_STATUSES = [
   'filed',
 ];
 
-export function FilingStatusBadge({ status }: { status: string }) {
-  const meta = STATUS_META[status] ?? { label: status, tone: 'bg-surface-alt text-ink-muted', description: '' };
+// ─────────────────── Provision status enum (stint 64.X.2) ───────────────────
+// Kept side-by-side with the filing meta so cross-cutting screens (the
+// /tax-ops/filings list, /tax-ops/filings/[id] detail, EntityFilingsMatrix)
+// can render the correct labels for provision rows. The provision UX
+// authority lives in TaxProvisionInlineCell — those labels here are
+// kept identical to that component so a status looks the same wherever
+// it's surfaced.
+
+const PROVISION_STATUS_META: Record<string, { label: string; tone: string; description: string }> = {
+  awaiting_fs: {
+    label: 'Awaiting FS',
+    tone: 'bg-surface-alt text-ink-muted',
+    description: 'Esperando que el cliente nos mande el borrador de los estados financieros para empezar a calcular la provision.',
+  },
+  fs_received: {
+    label: 'FS received',
+    tone: 'bg-amber-50 text-amber-800',
+    description: 'Hemos recibido el borrador de los estados financieros. Próximo paso: empezar a calcular la provision.',
+  },
+  working: {
+    label: 'Calculating',
+    tone: 'bg-amber-100 text-amber-800',
+    description: 'Trabajando en el cálculo de la tax provision a partir del borrador de FS.',
+  },
+  sent: {
+    label: 'Sent — awaiting feedback',
+    tone: 'bg-brand-100 text-brand-800',
+    description: 'Provision enviada al cliente. Esperando confirmación o comentarios.',
+  },
+  comments_received: {
+    label: 'Comments received',
+    tone: 'bg-orange-100 text-orange-900',
+    description: 'El cliente ha enviado comentarios sobre la provision — necesita revisión y re-envío.',
+  },
+  finalized: {
+    label: 'Finalized',
+    tone: 'bg-green-100 text-green-800',
+    description: 'Provision aprobada por el cliente. El siguiente paso de este ciclo es la declaración CIT final cuando llegan los FS finales.',
+  },
+};
+
+export const PROVISION_STATUSES = [
+  'awaiting_fs',
+  'fs_received',
+  'working',
+  'sent',
+  'comments_received',
+  'finalized',
+];
+
+export type ServiceKind = 'filing' | 'provision' | 'review';
+
+function pickMeta(status: string, serviceKind: ServiceKind | undefined) {
+  if (serviceKind === 'provision') {
+    return PROVISION_STATUS_META[status]
+      ?? { label: status, tone: 'bg-surface-alt text-ink-muted', description: '' };
+  }
+  // Default + 'filing' + 'review' use the filing meta. Reviews historically
+  // share the filing enum (Diego: review = lighter filing, no separate
+  // status semantics needed today).
+  return STATUS_META[status]
+    ?? { label: status, tone: 'bg-surface-alt text-ink-muted', description: '' };
+}
+
+export function FilingStatusBadge({
+  status, serviceKind,
+}: { status: string; serviceKind?: ServiceKind }) {
+  const meta = pickMeta(status, serviceKind);
   return (
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${meta.tone}`}
@@ -88,10 +166,17 @@ export function FilingStatusBadge({ status }: { status: string }) {
   );
 }
 
-export function filingStatusLabel(status: string): string {
-  return STATUS_META[status]?.label ?? status;
+export function filingStatusLabel(status: string, serviceKind?: ServiceKind): string {
+  return pickMeta(status, serviceKind).label;
 }
 
-export function filingStatusDescription(status: string): string {
-  return STATUS_META[status]?.description ?? '';
+export function filingStatusDescription(status: string, serviceKind?: ServiceKind): string {
+  return pickMeta(status, serviceKind).description;
+}
+
+/** Stint 64.X.2 — explicit provision-only badge for callers that
+ *  always render provisions (e.g. TaxProvisionInlineCell). Convenience
+ *  wrapper around the same routing logic. */
+export function ProvisionStatusBadge({ status }: { status: string }) {
+  return <FilingStatusBadge status={status} serviceKind="provision" />;
 }

@@ -25,6 +25,12 @@ import { shortPeriodLabel } from './useMatrixData';
 export interface EntityFiling {
   id: string;
   tax_type: string;
+  /** Stint 64.X.2 — service_kind threads through to FilingStatusBadge
+   *  so provision filings render with the provision label set
+   *  (Awaiting FS, Calculating, Sent — awaiting feedback, Finalized)
+   *  instead of the filing one. Optional for backward compat with
+   *  callers that haven't been updated yet. */
+  service_kind?: 'filing' | 'provision' | 'review';
   period_year: number;
   period_label: string;
   deadline_date: string | null;
@@ -242,7 +248,7 @@ function PeriodCell({ label, filing }: { label: string; filing: EntityFiling | n
     );
   }
   const tooltipParts = [
-    filingStatusLabel(filing.status),
+    filingStatusLabel(filing.status, filing.service_kind),
     filing.deadline_date ? `Deadline: ${filing.deadline_date}` : null,
     filing.filed_at ? `Filed: ${filing.filed_at}` : null,
     filing.tax_assessment_received_at ? `Assessment: ${filing.tax_assessment_received_at}` : null,
@@ -254,7 +260,7 @@ function PeriodCell({ label, filing }: { label: string; filing: EntityFiling | n
       title={tooltipParts.join('\n')}
     >
       <Link href={`/tax-ops/filings/${filing.id}`} className="inline-block">
-        <FilingStatusBadge status={filing.status} />
+        <FilingStatusBadge status={filing.status} serviceKind={filing.service_kind} />
       </Link>
     </td>
   );

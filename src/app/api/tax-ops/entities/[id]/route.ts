@@ -82,7 +82,7 @@ export async function GET(
       // review actually lives as a column) reads its own filings via
       // the matrix endpoint, not this one — so the column there is
       // unaffected.
-      `SELECT f.id, f.obligation_id, o.tax_type,
+      `SELECT f.id, f.obligation_id, o.tax_type, o.service_kind,
               f.period_year, f.period_label,
               f.deadline_date::text, f.status, f.assigned_to,
               f.filed_at::text, f.tax_assessment_received_at::text

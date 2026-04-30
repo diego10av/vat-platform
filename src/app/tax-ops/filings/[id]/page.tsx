@@ -37,6 +37,10 @@ interface FilingDetail {
   group_id: string | null;
   group_name: string | null;
   tax_type: string;
+  /** Stint 64.X.2 — provision filings render with the provision label
+   *  set; field added to the FilingDetail GET response so the badge
+   *  uses the right enum. */
+  service_kind?: 'filing' | 'provision' | 'review';
   period_pattern: string;
   period_year: number;
   period_label: string;
@@ -144,7 +148,7 @@ export default function FilingDetailPage({ params }: { params: Promise<{ id: str
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <FilingStatusBadge status={data.status} />
+            <FilingStatusBadge status={data.status} serviceKind={data.service_kind} />
             <select
               value={data.status}
               onChange={e => patch({ status: e.target.value }, 'Status updated')}

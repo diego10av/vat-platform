@@ -30,6 +30,11 @@ interface FilingListRow {
   group_id: string | null;
   group_name: string | null;
   tax_type: string;
+  /** Stint 64.X.2 — provision filings have a different status enum
+   *  from filings. Returning service_kind lets the UI render the
+   *  correct labels (Awaiting FS, Calculating, etc) instead of the
+   *  filing labels (Info to request, Working, Filed). */
+  service_kind: 'filing' | 'provision' | 'review';
   period_year: number;
   period_label: string;
   deadline_date: string | null;
@@ -91,7 +96,8 @@ export async function GET(request: NextRequest) {
     `SELECT f.id, f.obligation_id,
             e.id AS entity_id, e.legal_name AS entity_name,
             g.id AS group_id, g.name AS group_name,
-            o.tax_type, f.period_year, f.period_label,
+            o.tax_type, o.service_kind,
+            f.period_year, f.period_label,
             f.deadline_date::text AS deadline_date,
             f.status, f.assigned_to, f.prepared_with,
             COALESCE(JSONB_ARRAY_LENGTH(

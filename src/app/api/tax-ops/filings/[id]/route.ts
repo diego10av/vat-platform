@@ -13,6 +13,9 @@ interface FilingDetail {
   group_id: string | null;
   group_name: string | null;
   tax_type: string;
+  /** Stint 64.X.2 — service_kind drives status-label routing on the
+   *  detail page (provision vs filing enums). */
+  service_kind: 'filing' | 'provision' | 'review';
   period_pattern: string;
   period_year: number;
   period_label: string;
@@ -63,7 +66,7 @@ export async function GET(
     `SELECT f.id, f.obligation_id,
             e.id AS entity_id, e.legal_name AS entity_name,
             g.id AS group_id, g.name AS group_name,
-            o.tax_type, o.period_pattern,
+            o.tax_type, o.service_kind, o.period_pattern,
             f.period_year, f.period_label,
             f.deadline_date::text AS deadline_date,
             f.status, f.assigned_to, f.prepared_with,

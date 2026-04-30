@@ -34,6 +34,7 @@ interface FilingListRow {
   group_id: string | null;
   group_name: string | null;
   tax_type: string;
+  service_kind: 'filing' | 'provision' | 'review';
   period_year: number;
   period_label: string;
   deadline_date: string | null;
@@ -219,7 +220,7 @@ export default function FilingsListPage() {
                   <td className="px-3 py-2 text-ink-soft">{humanTaxType(f.tax_type)}</td>
                   <td className="px-3 py-2 tabular-nums">{f.period_label}</td>
                   <td className="px-3 py-2"><DateBadge value={f.deadline_date} mode="urgency" /></td>
-                  <td className="px-3 py-2"><FilingStatusBadge status={f.status} /></td>
+                  <td className="px-3 py-2"><FilingStatusBadge status={f.status} serviceKind={f.service_kind} /></td>
                   <td className="px-3 py-2 text-ink-soft">{f.assigned_to ?? '—'}</td>
                   <td className="px-3 py-2 text-right tabular-nums text-ink-muted">{f.csp_count || '—'}</td>
                 </tr>
