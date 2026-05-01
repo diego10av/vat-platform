@@ -269,7 +269,18 @@ export function EntityActionsMenu({
         onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
         aria-label={`Actions for ${entityName}`}
         title="Entity actions"
-        className="inline-flex items-center justify-center w-5 h-5 rounded text-ink-faint opacity-60 hover:opacity-100 hover:bg-surface-alt hover:text-ink"
+        // Stint 64.X.11 — kebab now reveals on row hover only (Linear /
+        // Notion pattern). Was `opacity-60` at rest which still painted
+        // 140 dots of grey across /tax-ops/cit; the parent <tr> carries
+        // `group` so this descendant's `group-hover:` works. While the
+        // menu is OPEN we force opacity-100 so the trigger doesn't
+        // disappear from the user's mouse path the moment they move it
+        // off the row to use the popover.
+        className={[
+          'inline-flex items-center justify-center w-5 h-5 rounded transition-opacity',
+          'text-ink-faint hover:bg-surface-alt hover:text-ink',
+          open ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+        ].join(' ')}
       >
         <MoreVerticalIcon size={12} />
       </button>

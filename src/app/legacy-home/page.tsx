@@ -399,7 +399,7 @@ export default function Home() {
             compact
           >
             <div className="flex items-baseline gap-2">
-              <div className="text-[34px] font-bold text-ink tabular-nums leading-none tracking-tight">
+              <div className="text-3xl font-bold text-ink tabular-nums leading-none tracking-tight">
                 {filedThisMonth}
               </div>
               <div className="text-sm text-ink-muted">declarations filed</div>
