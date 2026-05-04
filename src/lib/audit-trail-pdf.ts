@@ -117,7 +117,38 @@ export async function buildAuditTrailPDF(declarationId: string): Promise<AuditPD
     mono:    await pdfDoc.embedFont(StandardFonts.Courier),
   };
 
-  let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+  // Stint 67.D bug fix: pdf-lib StandardFonts use WinAnsi encoding
+  // which can't encode glyphs outside Latin-1 (→ arrows, “ ” curly
+  // quotes, … ellipsis, etc). Audit-trail PDFs were 500-ing on the
+  // very first non-trivial declaration because the inline-diff
+  // format includes "old → new". `addSafePage` wraps every new page
+  // so its drawText silently replaces non-Latin1 glyphs with ASCII
+  // equivalents. A stray Unicode char from a provider name or
+  // description should never abort the whole audit-trail render.
+  function safe(s: unknown): string {
+    return String(s ?? '')
+      .replace(/[→➔➜➞]/g, '->')
+      .replace(/[—―]/g, '--')
+      .replace(/[–]/g, '-')
+      .replace(/[“”„‟]/g, '"')
+      .replace(/[‘’‚‛]/g, "'")
+      .replace(/[…]/g, '...')
+      .replace(/[ ]/g, ' ')
+      .replace(/[•·]/g, '*')
+      // Strip any remaining BMP codepoint outside Latin-1 (≥ 0x100)
+      // as a final guard. Reviewer reads "?" instead of crashing.
+      .replace(/[Ā-￿]/g, '?');
+  }
+  function addSafePage(): ReturnType<typeof pdfDoc.addPage> {
+    const p = pdfDoc.addPage([PAGE_W, PAGE_H]);
+    const orig = p.drawText.bind(p);
+    type DrawTextOpts = Parameters<typeof p.drawText>[1];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (p as any).drawText = (text: string, opts: DrawTextOpts) => orig(safe(text), opts);
+    return p;
+  }
+
+  let page = addSafePage();
   let y = PAGE_H - MARGIN;
 
   // Header band
@@ -191,7 +222,7 @@ export async function buildAuditTrailPDF(declarationId: string): Promise<AuditPD
     if (y - rowHeight < MARGIN + 30) {
       // Footer on the page we're about to leave
       drawFooter(page, fonts);
-      page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+      page = addSafePage();
       y = PAGE_H - MARGIN;
     }
     y = drawEventRow(page, fonts, row, y);
@@ -228,7 +259,7 @@ export async function buildAuditTrailPDF(declarationId: string): Promise<AuditPD
     // Page break if we're close to the bottom
     if (y < MARGIN + 120) {
       drawFooter(page, fonts);
-      page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+      page = addSafePage();
       y = PAGE_H - MARGIN;
     } else {
       y -= 14;
@@ -246,7 +277,7 @@ export async function buildAuditTrailPDF(declarationId: string): Promise<AuditPD
       const estH = estimateAttachmentHeight(att);
       if (y - estH < MARGIN + 30) {
         drawFooter(page, fonts);
-        page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+        page = addSafePage();
         y = PAGE_H - MARGIN;
       }
       y = drawAttachmentRow(page, fonts, att, y);
