@@ -90,7 +90,17 @@ export async function buildECSLReport(declarationId: string): Promise<ECSLReport
         AND il.state != 'deleted'
         AND i.direction = 'outgoing'
         AND il.treatment IN ('OUT_EU_RC', 'OUT_IC_GOODS', 'OUT_LU_TRIANG')
-      GROUP BY customer_name, customer_vat_raw, country, il.treatment
+      -- Postgres requires either output-position numbers or the full
+      -- expressions in GROUP BY. The earlier alias-only form
+      -- ("GROUP BY customer_name, …, country") happened to work in
+      -- some older PG versions but blew up on the live 17 instance
+      -- with "column \"i.customer_country\" must appear in the GROUP BY".
+      -- Repeating the expressions is the portable fix.
+      GROUP BY
+        COALESCE(i.customer_name_as_written, i.provider),
+        COALESCE(NULLIF(i.customer_vat, ''), NULLIF(i.provider_vat, '')),
+        UPPER(COALESCE(NULLIF(i.customer_country, ''), NULLIF(i.country, ''), '')),
+        il.treatment
       ORDER BY country, customer_name`,
     [declarationId]
   );
