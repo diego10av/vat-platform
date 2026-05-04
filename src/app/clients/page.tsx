@@ -12,7 +12,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useCallback, useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -61,12 +61,17 @@ const FILTERS = ['all', 'end_client', 'csp', 'other'] as const;
 type ClientFilter = typeof FILTERS[number];
 const PAGE_SIZES = [25, 50, 100, 250] as const;
 
+// Stint 67.C: removed the <Suspense fallback={<PageSkeleton />}> wrapper
+// that previously sat around <ClientsContent />. With force-dynamic on
+// this page (and the root layout) useSearchParams resolves at request
+// time on the server — it doesn't suspend, so the boundary added to
+// "satisfy" useSearchParams in static mode was actually trapping the
+// SSR stream in a permanently-pending state on production. Removing
+// the wrapper lets React render the content directly; ClientsContent
+// already renders <PageSkeleton /> when `clients === null`, so the
+// loading visual is identical, just without the dead Suspense.
 export default function ClientsPage() {
-  return (
-    <Suspense fallback={<PageSkeleton />}>
-      <ClientsContent />
-    </Suspense>
-  );
+  return <ClientsContent />;
 }
 
 function ClientsContent() {
