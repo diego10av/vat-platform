@@ -16,9 +16,11 @@
 //
 // Shape of the diff returned to the client when kind=vat_registration:
 //   [{ field: 'frequency', before: 'quarterly', after: 'monthly', changed: true }, …]
-// The client shows these in a modal and PATCHes /api/entities/:id
-// with only the fields the user confirms. We do NOT auto-apply diffs —
-// the reviewer is always the final authority (Gassner principle).
+// The client shows these in a modal and POSTs to
+// /api/entities/:id/apply-vat-letter-diff with the per-field selection
+// the user confirms. We do NOT auto-apply diffs — the reviewer is
+// always the final authority (Gassner principle). See
+// src/components/entity/OfficialDocumentsCard.tsx for the modal UI.
 // ════════════════════════════════════════════════════════════════════════
 
 import { NextRequest } from 'next/server';
