@@ -5,7 +5,12 @@
 // expands to show the entities that hang off it + their lifecycle.
 //
 // Stint 12: URL-synced filters + sort dropdown + pagination.
+// Stint 67.B.b: page-level force-dynamic — the layout-level setting
+// from 67.B did not propagate; opting out per-page is what actually
+// flips the static-prerender Suspense trap to streaming-resolves-now.
 // ════════════════════════════════════════════════════════════════════════
+
+export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';

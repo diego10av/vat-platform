@@ -1,5 +1,7 @@
 'use client';
 
+// Stint 67.B.b: per-page force-dynamic — see /clients/page.tsx.
+export const dynamic = 'force-dynamic';
 // /tax-ops/cit — Corporate tax returns (Form 500) per entity.
 // Stint 37.D redesign: family column visible, Assessment {year-1}
 // editable inline, NWT Review {year} collapsed into a column (was

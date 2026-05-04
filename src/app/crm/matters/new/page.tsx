@@ -1,5 +1,7 @@
 'use client';
 
+// Stint 67.B.b: per-page force-dynamic — see /clients/page.tsx.
+export const dynamic = 'force-dynamic';
 // ════════════════════════════════════════════════════════════════════════
 // /crm/matters/new — Four-step matter intake wizard.
 //

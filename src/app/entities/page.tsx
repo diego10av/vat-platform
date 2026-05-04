@@ -5,7 +5,10 @@
 //
 // Stint 12: URL-synced filters + column sort + pagination (via
 // useListState + ListFooter). Matches the declarations-list UX.
+// Stint 67.B.b: per-page force-dynamic — see /clients/page.tsx.
 // ════════════════════════════════════════════════════════════════════════
+
+export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';

@@ -10,7 +10,10 @@
 //
 // Periods are picked via a compact segmented control at the top.
 // Default: current calendar quarter.
+// Stint 67.B.b: per-page force-dynamic — see /clients/page.tsx.
 // ════════════════════════════════════════════════════════════════════════
+
+export const dynamic = 'force-dynamic';
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';

@@ -1,5 +1,7 @@
 'use client';
 
+// Stint 67.B.b: per-page force-dynamic — see /clients/page.tsx.
+export const dynamic = 'force-dynamic';
 // ════════════════════════════════════════════════════════════════════════
 // /entities/new — create an entity under a Client.
 //

@@ -1,5 +1,7 @@
 'use client';
 
+// Stint 67.B.b: per-page force-dynamic — see /clients/page.tsx.
+export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';

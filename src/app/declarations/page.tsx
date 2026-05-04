@@ -5,6 +5,9 @@
 // dashboard work), and a clean table. New-declaration creation goes
 // through the NewDeclarationModal (same path as the Home CTA) — no
 // inline form on this page since stint 14.
+// Stint 67.B.b: per-page force-dynamic — see /clients/page.tsx.
+
+export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, Suspense, useCallback } from 'react';
 import Link from 'next/link';

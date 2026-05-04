@@ -1,5 +1,7 @@
 'use client';
 
+// Stint 67.B.b: per-page force-dynamic — see /clients/page.tsx.
+export const dynamic = 'force-dynamic';
 // /tax-ops/tasks — rediseño 37.G para gestión de proyectos real.
 // Columnas: Family | Entity | Title | Kind | Status | Waiting on |
 //           Follow-up | Assignee | Due | Priority | Actions
