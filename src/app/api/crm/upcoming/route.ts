@@ -23,7 +23,11 @@ import { query } from '@/lib/db';
 //   - crm_matters.closing_date (active)    → type: 'matter_close'
 //   - crm_tasks.due_date (open)            → type: 'task_due'
 //   - crm_billing_invoices.due_date (outstanding) → type: 'invoice_due'
-//   - tax_filings.deadline_date (not filed)       → type: 'tax_deadline'
+//
+// Stint 66.B — `tax_deadline` source removed (Rule §14: strict
+// module independence). The 'tax_deadline' event type stays in the
+// union so existing consumers don't crash, but no new events of
+// that type are emitted by this endpoint.
 //
 // Returns flat array, sorted ascending by date.
 
@@ -240,44 +244,16 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // ─── 8. Tax-ops filing deadlines (stint 64.Q.6) ────────────────
-  // Every active filing whose statutory deadline lands inside the
-  // window AND that hasn't been filed/paid/waived yet. Joins to
-  // tax_obligations + tax_entities for the human-readable label
-  // ("VAT Q1 2026 · Acme SARL"). Status filter mirrors what the
-  // tax-ops "Deadline radar" widget on /tax-ops home considers
-  // actionable.
-  const taxDeadlines = await query<{
-    id: string;
-    deadline_date: string;
-    period_label: string;
-    tax_type: string;
-    entity_id: string;
-    entity_name: string;
-    status: string;
-  }>(
-    `SELECT f.id, f.deadline_date::text, f.period_label, o.tax_type,
-            e.id AS entity_id, e.legal_name AS entity_name, f.status
-       FROM tax_filings f
-       JOIN tax_obligations o ON o.id = f.obligation_id
-       JOIN tax_entities    e ON e.id = o.entity_id
-      WHERE o.is_active = TRUE
-        AND e.is_active = TRUE
-        AND f.deadline_date IS NOT NULL
-        AND f.status NOT IN ('filed', 'paid', 'waived')
-        AND f.deadline_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ($1 || ' days')::interval`,
-    [days],
-  );
-  for (const t of taxDeadlines) {
-    const niceTaxType = t.tax_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    events.push({
-      id: `tax_deadline:${t.id}`, type: 'tax_deadline', date: t.deadline_date,
-      title: `${niceTaxType} · ${t.period_label}`,
-      detail: t.entity_name,
-      link: `/tax-ops/filings/${t.id}`,
-      target_type: 'tax_filing', target_id: t.id,
-    });
-  }
+  // Stint 66.B — section "Tax-ops filing deadlines" REMOVED. It was
+  // pulling tax_filings + tax_obligations + tax_entities into the CRM
+  // upcoming widget (stint 64.Q.6). Diego's Rule §14: strict module
+  // independence — CRM does not surface Tax-Ops data. Tax deadlines
+  // belong to /tax-ops (TasksDueWidget + StuckFollowUpsWidget +
+  // filings 2x2 grid on /tax-ops home + the inbox on every page).
+  //
+  // The `tax_deadline` event type stays in the union so older clients
+  // don't break, but the GET will never emit one. A future cleanup
+  // can drop it from the type union and consumers.
 
   // Sort ascending by date, then by type for stable ordering.
   events.sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type));

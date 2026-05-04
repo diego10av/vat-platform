@@ -4,9 +4,14 @@ import { apiError } from '@/lib/api-errors';
 
 // Columns on crm_companies that accept UPDATE via the PUT endpoint.
 // Explicit whitelist — the API doesn't trust client-sent field names.
+//
+// Stint 66.A — `entity_id` dropped from the whitelist. Diego's Rule
+// §14 (strict module independence): CRM does not link to Tax-Ops
+// entities. The DB column survives as dead data; PATCH requests
+// referencing it are now silently ignored.
 const UPDATABLE_FIELDS = [
   'company_name', 'country', 'industry', 'size', 'classification',
-  'website', 'linkedin_url', 'tags', 'notes', 'lead_counsel', 'entity_id',
+  'website', 'linkedin_url', 'tags', 'notes', 'lead_counsel',
   'billing_address', 'registered_address', 'vat_number', 'matricule',
 ] as const;
 type UpdatableField = typeof UPDATABLE_FIELDS[number];

@@ -203,7 +203,12 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
             ariaLabel="Size"
           />
         </Card>
-        <Card title="Linked tax entity">{c.entity_id ? <Link href={`/entities/${String(c.entity_id)}`} className="text-brand-700 hover:underline">View in Tax module →</Link> : '—'}</Card>
+        {/* Stint 66.A — "Linked tax entity" card removed. Diego
+            (2026-05-04, Rule §14): the three modules stay strictly
+            independent. CRM owns its own companies; Tax-Ops owns its
+            own entities; no cross-FK. The `entity_id` column stays
+            in the DB as dead data (easy revert if Diego changes
+            mind), but every UI / API surface stops exposing it. */}
       </div>
 
       {c.notes && (

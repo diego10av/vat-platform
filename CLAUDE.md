@@ -138,6 +138,40 @@ When working in any new module (e.g. future Peppol, FATCA/CRS,
 direct-tax), the per-page checklist in `docs/DESIGN_SYSTEM.md §7`
 runs through every conformance point.
 
+### Rule §14 — **Strict module independence** (2026-05-04)
+
+> *"Quiero que los tres módulos se mantengan independientes. CRM
+> son contactos míos y lo que hay en Tax Operations son contactos de
+> la firma. A no ser que yo quiera meter alguno de manera manual, no
+> quisiera que estuviesen conectados."*
+
+cifra is one product **visually** (Rule §13) but **three modules
+data-wise**, kept strictly separate:
+
+- **CRM** → Diego's personal commercial book. Contacts, companies,
+  opportunities, matters, billing. His clients.
+- **Tax-Ops** → the firm's compliance tracker. Matrices, status,
+  deadlines, sign-off, audit trail. The firm's entities and
+  csp_contacts.
+- **VAT** → the original prep tool. Invoices → classifier → eCDF →
+  AED. Its own clients/entities/declarations schema.
+
+Each module owns its own contacts/companies/entities lists. Diego
+**accepts manual duplication** as the cost of this separation.
+
+**Anti-patterns** — refuse to build:
+- Auto-sync of contacts between any two modules.
+- Cross-module foreign keys (e.g. `crm_companies.entity_id` → the
+  legacy `entities` table; removed in stint 66.A).
+- A widget on /crm that surfaces Tax-Ops events (e.g. tax filing
+  deadlines on the CRM "Upcoming this week"; removed in 66.B).
+- Auto-create on cascade ("when an entity is added in Tax-Ops, also
+  create a CRM company").
+
+If a future feature *seems* to need cross-module data, push back
+before building. Diego will revisit this rule if/when his single-
+user dogfooding stage ends.
+
 ### Rule — **Next.js 16 breaking changes**
 
 <!-- BEGIN:nextjs-agent-rules -->

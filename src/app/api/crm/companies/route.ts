@@ -30,9 +30,12 @@ export async function GET(request: NextRequest) {
   }
   params.push(limit);
 
+  // Stint 66.A — `entity_id` removed from SELECT. Diego (Rule §14):
+  // the three modules stay strictly independent; CRM does not expose
+  // any link to Tax-Ops entities at the UI/API layer.
   const rows = await query(
     `SELECT id, company_name, country, industry, size, classification,
-            website, linkedin_url, tags, entity_id, notes,
+            website, linkedin_url, tags, notes,
             created_at, updated_at
        FROM crm_companies
       WHERE ${conditions.join(' AND ')}
@@ -54,8 +57,12 @@ export async function GET(request: NextRequest) {
 // POST /api/crm/companies — create a new company row.
 //
 // Body: { company_name, country?, industry?, size?, classification?,
-//         website?, linkedin_url?, tags?[], notes?, lead_counsel?, entity_id?,
+//         website?, linkedin_url?, tags?[], notes?, lead_counsel?,
 //         billing_address?, registered_address?, vat_number?, matricule? }
+//
+// Stint 66.A — `entity_id` no longer accepted on POST. Modules
+// stay independent (Rule §14). The DB column survives as dead
+// data; no NEW rows ever get a non-null value.
 // Returns: { id, ... }
 //
 // Required: company_name (min 1 char after trim).
@@ -66,12 +73,15 @@ export async function POST(request: NextRequest) {
   if (!name) return apiError('company_name_required', 'company_name is required.', { status: 400 });
 
   const id = generateId();
+  // Stint 66.A — `entity_id` dropped from the INSERT. New rows
+  // never carry a Tax-Ops link. Existing rows keep their value
+  // until a future migration drops the column.
   await execute(
     `INSERT INTO crm_companies
        (id, company_name, country, industry, size, classification,
-        website, linkedin_url, tags, notes, lead_counsel, entity_id,
+        website, linkedin_url, tags, notes, lead_counsel,
         billing_address, registered_address, vat_number, matricule, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,NOW())`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())`,
     [
       id, name,
       body.country ?? null,
@@ -83,7 +93,6 @@ export async function POST(request: NextRequest) {
       Array.isArray(body.tags) ? body.tags : [],
       body.notes ?? null,
       body.lead_counsel ?? null,
-      body.entity_id ?? null,
       body.billing_address ?? null,
       body.registered_address ?? null,
       body.vat_number ?? null,
