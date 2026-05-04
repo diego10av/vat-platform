@@ -245,9 +245,56 @@ clients → entities → declarations → invoices → invoice_lines
 
 ## 4 · Current state (keep this section fresh on each stint)
 
-**As of 2026-04-27, stint 50 just closed (data-integrity emergency).** Status:
+**As of 2026-05-04, stint 67.D closed (VAT module end-to-end audit night).** Status:
 
 ### Shipped — recent stints (newest first)
+- ✅ **Stint 67.D** (2026-05-04 night, 11 commits): VAT module
+  end-to-end audit + fixes per Diego's mandate "el módulo tiene que
+  funcionar perfecto de la A a la Z". 8 PDFs generated
+  (`scripts/gen-test-invoices.ts`, every classifier-relevant
+  treatment code), seeded directly into a fresh SCSp Q2 2026
+  declaration via API, and walked the lifecycle created → uploading
+  → review → approved → filed → paid → reopened. Bugs found and
+  fixed live:
+  - **Suspense trap** (67.B/B.b/C/C.b/C.c, 5 commits): every
+    authenticated page using `useSearchParams` was stuck on
+    `<PageSkeleton />` on direct nav because Next 16 statically
+    prerendered the route, useSearchParams suspended, the parent
+    `<Suspense>` baked its fallback into the SSR HTML, and
+    hydration couldn't resolve a server-pending boundary. Fix:
+    `force-dynamic` per-page on 13 pages + drop the now-dead
+    `<Suspense>` wrappers. Verified live, `pending: 0` across all.
+  - **fix(ec-sales-list)** (`fca944d`): GROUP BY of SELECT-list
+    aliases failed on Postgres 17 — repeat full expressions.
+  - **fix(ecdf, box 097)** (`f9d4736`): manual boxes initialised
+    AFTER the formula loop, so 097 = 046+056+410+045-093-099 always
+    bailed at 0 → totals.vat_due / payable / credit always 0 in
+    ordinary regime. Added pre-fill from `entity_prorata` so 093/095
+    seed with the configured pro-rata before formulas resolve.
+    SCSp Q2 fixture now reports €5,717.63 due (was €0).
+  - **fix(audit-trail-pdf)** (`98fdc04`): pdf-lib StandardFonts
+    reject `→` (0x2192) so audit-log.pdf 500-ed on every non-trivial
+    declaration. `addSafePage()` now wraps each page so drawText
+    silently rewrites `→ — “ ” … •` to ASCII equivalents.
+  - **fix(portal/approve)** (`c2be931`): the public approval flow
+    only stamped `status='approved'` and left `approved_at` /
+    `approved_by` NULL. Now stamps both (`approved_by =
+    'client_portal:<name>'` when the form sent an approver_name).
+  - **feat(classifier RULE 16)** (`344a74a`): outgoing B2B services
+    to EU-VAT-registered customers now hit OUT_EU_RC
+    deterministically instead of falling to TIER 4 AI proposer.
+  - **seed-demo schema drift** (`2ae9a2d`): entity_type aifm/holding,
+    approver_type internal, treatment OUT_EU all renamed in earlier
+    migrations; demo seeder broke on first run against prod. Fixed.
+  - **UI banner**: yellow XSD-not-yet-validated warning above every
+    output download — the eCDF XML still has 5 unverified items vs.
+    the AED's current schema (namespace, FormVersion, NumericField
+    shape, period encoding, missing `<Agent>` block under
+    `<Sender>`). Treats produced XML as "for inspection only" until
+    the AED publishes a stable XSD URL we can reconcile against.
+  All endpoints exercised: GET XML/ECSL/PDF/CSV outputs, POST
+  sanity-check (Opus, 4 findings), POST share-link → portal/approve,
+  PATCH file/pay/reopen with artifact-cleanup. 707/707 tests passing.
 - ✅ **Stint 50** (2026-04-27, 1 commit `cfd6025`): data-integrity
   emergency, two issues Diego found in real use, fixed in one stint
   with zero data loss. **A · Contactos recuperados** (mig 063) —
