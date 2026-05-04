@@ -96,13 +96,77 @@ export async function computeECDF(declarationId: string): Promise<ECDFReport> {
   const manualPending: string[] = [];
   const warnings: string[] = [];
 
-  // First pass: sums only.
+  // ─── First pass: sums ───
   for (const def of boxDefs) {
     if (def.computation !== 'sum') continue;
     boxValues[def.box] = computeSum(lines, def);
   }
 
-  // Second pass: formulas, resolved in dependency order (iteratively until stable).
+  // ─── Pre-fill manual boxes from pro-rata configuration ───
+  // Stint 67.D bug fix: previously the manual boxes 093/095 were
+  // initialized AFTER the formula loop, which made every formula that
+  // depended on them (notably 097 = 046+056+410+045-093-099) bail out
+  // with `null` because the formula evaluator's "fail-closed" semantics
+  // treat undefined refs as unresolved → return null. End result:
+  // box 097 was always 0, and totals.vat_due / totals.payable / credit
+  // for ordinary-regime declarations were ALWAYS 0 even with thousands
+  // of euros of output VAT. Worse, the pro-rata configuration the user
+  // had carefully entered on /entities/[id] was completely ignored.
+  //
+  // Fix: look up the matching entity_prorata row for this declaration's
+  // period BEFORE the formula loop and pre-seed boxes 093 (deductible
+  // input VAT after pro-rata) and 095 (pro-rata percentage). The
+  // reviewer can still override either via the UI; this just gives the
+  // formulas something better than 0 to compute against.
+  // Resolve the declaration's calendar bounds, then look up an
+  // overlapping entity_prorata row.
+  const { start: declStart, end: declEnd } = declarationBounds(decl.year, decl.period);
+  let prorataPct: number | null = null;
+  try {
+    const pr = await queryOne<{ ratio_pct: number | string | null }>(
+      `SELECT ratio_pct::float8 AS ratio_pct
+         FROM entity_prorata
+        WHERE entity_id = $1
+          AND period_start <= $3::date
+          AND period_end   >= $2::date
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [decl.entity_id, declStart, declEnd],
+    );
+    if (pr && pr.ratio_pct != null) {
+      prorataPct = Number(pr.ratio_pct);
+    }
+  } catch {
+    // entity_prorata table may be missing in older deploys; treat as 100%
+    // (no apportionment) which is the legacy behaviour.
+  }
+
+  for (const def of boxDefs) {
+    if (def.computation !== 'manual') continue;
+    if (def.box === '093') {
+      // 093 = deductible input VAT = (085 + 077 + 045 + 044*0.17 + RC totals) × pro-rata
+      // The reviewer may override; we just provide a sensible default so the
+      // 097 formula has a real number to subtract.
+      const luxInput = boxValues['085'] ?? 0;
+      const importVat = boxValues['077'] ?? 0;
+      const rcVat = boxValues['410'] ?? 0;     // RC VAT due is also deductible input
+      const grossDeductible = luxInput + importVat + rcVat;
+      const ratio = prorataPct == null ? 100 : prorataPct;
+      boxValues['093'] = round2(grossDeductible * (ratio / 100));
+    } else if (def.box === '095') {
+      // 095 = pro-rata percentage. Default 100 (no apportionment) when
+      // none is configured, which matches the comment in the legal-refs
+      // panel: "Defaulting to 100% deductible".
+      boxValues['095'] = prorataPct ?? 100;
+    } else {
+      boxValues[def.box] = 0;
+    }
+    manualPending.push(def.box);
+  }
+
+  // ─── Second pass: formulas ───
+  // Iteratively resolved until stable. Now that manual boxes have real
+  // values, formulas like 097 (which subtracts 093) can compute.
   const MAX_ITER = 10;
   let iter = 0;
   let changed = true;
@@ -117,14 +181,6 @@ export async function computeECDF(declarationId: string): Promise<ECDFReport> {
         boxValues[def.box] = val;
         changed = true;
       }
-    }
-  }
-
-  // Manual-entry boxes stay at 0 unless explicitly set later (pro-rata).
-  for (const def of boxDefs) {
-    if (def.computation === 'manual') {
-      if (boxValues[def.box] == null) boxValues[def.box] = 0;
-      manualPending.push(def.box);
     }
   }
 
@@ -231,6 +287,38 @@ function evaluateFormula(expr: string, values: Record<string, number>): number |
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+// Stint 67.D — translate (year, period) into ISO date bounds for
+// pro-rata overlap matching. Period values: 'Y1' (annual),
+// 'Q1'..'Q4' (quarter), '01'..'12' (month). Anything else falls back
+// to the full year so we don't miss a configured pro-rata.
+function declarationBounds(year: number, period: string): { start: string; end: string } {
+  const p = (period || '').toUpperCase();
+  if (p === 'Y1' || p === 'ANNUAL' || p === '') {
+    return { start: `${year}-01-01`, end: `${year}-12-31` };
+  }
+  const qm = /^Q([1-4])$/.exec(p);
+  if (qm) {
+    const q = Number(qm[1]);
+    const startMonth = (q - 1) * 3 + 1;
+    const endMonth = q * 3;
+    const endDay = endMonth === 6 || endMonth === 9 ? 30 : 31;
+    return {
+      start: `${year}-${String(startMonth).padStart(2, '0')}-01`,
+      end:   `${year}-${String(endMonth).padStart(2, '0')}-${endDay}`,
+    };
+  }
+  const mm = /^(\d{1,2})$/.exec(p);
+  if (mm) {
+    const m = Math.min(12, Math.max(1, Number(mm[1])));
+    const lastDay = new Date(year, m, 0).getDate();
+    return {
+      start: `${year}-${String(m).padStart(2, '0')}-01`,
+      end:   `${year}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+    };
+  }
+  return { start: `${year}-01-01`, end: `${year}-12-31` };
 }
 
 function computeTotals(
