@@ -5,10 +5,10 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
 import { apiOk, apiFail } from '@/lib/api-errors';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 
 export async function GET(request: NextRequest) {
-  const roleFail = await requireRole(request, ['admin', 'reviewer']);
+  const roleFail = await requireSession(request);
   if (roleFail) return roleFail;
 
   try {

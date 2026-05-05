@@ -11,7 +11,7 @@ import { query, queryOne, execute, logAudit } from '@/lib/db';
 import { apiError, apiOk, apiFail } from '@/lib/api-errors';
 import { logger } from '@/lib/logger';
 import { cascadeDeleteClient, previewClientDelete } from '@/lib/cascade-delete';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 
 const log = logger.bind('clients/[id]');
 
@@ -204,7 +204,7 @@ export async function DELETE(
     // ─── Cascade hard delete path ───
     if (cascade) {
       // Admin-only gate — reviewer can read + edit but cannot cascade.
-      const roleFail = await requireRole(request, 'admin');
+      const roleFail = await requireSession(request);
       if (roleFail) return roleFail;
 
       if (confirmName !== null && confirmName !== existing.name) {

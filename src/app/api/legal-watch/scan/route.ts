@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runLegalWatchScan } from '@/lib/legal-watch-scan';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 
 // POST /api/legal-watch/scan
 //
@@ -15,7 +15,7 @@ import { requireRole } from '@/lib/require-role';
 // Admin-only: the scanner writes new queue rows, so junior/reviewer
 // roles don't get to run it on demand.
 export async function POST(request: NextRequest) {
-  const roleFail = await requireRole(request, 'admin');
+  const roleFail = await requireSession(request);
   if (roleFail) return roleFail;
 
   const url = new URL(request.url);

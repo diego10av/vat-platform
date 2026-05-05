@@ -3,7 +3,7 @@ import { queryOne, execute, logAudit, initializeSchema } from '@/lib/db';
 import { validateVatNumber, validateIban } from '@/lib/validation';
 import { apiError } from '@/lib/api-errors';
 import { cascadeDeleteEntity, previewEntityDelete } from '@/lib/cascade-delete';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 
 // GET /api/entities/:id
 export async function GET(
@@ -126,7 +126,7 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: 'Entity not found' }, { status: 404 });
 
   if (cascade) {
-    const roleFail = await requireRole(request, 'admin');
+    const roleFail = await requireSession(request);
     if (roleFail) return roleFail;
 
     if (confirmName !== null && confirmName !== existing.name) {

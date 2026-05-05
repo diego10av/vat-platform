@@ -7,7 +7,7 @@
 //     → the row itself (metadata + extracted_fields).
 //   DELETE /api/entities/:id/official-documents/:docId
 //     → deletes the row + the storage object. Admin-only per the
-//       destructive-action policy (requireRole). If the row is the
+//       destructive-action policy (requireSession). If the row is the
 //       current (non-superseded) doc and there's a history entry,
 //       the next-most-recent sibling becomes current.
 //
@@ -18,7 +18,7 @@ import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { execute, queryOne, logAudit } from '@/lib/db';
 import { apiError, apiFail, apiOk } from '@/lib/api-errors';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 
 function supabase() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
@@ -78,7 +78,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; docId: string }> },
 ) {
   try {
-    const roleFail = await requireRole(request, 'admin');
+    const roleFail = await requireSession(request);
     if (roleFail) return roleFail;
 
     const { id: entityId, docId } = await params;

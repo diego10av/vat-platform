@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execute, queryOne, logAudit } from '@/lib/db';
 import { apiError, apiFail } from '@/lib/api-errors';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 import { ALLOWED_FILES, extractFilePaths } from '@/lib/github-apply-patch';
 
 // PATCH /api/legal-watch/queue/[id]/update-patch
@@ -33,7 +33,7 @@ export async function PATCH(
   try {
     const { id } = await ctx.params;
 
-    const roleFail = await requireRole(request, 'admin');
+    const roleFail = await requireSession(request);
     if (roleFail) return roleFail;
 
     const body = (await request.json().catch(() => ({}))) as { diff?: unknown };

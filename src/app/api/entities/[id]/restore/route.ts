@@ -2,14 +2,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, execute, logAudit } from '@/lib/db';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const roleFail = await requireRole(request, ['admin', 'reviewer']);
+  const roleFail = await requireSession(request);
   if (roleFail) return roleFail;
 
   const existing = await queryOne<{ id: string; name: string; deleted_at: string | null }>(

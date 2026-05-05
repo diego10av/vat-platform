@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execute, queryOne, logAudit } from '@/lib/db';
 import { apiError, apiFail } from '@/lib/api-errors';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 
 // POST /api/legal-watch/queue/[id]/reject-patch
 //
@@ -20,7 +20,7 @@ export async function POST(
   try {
     const { id } = await ctx.params;
 
-    const roleFail = await requireRole(request, 'admin');
+    const roleFail = await requireSession(request);
     if (roleFail) return roleFail;
 
     const row = await queryOne<{ id: string; ai_patch_diff: string | null; patch_applied_at: string | null }>(

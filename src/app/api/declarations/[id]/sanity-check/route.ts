@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
 import { apiError, apiFail } from '@/lib/api-errors';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 import { runSanityCheck, type BoxSnapshot } from '@/lib/ecdf-sanity-check';
 import { computeECDF } from '@/lib/ecdf';
 
@@ -24,7 +24,7 @@ export async function POST(
     const { id } = await ctx.params;
 
     // admin OR reviewer can run this
-    const roleFail = await requireRole(request, ['admin', 'reviewer']);
+    const roleFail = await requireSession(request);
     if (roleFail) return roleFail;
 
     const decl = await queryOne<{

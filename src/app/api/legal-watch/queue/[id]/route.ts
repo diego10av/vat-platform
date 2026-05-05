@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execute, query, logAudit } from '@/lib/db';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 
 // PATCH /api/legal-watch/queue/[id]
 //
@@ -16,7 +16,7 @@ export async function PATCH(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
-  const roleFail = await requireRole(request, 'admin');
+  const roleFail = await requireSession(request);
   if (roleFail) return roleFail;
 
   const body = (await request.json().catch(() => ({}))) as {
@@ -73,7 +73,7 @@ export async function DELETE(
   ctx: { params: Promise<{ id: string }> },
 ) {
   const { id } = await ctx.params;
-  const roleFail = await requireRole(request, 'admin');
+  const roleFail = await requireSession(request);
   if (roleFail) return roleFail;
 
   await execute(`DELETE FROM legal_watch_queue WHERE id = $1`, [id]);

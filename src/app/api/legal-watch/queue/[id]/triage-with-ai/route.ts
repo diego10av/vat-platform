@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { execute, queryOne } from '@/lib/db';
 import { apiError, apiFail } from '@/lib/api-errors';
-import { requireRole } from '@/lib/require-role';
+import { requireSession } from '@/lib/require-role';
 import { triageQueueItem } from '@/lib/legal-watch-triage';
 
 // POST /api/legal-watch/queue/[id]/triage-with-ai
@@ -21,7 +21,7 @@ export async function POST(
   try {
     const { id } = await ctx.params;
 
-    const roleFail = await requireRole(request, 'admin');
+    const roleFail = await requireSession(request);
     if (roleFail) return roleFail;
 
     const row = await queryOne<{

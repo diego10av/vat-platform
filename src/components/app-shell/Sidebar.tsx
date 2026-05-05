@@ -330,20 +330,11 @@ const EXPANDED_KEY_PREFIX = 'cifra-sidebar-expanded-';
 
 export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
   const pathname = usePathname() || '/';
-  const [role, setRole] = useState<Role>('admin');
+  // Single-user reset: always admin. Role-based filtering is a no-op now,
+  // but the type + filterForRole call are kept for now (clean-up pending).
+  const role: Role = 'admin';
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [taxCategories, setTaxCategories] = useState<TaxCategory[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/auth/me')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (!cancelled && data?.role) setRole(data.role);
-      })
-      .catch(() => { /* swallow — defaults to admin */ });
-    return () => { cancelled = true; };
-  }, []);
 
   // Stint 38.A — fetch tax-type sidebar categories. Silent fail → uses
   // hardcoded fallback from buildTaxCategoryNavItems.
@@ -528,26 +519,10 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
   );
 }
 
-// Stint 61.B — UserMenu now fetches the live username from /api/auth/me
-// (was hard-coded "Diego" for the admin role) and exposes a Sign-out
-// affordance via a click-to-open menu. Closes Diego's "habría que añadir
-// la posibilidad de hacer logout, no?".
-function UserMenu({ role }: { role: Role }) {
-  const [username, setUsername] = useState<string | null>(null);
+// Single-user UserMenu: shows "Diego · cifra · founder" + sign-out menu.
+function UserMenu({ role: _role }: { role: Role }) {
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch('/api/auth/me')
-      .then(r => r.ok ? r.json() : null)
-      .then(b => {
-        if (cancelled || !b) return;
-        if (typeof b.username === 'string') setUsername(b.username);
-      })
-      .catch(() => { /* keep fallback label */ });
-    return () => { cancelled = true; };
-  }, []);
 
   // Close menu when user clicks anywhere else.
   useEffect(() => {
@@ -578,18 +553,8 @@ function UserMenu({ role }: { role: Role }) {
     window.location.href = '/login';
   }
 
-  // Display label: prefer the real username (capitalised), fall back to
-  // a role-based placeholder until /api/auth/me resolves.
-  const display =
-    username
-      ? username.charAt(0).toUpperCase() + username.slice(1)
-      : role === 'junior' ? 'Associate'
-      : role === 'reviewer' ? 'Reviewer'
-      : 'You';
-  const tagline =
-    role === 'junior' ? 'cifra · associate' :
-    role === 'reviewer' ? 'cifra · reviewer' :
-    'cifra · founder';
+  const display = 'Diego';
+  const tagline = 'cifra · founder';
 
   return (
     <div id="cifra-user-menu" className="relative">

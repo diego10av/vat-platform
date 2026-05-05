@@ -1,30 +1,15 @@
 import { NextResponse } from 'next/server';
 import { queryOne } from '@/lib/db';
-import { parseAuthUsers } from '@/lib/auth';
 
 // GET /api/system — non-secret system status for the Settings page.
 // Same shape philosophy as /api/health but never exposes raw env values.
 export async function GET() {
-  // Stint 67.G — Bug #17. The auth_configured row on /settings was
-  // false-red since stint 62 deleted the legacy AUTH_PASSWORD env var.
-  // Reuse the same parseAuthUsers() helper the login route uses so the
-  // status row stays in sync with the actual auth model (AUTH_USERS +
-  // per-user AUTH_PASS_<UPPER>).
-  const users = parseAuthUsers();
-  const usersWithPassword = users.filter(
-    u => !!process.env[`AUTH_PASS_${u.username.toUpperCase()}`],
-  );
-
   const checks: Record<string, unknown> = {
     storage: 'ok',
     database: 'ok',
     anthropic_configured: !!process.env.ANTHROPIC_API_KEY,
     supabase_configured: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    auth_configured:
-      users.length > 0 &&
-      usersWithPassword.length === users.length &&
-      !!process.env.AUTH_SECRET,
-    auth_users_count: users.length,
+    auth_configured: !!process.env.ADMIN_PASSWORD && !!process.env.AUTH_SECRET,
   };
 
   // DB ping
