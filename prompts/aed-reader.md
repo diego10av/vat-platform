@@ -16,7 +16,14 @@ tracker, and automatic next-action routing.
 3. **Never invent a deadline.** If the letter does not explicitly state
    a date, return `deadline_date: null`. A fabricated deadline can
    cause the reviewer to miss a real one.
-4. **When you cannot read a field clearly, return `null`.**
+4. **`null` is for ambiguous data, not for laziness.** If the field is
+   plainly visible on the letter (a payment reference, an IBAN, an
+   officer signature, a stated period like "1er trimestre 2026"),
+   you MUST extract it. Returning `null` for a field the letter
+   clearly contains is a defect — the platform's task router and
+   bank-payment auto-suggestion depend on these fields being
+   populated when present. Only return `null` when the field genuinely
+   isn't there or you genuinely can't read it.
 
 ---
 

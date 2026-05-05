@@ -17,9 +17,13 @@
 // before this component, so unauthenticated visits still bounce to
 // `/login` (preserving the `?next=/tax-ops` flow shipped in 64.X.4).
 //
-// The 843-line legacy home is preserved verbatim at `/legacy-home` so
-// it isn't lost — only de-prioritised. Nothing in the live product
-// links to it; only there if we ever need a reference.
+// Stint 67.E (2026-05-05) — the 843-line legacy home that lived at
+// /legacy-home was deleted. It read from the pre-pivot
+// clients/declarations/invoices schema and rendered zeroes against
+// today's tax_entities/tax_obligations/tax_filings world; keeping it
+// around was confusing for future readers without adding any value.
+// If a future stint needs the historical layout it lives in git
+// history at commit f3c929e (stint 64.X.4.b).
 
 import { redirect } from 'next/navigation';
 

@@ -3,6 +3,7 @@ import { queryOne, execute, logAudit, initializeSchema, tx, execTx, logAuditTx }
 import { validateInvoiceDate, validateVatRate, validateCurrency, validateCountry, validateVatNumber } from '@/lib/validation';
 import { apiError } from '@/lib/api-errors';
 import { TREATMENT_CODES } from '@/config/treatment-codes';
+import { declarationBounds } from '@/lib/ecdf';
 
 const LOCKED_STATUSES = new Set(['approved', 'filed', 'paid']);
 
@@ -17,8 +18,11 @@ export async function PATCH(
 
   const line = await queryOne<Record<string, unknown> & {
     declaration_id: string; invoice_id: string; entity_id: string; decl_status: string;
+    decl_year: number; decl_period: string;
   }>(
-    `SELECT il.*, i.declaration_id, il.invoice_id, d2.entity_id, d2.status AS decl_status
+    `SELECT il.*, i.declaration_id, il.invoice_id,
+            d2.entity_id, d2.status AS decl_status,
+            d2.year AS decl_year, d2.period AS decl_period
      FROM invoice_lines il
      JOIN invoices i ON il.invoice_id = i.id
      JOIN declarations d2 ON i.declaration_id = d2.id
@@ -41,6 +45,27 @@ export async function PATCH(
   if ('invoice_date' in body && body.invoice_date) {
     const v = validateInvoiceDate(body.invoice_date);
     if (!v.ok) return apiError(v.error.code, v.error.message, { hint: v.error.hint, status: 400 });
+
+    // Stint 67.E (Bug #12) — soft warning when invoice_date falls
+    // outside the declaration's calendar period. Common case: a Q3
+    // declaration that received an April invoice means the line
+    // belongs in Q2, not Q3. We don't reject (chargeable-event vs.
+    // invoice-date timing has legitimate edge cases under Art. 19/20
+    // LTVA) but we DO flag the line so the reviewer surfaces it
+    // before approval. Existing flag/flag_reason wins if the caller
+    // explicitly set one in this PATCH.
+    const bounds = declarationBounds(line.decl_year, line.decl_period);
+    const inv = String(body.invoice_date);
+    if (inv < bounds.start || inv > bounds.end) {
+      if (!('flag' in body)) body.flag = true;
+      if (!('flag_reason' in body)) {
+        body.flag_reason =
+          `Invoice date ${inv} falls outside the declaration's period ` +
+          `(${bounds.start} → ${bounds.end}). Confirm the chargeable event is in ` +
+          `${line.decl_year} ${line.decl_period} per Art. 19/20 LTVA — otherwise ` +
+          `move the line to the correct declaration.`;
+      }
+    }
   }
   if ('vat_rate' in body && body.vat_rate != null) {
     const v = validateVatRate(Number(body.vat_rate));

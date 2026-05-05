@@ -7,6 +7,7 @@ import { Trash2Icon } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { ApproversCard } from '@/components/entity/ApproversCard';
 import { EntityEditCard } from '@/components/entity/EntityEditCard';
+import { EntityProrataCard } from '@/components/entity/EntityProrataCard';
 import { OfficialDocumentsCard } from '@/components/entity/OfficialDocumentsCard';
 import { CascadeDeleteModal } from '@/components/delete/CascadeDeleteModal';
 
@@ -151,6 +152,8 @@ export default function EntityDetailPage() {
       />
 
       <ApproversCard entityId={id} />
+
+      <EntityProrataCard entityId={id} />
 
       <AiModeCard
         entityId={id}

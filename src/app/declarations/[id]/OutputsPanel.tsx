@@ -146,27 +146,27 @@ export function OutputsPanel({ declarationId }: { declarationId: string }) {
       </div>
       {emailOpen && <EmailDrafterModal declarationId={declarationId} onClose={() => setEmailOpen(false)} />}
 
-      {/* Stint 67.D — eCDF XML XSD-compliance warning. The generator
-          (src/lib/ecdf-xml.ts) flags five issues in its header that need
-          AED-XSD verification before any real filing: namespace
-          (currently 2011), FormVersion (1.0 hardcoded), <NumericField>
-          element shape, period encoding, and missing <Agent> sub-block
-          under <Sender>. Until those are reconciled the XML produced by
-          the "eCDF XML" download is FOR REVIEWER INSPECTION ONLY and
-          will be rejected by the AED MyGuichet validator. */}
+      {/* Stint 67.D + 67.E — eCDF XML XSD-compliance warning. The five
+          flagged items are now extracted into src/config/ecdf-xsd-config.ts
+          (one constant + *_VERIFIED flag per item) so an XSD-pull update
+          is mechanical. See docs/ECDF_XSD_RECONCILIATION.md for the
+          unblock procedure (CIGUE → AED developer space). Until all
+          five flags flip, the XML produced by the "eCDF XML" download
+          is FOR REVIEWER INSPECTION ONLY. */}
       <div className="px-4 py-2.5 bg-warning-50 border-b border-warning-200 flex items-start gap-2 text-xs text-warning-900">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5">
           <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
         <span>
           <strong>The generated eCDF XML is for reviewer inspection only.</strong>{' '}
-          Five XSD-compliance items are still pending verification against
-          the AED&apos;s current schema (namespace, FormVersion, field
-          element shape, period encoding, &lt;Agent&gt; block). Validate
-          the file in MyGuichet&apos;s preview before any real submission;
-          treat a successful download as &quot;produced&quot;, not &quot;filing-ready&quot;.
-          See <code className="font-mono">src/lib/ecdf-xml.ts</code> header for the
-          open list.
+          Five XSD-compliance items are pending verification against the
+          AED&apos;s current schema (namespace, FormVersion, box element
+          shape, period encoding, &lt;Agent&gt; block). Each is now a
+          one-line flip in <code className="font-mono">src/config/ecdf-xsd-config.ts</code>{' '}
+          once we obtain the XSD via the AED developer space —
+          see <code className="font-mono">docs/ECDF_XSD_RECONCILIATION.md</code>{' '}
+          for the unblock procedure. Until then, validate in MyGuichet&apos;s
+          preview before any real submission.
         </span>
       </div>
 

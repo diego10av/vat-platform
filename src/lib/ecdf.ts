@@ -293,7 +293,9 @@ function round2(n: number): number {
 // pro-rata overlap matching. Period values: 'Y1' (annual),
 // 'Q1'..'Q4' (quarter), '01'..'12' (month). Anything else falls back
 // to the full year so we don't miss a configured pro-rata.
-function declarationBounds(year: number, period: string): { start: string; end: string } {
+// Stint 67.E — exported so the invoice-line PATCH route can use
+// the same logic for the invoice_date-outside-period soft warning.
+export function declarationBounds(year: number, period: string): { start: string; end: string } {
   const p = (period || '').toUpperCase();
   if (p === 'Y1' || p === 'ANNUAL' || p === '') {
     return { start: `${year}-01-01`, end: `${year}-12-31` };

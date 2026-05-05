@@ -48,6 +48,17 @@
 
 import { computeECDF } from '@/lib/ecdf';
 import { queryOne } from '@/lib/db';
+import {
+  ECDF_NAMESPACE,
+  getFormVersion,
+  BOX_FIELD_ELEMENT_NAME,
+  BOX_FIELD_INCLUDE_SECTION,
+  encodePeriodLegacy,
+  encodePeriodForXSD,
+  PERIOD_ENCODING_VERIFIED,
+  SENDER_AGENT_REQUIRED,
+  PLATFORM_AGENT_INFO,
+} from '@/config/ecdf-xsd-config';
 
 // AED form code mapping. These codes are the platform's best mapping from
 // (regime, frequency) to the AED form identifier; verify against the actual
@@ -89,17 +100,32 @@ export async function buildECDFXml(declarationId: string): Promise<XMLBuildResul
   const push = (s: string) => lines.push(s);
 
   push(`<?xml version="1.0" encoding="UTF-8"?>`);
-  push(`<eCDFDeclarations xmlns="http://www.ctie.etat.lu/2011/ecdf">`);
+  push(`<eCDFDeclarations xmlns="${ECDF_NAMESPACE}">`);
   push(`  <eCDFDeclaration>`);
   push(`    <Sender>`);
   push(`      <SenderType>tax_professional</SenderType>`);
   push(`      <Matricule>${esc(decl.matricule)}</Matricule>`);
+  // Stint 67.E — <Agent> sub-block under <Sender>. AED XSDs flag this
+  // as required when SenderType=tax_professional. Surface only when
+  // verified + the platform has a configured agent matricule.
+  if (SENDER_AGENT_REQUIRED && PLATFORM_AGENT_INFO) {
+    push(`      <Agent>`);
+    push(`        <Matricule>${esc(PLATFORM_AGENT_INFO.matricule)}</Matricule>`);
+    push(`        <Name>${esc(PLATFORM_AGENT_INFO.name)}</Name>`);
+    push(`      </Agent>`);
+  }
   push(`    </Sender>`);
   push(`    <DeclarationData>`);
   push(`      <Form>`);
   push(`        <FormType>${esc(formCode)}</FormType>`);
-  push(`        <FormVersion>1.0</FormVersion>`);
-  push(`        <Period>${esc(periodCode)}</Period>`);
+  push(`        <FormVersion>${esc(getFormVersion(formCode, decl.year))}</FormVersion>`);
+  // Period encoding: switch to integer code when the AED XSD is
+  // confirmed. Today still string for back-compat with the comment
+  // in the XSD-config file.
+  const encodedPeriod = PERIOD_ENCODING_VERIFIED
+    ? encodePeriodForXSD(decl.period)
+    : periodCode;
+  push(`        <Period>${esc(encodedPeriod)}</Period>`);
   push(`        <Year>${decl.year}</Year>`);
   push(`        <Declarant>`);
   push(`          <Matricule>${esc(decl.matricule)}</Matricule>`);
@@ -114,7 +140,10 @@ export async function buildECDFXml(declarationId: string): Promise<XMLBuildResul
   // "not filed" and trigger a taxation d'office). Readability is the
   // reviewer's problem — correctness is ours.
   for (const b of ecdf.boxes) {
-    push(`          <NumericField id="${esc(b.box)}" section="${esc(b.section)}">${b.value.toFixed(2)}</NumericField>`);
+    const sectionAttr = BOX_FIELD_INCLUDE_SECTION
+      ? ` section="${esc(b.section)}"`
+      : '';
+    push(`          <${BOX_FIELD_ELEMENT_NAME} id="${esc(b.box)}"${sectionAttr}>${b.value.toFixed(2)}</${BOX_FIELD_ELEMENT_NAME}>`);
   }
   push(`        </Boxes>`);
   push(`      </Form>`);
@@ -129,13 +158,10 @@ export async function buildECDFXml(declarationId: string): Promise<XMLBuildResul
   return { xml, filename };
 }
 
-// Exported for testing.
+// Exported for testing. Stint 67.E — re-exported from the XSD config
+// so test callers don't import the internal legacy helper directly.
 export function periodToECDF(period: string, year: number): string {
-  const p = (period || '').toUpperCase();
-  if (p === 'Y1') return `${year}`;
-  if (/^Q[1-4]$/.test(p)) return `${year}-${p}`;
-  if (/^\d{1,2}$/.test(p)) return `${year}-${p.padStart(2, '0')}`;
-  return `${year}-${p}`;
+  return encodePeriodLegacy(period, year);
 }
 
 // Exported for testing.
