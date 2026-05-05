@@ -1,11 +1,7 @@
 // ════════════════════════════════════════════════════════════════════════
 // Declaration detail page — shared types.
-//
-// Extracted from page.tsx during the 2026-04-18 refactor. Every subfile
-// (ReviewTable, PreviewPanel, OutputsPanel, FilingPanel, EmailDrafterModal)
-// imports from here so the shapes stay in one place.
-//
-// No behaviour change — verbatim copies.
+// Imported by every subfile (ReviewTable, PreviewPanel, OutputsPanel,
+// FilingPanel) so the shapes stay in one place.
 // ════════════════════════════════════════════════════════════════════════
 
 export interface InvoiceLine {

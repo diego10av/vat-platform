@@ -208,7 +208,7 @@ export async function PATCH(
   return NextResponse.json({ ok: true });
 }
 
-// Same set the cron uses — keep in sync with src/app/api/cron/stuck-followups/route.ts
+// Same waiting-state set as src/app/api/tax-ops/stuck-followups/route.ts.
 const STUCK_WAITING_STATES = new Set<string>([
   // Provision waiting states
   'awaiting_fs', 'sent',

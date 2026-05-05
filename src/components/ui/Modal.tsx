@@ -1,22 +1,13 @@
 'use client';
 
 // ════════════════════════════════════════════════════════════════════════
-// Modal — shared primitive for every dialog in the app.
-//
-// Stint 12 extra #5: there were 6+ ad-hoc modals (ShareLinkModal,
-// ExcelImportModal, AttachmentsModal, BulkEditModal, EmailDrafterModal,
-// feedback widget) each rolling its own overlay + escape-to-close +
-// body-scroll-lock. This primitive standardises the behaviour so:
-//
-//   - ESC always closes (unless the modal sets `dismissable={false}`)
+// Modal — shared primitive for every dialog in the app. Standardises:
+//   - ESC closes (unless `dismissable={false}`)
 //   - Click on backdrop closes
-//   - Body scroll is locked while open
-//   - Initial focus moves to the modal's first focusable element
+//   - Body scroll locked while open
+//   - Initial focus moves to first focusable element
 //   - `role="dialog"` + `aria-modal` + `aria-labelledby` wired
-//   - z-index / backdrop / shadow / rounded corners are consistent
-//
-// Existing modals can migrate one at a time; the primitive doesn't
-// force a rewrite — it just becomes the default for new dialogs.
+//   - Consistent z-index / backdrop / shadow / rounded corners
 // ════════════════════════════════════════════════════════════════════════
 
 import { useEffect, useId, useRef } from 'react';

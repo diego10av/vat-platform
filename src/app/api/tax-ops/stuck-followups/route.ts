@@ -2,18 +2,14 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
 // ════════════════════════════════════════════════════════════════════════
-// GET /api/tax-ops/stuck-followups — stint 64.L (3/3)
+// GET /api/tax-ops/stuck-followups
 //
 // Lists filings whose status is "waiting on the client" and whose
 // last_action_at puts them past the amber (7d) or red (14d) threshold.
-// Used by:
-//   • /tax-ops home StuckFollowUpsWidget — counts + click-through.
-//   • /api/cron/stuck-followups POST — to materialise CRM tasks for
-//     red rows so they show up in Diego's daily focus.
+// Used by /tax-ops home StuckFollowUpsWidget for counts + click-through.
 //
 // Single source of truth for "what does stuck mean": same waiting-states
-// tables as the front-end follow-up.ts. Keep the two in sync if a state
-// is added or relabelled.
+// tables as the front-end follow-up.ts.
 // ════════════════════════════════════════════════════════════════════════
 
 const PROVISION_WAITING_STATES = ['awaiting_fs', 'sent'];
