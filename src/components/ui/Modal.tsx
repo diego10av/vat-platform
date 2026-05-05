@@ -88,8 +88,13 @@ export function Modal({
       aria-modal="true"
       aria-labelledby={title ? titleId : undefined}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-ink/60 backdrop-blur-[2px] animate-fadeIn" aria-hidden />
+      {/* Backdrop — heavier opacity + blur than the previous ink/60 +
+          2px blur. Diego (2026-05-05) reported that the lighter backdrop
+          made it feel like the modal content was floating over a
+          half-readable table, "as if the modal text was overlapping the
+          table behind it". Bumping to ink/75 + 6px blur kills the
+          illusion: backdrop reads as a clear modal-mode separator. */}
+      <div className="absolute inset-0 bg-ink/75 backdrop-blur-[6px] animate-fadeIn" aria-hidden />
 
       {/* Panel */}
       <div

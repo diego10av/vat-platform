@@ -113,8 +113,10 @@ export function Drawer({
       className="fixed inset-0 z-modal flex justify-end"
       onClick={dismissOnBackdropClick ? onClose : undefined}
     >
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-ink/20 animate-fadeIn" aria-hidden="true" />
+      {/* Backdrop — heavier than the previous ink/20 (almost invisible)
+          for the same reason as the Modal primitive: backdrop should
+          read as a clear modal-mode separator from the page underneath. */}
+      <div className="absolute inset-0 bg-ink/50 backdrop-blur-[3px] animate-fadeIn" aria-hidden="true" />
 
       {/* Panel */}
       <div

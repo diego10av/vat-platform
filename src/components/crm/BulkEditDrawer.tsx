@@ -104,7 +104,7 @@ export function BulkEditDrawer({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/30 z-modal"
+        className="fixed inset-0 bg-ink/50 backdrop-blur-[3px] z-modal"
         onClick={onClose}
         aria-hidden="true"
       />

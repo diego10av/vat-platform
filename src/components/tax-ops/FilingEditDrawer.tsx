@@ -174,7 +174,7 @@ export function FilingEditDrawer({ filingId, onClose, onSaved }: Props) {
       onClick={onClose}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/20" />
+      <div className="absolute inset-0 bg-ink/50 backdrop-blur-[3px]" />
 
       {/* Drawer */}
       <div

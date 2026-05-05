@@ -130,7 +130,7 @@ export function GlobalSearch() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-modal flex items-start justify-center pt-[10vh] px-4 bg-black/30" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-modal flex items-start justify-center pt-[10vh] px-4 bg-ink/75 backdrop-blur-[6px]" onClick={() => setOpen(false)}>
       <div className="w-full max-w-xl bg-white rounded-xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-2 px-3 py-3 border-b border-border">
           <SearchIcon size={16} className="text-ink-muted" />

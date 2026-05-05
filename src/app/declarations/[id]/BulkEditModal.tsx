@@ -113,7 +113,7 @@ export function BulkEditModal({ lineIds, direction, onClose, onApplied }: Props)
 
   return (
     <div
-      className="fixed inset-0 z-modal bg-black/40 flex items-center justify-center p-4 animate-fadeIn"
+      className="fixed inset-0 z-modal bg-ink/75 backdrop-blur-[6px] flex items-center justify-center p-4 animate-fadeIn"
       role="presentation"
       onClick={onClose}
     >

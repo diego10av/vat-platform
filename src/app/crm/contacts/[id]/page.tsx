@@ -523,7 +523,7 @@ function SwitchFirmModal({
   }
 
   return (
-    <div className="fixed inset-0 z-modal bg-ink/50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-modal bg-ink/75 backdrop-blur-[6px] flex items-center justify-center p-4" onClick={onClose}>
       <div
         className="bg-surface rounded-lg shadow-xl max-w-md w-full p-4 space-y-3"
         onClick={(e) => e.stopPropagation()}
