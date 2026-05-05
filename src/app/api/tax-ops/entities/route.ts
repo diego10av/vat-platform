@@ -139,6 +139,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'legal_name_required' }, { status: 400 });
   }
 
+  // Stint 67.G — name hygiene: strip trailing punctuation/whitespace and
+  // collapse internal whitespace runs. The stint-34 importer (Excel CSV
+  // round-trip) introduced 2 names with trailing `;` and 2 with double
+  // spaces; cleaning at write time prevents the pattern from re-entering
+  // via manual create / future re-imports. The DB unique normalization
+  // already lowercases + strips non-alnum, but it doesn't rewrite the
+  // displayed legal_name — only this normalization does.
+  body.legal_name = body.legal_name
+    .trim()
+    .replace(/[\s;:,.\-]+$/g, '')   // trailing punctuation
+    .replace(/\s+/g, ' ');         // collapse runs to single space
+
   // Stint 50.C/D — pre-check for duplicates against the same normalization
   // rule used by the UNIQUE partial index `tax_entities_norm_unique`
   // (migration 065 — stricter than mig 064). Returns 409 + the existing

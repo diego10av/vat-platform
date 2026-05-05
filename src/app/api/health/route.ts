@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { parseAuthUsers } from '@/lib/auth';
 
 // GET /api/health
 //   - Default: cheap liveness — returns env presence and a DB ping only.
@@ -15,12 +16,16 @@ function maskKey(key: string | undefined): string {
 }
 
 export async function GET(request: NextRequest) {
+  // Stint 67.G — Bug #17. AUTH_PASSWORD is gone since stint 62; report on
+  // the live auth model (AUTH_USERS + per-user AUTH_PASS_<UPPER>) instead.
+  const users = parseAuthUsers();
+
   const checks: Record<string, unknown> = {
     ANTHROPIC_key: maskKey(process.env.ANTHROPIC_API_KEY),
     DATABASE_URL: process.env.DATABASE_URL ? 'set' : 'MISSING',
     SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'set' : 'MISSING',
     SERVICE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'set' : 'MISSING',
-    AUTH_PASSWORD: process.env.AUTH_PASSWORD ? 'set' : 'MISSING',
+    AUTH_USERS: users.length > 0 ? `set (${users.length} users)` : 'MISSING',
     AUTH_SECRET: process.env.AUTH_SECRET ? 'set' : 'MISSING',
   };
 

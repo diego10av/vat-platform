@@ -29,7 +29,9 @@
 // Removed vs stint 11: HowItWorks 4-step, Roadmap 10-items grid,
 // CTA wall, all mailto contact references, all Big-4 framing.
 // The page is noindex/nofollow (see layout.tsx) — fully private even
-// when DNS goes live. Sign in is gated by AUTH_PASSWORD.
+// when DNS goes live. Sign in is gated by the AUTH_USERS / AUTH_PASS_*
+// env vars (see src/lib/auth.ts; the stint-11 single-password
+// AUTH_PASSWORD model was removed in stint 62).
 
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
@@ -144,7 +146,7 @@ function Hero() {
 //
 // CRITICAL — NEVER use real client / family / entity names from cifra's
 // production data here. The landing is publicly reachable (even if
-// noindex/nofollow + AUTH_PASSWORD-gated app), so leaking a client name
+// noindex/nofollow + auth-gated app), so leaking a client name
 // is a confidentiality breach. Diego's instruction (stint 64.D, post-
 // review): "no pongas nunca información de clientes en la landing
 // page a no ser que yo te diga que hay confirmación por su parte

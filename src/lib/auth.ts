@@ -223,10 +223,13 @@ export const AUTH_COOKIE_NAME = COOKIE_NAME;
 //     Per-username password env var. E.g. AUTH_PASS_DIEGO, AUTH_PASS_DEMO.
 //     Compared against submitted password using timingSafeEqual.
 //
-// Back-compat: while AUTH_USERS is unset (or doesn't include 'diego'),
-// the login route falls back to the stint-11 single-password model
-// (AUTH_PASSWORD / AUTH_PASSWORD_REVIEWER / AUTH_PASSWORD_JUNIOR) so
-// Diego doesn't get locked out during the rollout deploy.
+// Stint 62 (2026-04-27) removed the stint-11 single-password legacy
+// fallback. The login route at src/app/api/auth/login/route.ts now
+// rejects any submission that doesn't match an AUTH_USERS entry — the
+// AUTH_PASSWORD / AUTH_PASSWORD_REVIEWER / AUTH_PASSWORD_JUNIOR env
+// vars are no longer read and can be deleted from Vercel. Existing
+// session cookies issued under the legacy 2-/3-part formats remain
+// valid via verifySession() until they expire (30 days).
 //
 // To rotate Diego's password: change AUTH_PASS_DIEGO in Vercel env vars
 // → redeploy → next login uses the new password. Old session cookies
@@ -237,8 +240,9 @@ interface AuthUserEntry { username: string; role: Role }
 
 /**
  * Parse the AUTH_USERS env var. Returns an empty array if unset or
- * malformed. Caller should fall back to legacy single-password auth
- * when this returns empty.
+ * malformed — in which case login is impossible (post-stint-62 there
+ * is no legacy fallback). Used by the login route, /api/system, and
+ * /api/health to gate the auth-configured signal.
  */
 export function parseAuthUsers(): AuthUserEntry[] {
   const raw = process.env.AUTH_USERS;

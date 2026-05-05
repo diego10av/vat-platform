@@ -163,8 +163,10 @@ export default function SettingsPage() {
       <div className="bg-surface border border-border rounded-lg p-4 mb-5">
         <h3 className="text-sm font-semibold text-ink mb-3">Authentication</h3>
         <p className="text-sm text-ink-soft mb-3">
-          The login password is set as the <code className="text-xs bg-surface-alt px-1 rounded">AUTH_PASSWORD</code> environment variable in Vercel.
-          To change it, update the variable in <strong>Vercel → Project Settings → Environment Variables</strong> and redeploy.
+          Users are configured via the <code className="text-xs bg-surface-alt px-1 rounded">AUTH_USERS</code> environment variable
+          (CSV of <code className="text-xs bg-surface-alt px-1 rounded">username:role</code> pairs) plus one
+          <code className="text-xs bg-surface-alt px-1 rounded mx-1">AUTH_PASS_&lt;USERNAME&gt;</code> variable per user.
+          To change a password, update the matching <code className="text-xs bg-surface-alt px-1 rounded">AUTH_PASS_*</code> variable in <strong>Vercel → Project Settings → Environment Variables</strong> and redeploy.
         </p>
         <p className="text-sm text-ink-soft">
           Sessions last 30 days from the moment you log in. To invalidate all existing sessions, regenerate
