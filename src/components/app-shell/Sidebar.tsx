@@ -22,10 +22,12 @@ import {
   BarChart3Icon, ShieldCheckIcon, SettingsIcon, ChevronRightIcon,
   TargetIcon, CircleIcon, PercentIcon, CalculatorIcon, ScrollTextIcon,
   ChevronUpIcon, ChevronDownIcon, LogOutIcon,
+  PanelLeftCloseIcon, PanelLeftOpenIcon,
   // Stint 64.Q.1 — additional CRM child-route icons.
   UsersIcon, TrendingUpIcon, GavelIcon, MessageSquareIcon,
   type LucideIcon,
 } from 'lucide-react';
+import { useSidebarCollapsed } from '@/lib/use-sidebar-collapsed';
 
 // Icon name → component (stint 38.A). Sidebar_icon column stores the
 // lucide icon name; this map decodes. Anything not here falls back
@@ -68,7 +70,7 @@ const TAX_TYPE_TO_URL: Record<string, string> = {
 function urlForTaxType(taxType: string): string {
   return TAX_TYPE_TO_URL[taxType] ?? `/tax-ops/category/${taxType}`;
 }
-import { Logo } from '@/components/Logo';
+import { Logo, LogoMark } from '@/components/Logo';
 
 export interface SidebarBadges {
   /** Declarations currently in `review` status. */
@@ -314,6 +316,7 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
   const pathname = usePathname() || '/';
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [taxCategories, setTaxCategories] = useState<TaxCategory[]>([]);
+  const [collapsed, setCollapsed] = useSidebarCollapsed();
 
   // Stint 38.A — fetch tax-type sidebar categories. Silent fail → uses
   // hardcoded fallback from buildTaxCategoryNavItems.
@@ -393,25 +396,34 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
     const Icon = item.icon;
     const open = isExpanded(item);
     const iconSize = depth === 0 ? 16 : 13;
+
+    // When the sidebar is collapsed only render top-level items (depth 0)
+    // as icon-only tiles. Children are reachable via the expanded sidebar
+    // or by clicking the parent (which navigates to the parent route).
+    if (collapsed && depth > 0) return null;
+
     return (
       <li key={item.href} className="relative">
-        {/* Stint 48.U1 — back to brand-pink rail. Diego: "tendría más
-            sentido el color de cifra (rojo) que el gris". Reverts the
-            stint 40.K change. The rail is still 2px (not 3px) so it's
-            clearly the active marker without overwhelming. */}
         {active && (
           <span
-            className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-brand-500"
+            className={[
+              'absolute left-0 top-1.5 bottom-1.5 rounded-r-full bg-brand-500',
+              collapsed ? 'w-[2px]' : 'w-[3px]',
+            ].join(' ')}
             aria-hidden="true"
           />
         )}
         <div className="flex items-center">
           <Link
             href={item.href}
+            title={collapsed ? item.label : undefined}
+            aria-label={collapsed ? item.label : undefined}
             className={[
-              'flex items-center gap-2.5 pr-1 h-8 rounded-md text-sm',
+              'flex items-center rounded-md text-sm',
               'transition-colors duration-150 flex-1 min-w-0',
-              indentClass(depth),
+              collapsed
+                ? 'h-9 justify-center'
+                : `gap-2.5 pr-1 h-8 ${indentClass(depth)}`,
               active
                 ? 'bg-brand-50 text-brand-800 font-semibold'
                 : 'text-ink-soft hover:bg-surface-alt hover:text-ink',
@@ -422,8 +434,10 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
               strokeWidth={active ? 2.2 : 1.8}
               className={active ? 'text-brand-700' : 'text-ink-muted'}
             />
-            <span className="flex-1 truncate">{item.label}</span>
-            {typeof item.badge === 'number' && item.badge > 0 && (
+            {!collapsed && (
+              <span className="flex-1 truncate">{item.label}</span>
+            )}
+            {!collapsed && typeof item.badge === 'number' && item.badge > 0 && (
               <span
                 className={[
                   'tabular-nums inline-flex items-center justify-center',
@@ -437,8 +451,16 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
                 {item.badge > 99 ? '99+' : item.badge}
               </span>
             )}
+            {/* Collapsed-mode badge dot — keeps the urgency signal
+                without taking horizontal space. */}
+            {collapsed && typeof item.badge === 'number' && item.badge > 0 && (
+              <span
+                className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent-500"
+                aria-label={`${item.badge} items`}
+              />
+            )}
           </Link>
-          {hasChildren && (
+          {!collapsed && hasChildren && (
             <button
               type="button"
               onClick={() => toggleExpand(item.href)}
@@ -453,7 +475,7 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
             </button>
           )}
         </div>
-        {hasChildren && open && (
+        {!collapsed && hasChildren && open && (
           <ul className="space-y-0.5 mt-0.5">
             {item.children!.map(child => renderItem(child, depth + 1))}
           </ul>
@@ -464,21 +486,34 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
 
   return (
     <aside
-      className="hidden md:flex flex-col fixed top-0 left-0 bottom-0 w-[232px] bg-surface border-r border-divider z-drawer"
+      className={[
+        'hidden md:flex flex-col fixed top-0 left-0 bottom-0',
+        'bg-surface border-r border-divider z-drawer',
+        'transition-[width] duration-200',
+        collapsed ? 'w-[56px]' : 'w-[232px]',
+      ].join(' ')}
       aria-label="Primary"
     >
       {/* Logo area */}
-      <div className="h-14 px-4 flex items-center border-b border-divider shrink-0">
+      <div
+        className={[
+          'h-14 flex items-center border-b border-divider shrink-0',
+          collapsed ? 'justify-center px-0' : 'px-4',
+        ].join(' ')}
+      >
         <Link href="/" className="inline-flex" aria-label="cifra — home">
-          <Logo />
+          {collapsed ? <LogoMark size={22} /> : <Logo />}
         </Link>
       </div>
 
       {/* Nav body */}
-      <nav className="flex-1 overflow-y-auto py-4 px-2">
+      <nav className={[
+        'flex-1 overflow-y-auto overflow-x-hidden',
+        collapsed ? 'py-3 px-1.5' : 'py-4 px-2',
+      ].join(' ')}>
         {groups.map((group, i) => (
           <div key={i} className={i > 0 ? 'mt-5' : ''}>
-            {group.label && (
+            {!collapsed && group.label && (
               <div className="px-3 mb-1.5 text-2xs uppercase tracking-[0.08em] font-semibold text-ink-faint">
                 {group.label}
               </div>
@@ -490,9 +525,27 @@ export function Sidebar({ badges = {} }: { badges?: SidebarBadges }) {
         ))}
       </nav>
 
-      {/* Footer — user + logout */}
-      <div className="px-3 pb-3 pt-2 border-t border-divider shrink-0">
-        <UserMenu />
+      {/* Footer — collapse toggle + user menu */}
+      <div className="border-t border-divider shrink-0">
+        <button
+          type="button"
+          onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className={[
+            'w-full flex items-center text-2xs text-ink-muted hover:text-ink hover:bg-surface-alt transition-colors',
+            collapsed ? 'h-9 justify-center' : 'h-9 px-3 gap-2',
+          ].join(' ')}
+        >
+          {collapsed
+            ? <PanelLeftOpenIcon size={14} />
+            : <><PanelLeftCloseIcon size={14} /><span>Collapse</span></>}
+        </button>
+        {!collapsed && (
+          <div className="px-3 pb-3 pt-1 border-t border-divider">
+            <UserMenu />
+          </div>
+        )}
       </div>
     </aside>
   );

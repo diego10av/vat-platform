@@ -14,6 +14,7 @@ import { Sidebar, type SidebarBadges } from './Sidebar';
 import { TopBar } from './TopBar';
 import { OfflineBanner } from './OfflineBanner';
 import { FeedbackWidget } from '@/components/feedback/FeedbackWidget';
+import { useSidebarCollapsed } from '@/lib/use-sidebar-collapsed';
 
 interface Declaration { id: string; status: string; }
 interface AedLetter { id: string; urgency: string | null; status: string; }
@@ -22,6 +23,7 @@ interface Deadline { is_overdue: boolean; bucket: string; }
 export function AppShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || '/';
   const [badges, setBadges] = useState<SidebarBadges>({});
+  const [collapsed] = useSidebarCollapsed();
 
   // Refresh badges when the user navigates. Cheap: these endpoints are
   // already indexed and most returns are < 50 rows. No streaming needed.
@@ -65,7 +67,12 @@ export function AppShellInner({ children }: { children: React.ReactNode }) {
       </a>
       <OfflineBanner />
       <Sidebar badges={badges} />
-      <div className="md:pl-[232px]">
+      <div
+        className={[
+          'transition-[padding-left] duration-200',
+          collapsed ? 'md:pl-[56px]' : 'md:pl-[232px]',
+        ].join(' ')}
+      >
         <TopBar badges={badges} />
         <main id="main-content" className="px-4 md:px-8 py-6 md:py-8 max-w-[1400px]">
           {children}
