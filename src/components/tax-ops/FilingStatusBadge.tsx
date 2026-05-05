@@ -36,42 +36,42 @@ const STATUS_META: Record<string, { label: string; tone: string; description: st
   info_to_request: {
     label: 'Info to request',
     tone: 'bg-surface-alt text-ink-muted',
-    description: 'Aún no hemos pedido la información al CSP / cliente. Próximo paso: mandarles email pidiendo lo que falta.',
+    description: 'Information not yet requested from the CSP / client. Next step: send them an email asking for what is missing.',
   },
   info_requested: {
     label: 'Info requested',
     tone: 'bg-amber-50 text-amber-800',
-    description: 'Ya hemos pedido la información al CSP / cliente y estamos esperando respuesta. La fecha en "Last action" indica cuándo se mandó la petición; si pasan días sin respuesta, mandar follow-up.',
+    description: 'Information requested from the CSP / client; awaiting reply. The "Last action" date shows when the request was sent; follow up if days pass with no answer.',
   },
   working: {
     label: 'Working',
     tone: 'bg-amber-100 text-amber-800',
-    description: 'Tenemos la información y estamos preparando la declaración (incluye recepción + trabajo activo).',
+    description: 'Information received; preparing the filing (covers receipt + active work).',
   },
   awaiting_client_clarification: {
     label: 'Awaiting clarification',
     tone: 'bg-amber-100 text-amber-900',
-    description: 'Hemos pedido al cliente una aclaración por email y estamos esperando su respuesta.',
+    description: 'A clarification email was sent to the client; awaiting their reply.',
   },
   draft_sent: {
     label: 'Draft sent',
     tone: 'bg-brand-100 text-brand-800',
-    description: 'Borrador enviado al cliente para aprobación.',
+    description: 'Draft sent to the client for approval.',
   },
   partially_approved: {
     label: 'Partially approved',
     tone: 'bg-blue-100 text-blue-800',
-    description: 'Uno o más aprobadores ya firmaron, pero faltan otros (típicamente directores que firman conjuntos).',
+    description: 'One or more approvers have signed, but others are still pending (typically directors who sign jointly).',
   },
   client_approved: {
     label: 'Client approved',
     tone: 'bg-blue-200 text-blue-900',
-    description: 'Todas las aprobaciones recibidas. Pendiente de depositar la declaración con la AED.',
+    description: 'All approvals received. Pending submission to the AED.',
   },
   filed: {
     label: 'Filed',
     tone: 'bg-green-100 text-green-800',
-    description: 'Depositada con la AED + cliente notificado con justificante.',
+    description: 'Filed with the AED; client notified with the receipt.',
   },
 };
 
@@ -102,32 +102,32 @@ export const PROVISION_STATUS_META: Record<string, { label: string; tone: string
   awaiting_fs: {
     label: 'Awaiting FS',
     tone: 'bg-surface-alt text-ink-muted',
-    description: 'Esperando que el cliente nos mande el borrador de los estados financieros para empezar a calcular la provision.',
+    description: 'Waiting for the client to send the draft financial statements before we can start calculating the provision.',
   },
   fs_received: {
     label: 'FS received',
     tone: 'bg-amber-50 text-amber-800',
-    description: 'Hemos recibido el borrador de los estados financieros. Próximo paso: empezar a calcular la provision.',
+    description: 'Draft financial statements received. Next step: start calculating the provision.',
   },
   working: {
     label: 'Calculating',
     tone: 'bg-amber-100 text-amber-800',
-    description: 'Trabajando en el cálculo de la tax provision a partir del borrador de FS.',
+    description: 'Working on the tax provision calculation from the draft FS.',
   },
   sent: {
     label: 'Sent — awaiting feedback',
     tone: 'bg-brand-100 text-brand-800',
-    description: 'Provision enviada al cliente. Esperando confirmación o comentarios. Si pasa una semana sin respuesta, asumir finalizada (Diego edita el status manualmente).',
+    description: 'Provision sent to the client. Awaiting confirmation or comments. If a week passes with no reply, assume finalized (status edited manually).',
   },
   comments_received: {
     label: 'Comments received',
     tone: 'bg-orange-100 text-orange-900',
-    description: 'El cliente ha enviado comentarios sobre la provision — necesita revisión y re-envío. Volver a "Calculating" cuando se empiece la revisión.',
+    description: 'Client returned comments on the provision — needs review and re-send. Move back to "Calculating" once the review starts.',
   },
   finalized: {
     label: 'Finalized',
     tone: 'bg-green-100 text-green-800',
-    description: 'Provision aprobada por el cliente. El siguiente paso de este ciclo es la declaración CIT final cuando llegan los FS finales.',
+    description: 'Provision approved by the client. Next step in this cycle is the final CIT return once the final FS arrive.',
   },
 };
 

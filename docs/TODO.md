@@ -1,91 +1,108 @@
 # cifra · TODO
 
-> Tareas concretas de esta semana. Diego dogfoodea; cifra le hace su
-> trabajo más eficiente. Cuando algo se rompa al usar, lo escribimos
-> aquí. Cuando algo se arregle, se mueve a "Done this week" → archivo
-> los lunes.
+> Concrete tasks for this week. Diego dogfoods; cifra makes his
+> work faster. When something breaks during use, write it here.
+> When something is fixed, move it to "Done this week" → archive
+> on Mondays.
 >
-> Last updated: **2026-05-05** (post-reset).
+> Last updated: **2026-05-05** (post-reset Phases 1-10).
 
 ---
 
-## 🔥 Esta semana
+## 🔥 This week
 
-### Diego — manuales (3 clicks de Vercel + 0 más)
+### Diego — manual steps (3 Vercel clicks, nothing else)
 
-- [ ] **Vercel env vars** (3 minutos):
+- [ ] **Vercel env vars** (3 minutes):
   - Settings → Environment Variables.
-  - **Añadir**: `ADMIN_PASSWORD` con un string ≥ 12 chars.
-  - **Borrar**: `AUTH_USERS`, `AUTH_PASS_DIEGO` y cualquier `AUTH_PASS_*`,
+  - **Add**: `ADMIN_PASSWORD` with a string ≥ 12 chars.
+  - **Delete**: `AUTH_USERS`, `AUTH_PASS_DIEGO` and any `AUTH_PASS_*`,
     `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT`,
     `SENTRY_AUTH_TOKEN`, `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`,
-    `BUDGET_MONTHLY_EUR` (queda el default 20€), `CRON_SECRET`,
+    `BUDGET_MONTHLY_EUR` (default 20€ stays in code), `CRON_SECRET`,
     `CIFRA_ICAL_TOKEN`.
-  - **Mantener**: `AUTH_SECRET`, `DATABASE_URL`, `ANTHROPIC_API_KEY`,
+  - **Keep**: `AUTH_SECRET`, `DATABASE_URL`, `ANTHROPIC_API_KEY`,
     Supabase keys, `DEBUG_SECRET`.
-  - Después: redeploy en Vercel dashboard → confirmar login en
-    app.cifracompliance.com con la nueva ADMIN_PASSWORD.
+  - Then: redeploy from the Vercel dashboard → confirm login at
+    `app.cifracompliance.com` with the new `ADMIN_PASSWORD`.
 
-### Claude (yo, en próximas sesiones)
+### Claude (next sessions)
 
-- [ ] **Fase 6 — QA visual completa**: recorrer cada ruta con preview
-      tools, generar `docs/qa-YYYY-MM-DD.md` con la lista priorizada
-      (errores en consola JS, layouts rotos, 500s, inconsistencias de
-      diseño). Diego revisa y elige.
-- [ ] **Bug fix sprint**: atacar la lista de QA por prioridad.
+- [ ] **Full visual QA pass**: walk each route with preview tools,
+      produce a prioritised list (JS console errors, broken layouts,
+      500s, design inconsistencies). Diego reviews and picks priorities.
+- [ ] **Bug-fix sprint** over the QA list, by priority.
 
 ---
 
 ## 🧊 Pending decisions
 
-- [ ] Decidir si las páginas/funciones que sólo Diego usa "a veces"
-      siguen merecer estar (ejemplo: `/closing` dashboard, `/legal-watch`
-      manual page, `/audit` log explorer). Si no las consultas en 2-3
-      semanas, candidatas a quitar.
+- [ ] Decide whether pages / features Diego only uses "sometimes"
+      should stay (e.g. `/closing` dashboard, `/legal-watch` manual
+      page, `/audit` log explorer). If they go unused for 2-3 weeks,
+      candidates to remove.
 
 ---
 
 ## ✅ Done this week
 
-**2026-05-05** — Reset estratégico cifra dogfood-first (5 fases)
+**2026-05-05** — Strategic dogfood-first reset (10 phases)
 
-Diego pivotó de "voy a vender pronto" a "dogfood-first single-user".
-Ejecutados en una sesión larga + cleanup posterior:
+Diego pivoted from "going to sell soon" to "dogfood-first single-user".
+Executed in one long session + follow-on stabilization sessions:
 
-- **Fase 1**: 10 scheduled tasks deshabilitadas + borradas (morning
-  brief, legal-watch scan, CRM payment reminders / engagement /
+- **Phase 1**: 10 scheduled tasks disabled + deleted (morning brief,
+  legal-watch scan, CRM payment reminders / engagement /
   lead-scoring / anniversaries / trash-purge, tax-ops deadline-alerts /
-  recurrence-expand, model-tier-watch). 2 deps no usadas
-  desinstaladas (@notionhq/client, better-sqlite3). Memory file
-  obsoleto eliminado.
-- **Fase 2**: Sentry + PostHog completamente fuera (4 configs +
-  sentry-send.ts custom helper + provider + 1 evento + dependencies
-  + CSP cleanup + env vars marcadas para borrar de Vercel).
-- **Fase 3**: Auth multi-user → single-user (`ADMIN_PASSWORD` env var
-  + cookie HMAC simple). Drop /settings/users + /api/users +
-  two-person rule. 12 routes refactored (requireRole → requireSession).
-  Migration 080 (drop users table CASCADE).
-- **Fase 4**: Borrado masivo de sell-features + chat + inbox:
-  marketing, portal, approvers, contacts, email drafter, onboarding
-  seed, Vercel cron stuck-followups, iCal feed, chat in-product
-  (4 routes + components + libs + tests), inbox (page + endpoint).
-  Migration 081 (drop entity_approvers, client_contacts, chat_threads,
-  chat_messages CASCADE).
-- **Fase 5** (docs): borradas positioning.md + BUSINESS_PLAN.md +
-  go-to-market-alt-fund-managers.md. Archivadas gassner-audit y
-  tax-ops-migration-2026-04-24 a docs/archive/. Reescritos ROADMAP +
-  TODO + PROTOCOLS + CLAUDE para reflejar dogfood-first.
-- **Budget cap**: 75€ → 20€ (default).
+  recurrence-expand, model-tier-watch). Two unused deps removed
+  (`@notionhq/client`, `better-sqlite3`). Stale memory file deleted.
+- **Phase 2**: Sentry + PostHog removed completely (4 configs +
+  custom envelope helper + provider + tracking call + dependencies
+  + CSP cleanup + env vars listed for Vercel deletion).
+- **Phase 3**: Multi-user auth → single-user (`ADMIN_PASSWORD` env
+  var + simple HMAC session cookie). Dropped `/settings/users` +
+  `/api/users` + two-person approval rule. Twelve routes refactored
+  (`requireRole` → `requireSession`). Migration 080 dropped the
+  `users` table.
+- **Phase 4**: Bulk delete of sell-features + chat + inbox:
+  marketing, portal, approvers, contacts, email drafter,
+  onboarding seed, Vercel cron `stuck-followups`, iCal feed, chat
+  in-product (4 routes + components + libs + tests), inbox (page +
+  endpoint). Migration 081 dropped `entity_approvers`,
+  `client_contacts`, `chat_threads`, `chat_messages`. Budget cap
+  default 75€ → 20€.
+- **Phase 5** (docs): deleted `positioning.md`, `BUSINESS_PLAN.md`,
+  `go-to-market-alt-fund-managers.md`. Archived `gassner-audit` and
+  `tax-ops-migration-2026-04-24` to `docs/archive/`. Rewrote ROADMAP +
+  TODO + PROTOCOLS + CLAUDE to reflect dogfood-first.
+- **Phase 6** (QA baseline): smoke pass with preview tools, login
+  flow validated, baseline `docs/qa-2026-05-05.md` created with
+  manual checklist for Diego.
+- **Phase 7** (stabilization): favicon + theme color refresh
+  (Phase 7.1), post-login direct redirect to `/tax-ops` (Phase 7.2),
+  Modal + Drawer backdrop opacity + blur normalised across the
+  primitive plus 8 roll-your-own modals (Phase 7.3).
+- **Phase 8** (home dashboard): `/` is now `HomeDashboard` —
+  Today's focus (4 actionable cards) + Quick actions (3 primary
+  buttons) + Modules (3 cards). New `/api/home` aggregator with
+  defensive `safeCount` queries.
+- **Phase 9** (landing): `cifracompliance.com` rebuilt with
+  intermediate scope — hero + Sign in CTA + 3 module cards. Host-
+  based domain split re-introduced in `middleware.ts`.
+- **Phase 10** (logo): `Logo` wordmark earns the `·` dot signature
+  (option A confirmed). `LogoMark` unchanged. Coherence across
+  sidebar / login / landing.
 
-Tests bajaron de 707 → 614 (-93 por la purga). Build verde, tsc clean,
-lint:design ok. Migrations 080 + 081 aplicadas a Supabase via MCP.
+Tests went from 707 → 614 (-93 from the purge), still all green.
+Build green, tsc clean, design-lint 0 violations. Migrations 080 +
+081 applied to Supabase via MCP.
 
 ---
 
 ## 📁 Archive
 
-Las semanas anteriores se archivan automáticamente cada lunes a
-`docs/archive/TODO-YYYY-WW.md`. Antes del reset había una sección
-"Done this week" con ~40 stints (37-67) que ya no aplica al nuevo
-posicionamiento; la información histórica vive en git log + commit
-messages, que es donde debe vivir.
+Past weeks archive automatically every Monday into
+`docs/archive/TODO-YYYY-WW.md`. Pre-reset there was a "Done this
+week" section with ~40 stints (37-67) that no longer applies to
+the new positioning; the historical record lives in `git log` +
+commit messages, which is where it belongs.

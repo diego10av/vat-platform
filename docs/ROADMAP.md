@@ -1,84 +1,83 @@
 # cifra · ROADMAP
 
-> Dogfood-first single-user backlog. Diego es el único usuario; cifra
-> existe para hacer su trabajo de VAT compliance + CRM personal +
-> Tax-Ops más eficiente. Si vuelve al modo "vender" en 6-12 meses,
-> esto se rehace.
+> Dogfood-first single-user backlog. Diego is the only user; cifra
+> exists to make his VAT compliance + personal CRM + Tax-Ops work
+> faster. If he goes back to "sell mode" in 6-12 months, this gets
+> rebuilt.
 >
-> Last updated: **2026-05-05** (post Fase 5 reset).
+> Last updated: **2026-05-05** (post-reset Phases 1-10).
 
 ---
 
-## 🟢 Now (esta semana)
+## 🟢 Now (this week)
 
-Estabilizar lo construido. La app tiene tres módulos shipped (CRM,
-Tax-Ops, VAT) con muchos bugs visuales y de UX que Diego encuentra al
-usar. La prioridad #1 es identificarlos y arreglarlos.
+Stabilize what's built. The app has three modules shipped (VAT,
+Tax-Ops, CRM) with visual + UX bugs Diego finds while using.
+Priority #1 is identifying and fixing them.
 
-- [ ] **QA visual pass completo** — Claude recorre cada ruta principal
-      con preview tools, captura bugs concretos en `docs/qa-2026-05-XX.md`,
-      Diego prioriza, se atacan uno a uno por commit.
-- [ ] **Bug fix sprint sobre la lista QA** — iterativo, on-demand. Cada
-      fix es 1 commit pequeño con before/after.
+- [ ] **Full visual QA pass** — Claude walks each main route with
+      preview tools, captures concrete bugs in `docs/qa-2026-05-XX.md`,
+      Diego prioritises, fix one per commit.
+- [ ] **Bug-fix sprint over the QA list** — iterative, on-demand.
+      Each fix is one small commit with before/after.
 
-## 🟡 Next (este mes)
+## 🟡 Next (this month)
 
-Mejoras de día-a-día, sólo si dogfooding revela que duelen.
+Day-to-day improvements, only if dogfooding reveals real pain.
 
-- [ ] **Tax-Ops: acceso 1-click al filing actual** — desde la home,
-      el filing del trimestre en curso debe estar a 1 click sin
-      buscar entidad. (Confirmar al usar.)
-- [ ] **VAT: precedent panel mejor sortado** — mostrar precedents
-      relevantes ordenados por fecha o frecuencia, no aleatorio.
-- [ ] **CRM: vista "esta semana"** — un dashboard simple (matters
-      activos + tasks vencidas + opportunities en progreso). Sin
-      meter datos nuevos, solo filtros sobre lo que ya hay.
+- [ ] **Tax-Ops: one-click access to the current filing** — from
+      home, the current-quarter filing should be one click away
+      without entity search. (Confirm while using.)
+- [ ] **VAT: better-sorted precedent panel** — show relevant
+      precedents ordered by date or frequency, not random.
+- [ ] **CRM: "this week" view** — simple dashboard (active matters
+      + overdue tasks + opportunities in progress). No new data,
+      just filters on what's there.
 
-## 🔵 Later (tal vez algún día)
+## 🔵 Later (maybe someday)
 
-Cosas que pueden tener sentido si dogfooding las pide; no inversión
-deliberada hoy.
+Things that might make sense if dogfooding asks for them; no
+deliberate investment today.
 
-- [ ] Expansión del corpus sintético del classifier (60 → 100+ fixtures)
-      sólo si encuentras casos reales mal clasificados.
-- [ ] Soporte para FX rates históricos en input VAT cross-currency
-      (hoy se asume EUR; sólo importa si tienes facturas en USD/CHF).
-- [ ] Subscription tax (taxe d'abonnement) module si lo empiezas a
-      preparar manualmente y duele.
-- [ ] Direct tax (CIT/NWT) prep beyond the matrix — sólo si los Tax-Ops
-      tabs actuales no son suficiente.
+- [ ] Expand the classifier synthetic corpus (60 → 100+ fixtures)
+      only if real cases surface that misclassify.
+- [ ] Historical FX rate support for cross-currency input VAT
+      (today EUR is assumed; only matters if invoices arrive in
+      USD / CHF).
+- [ ] Subscription tax (taxe d'abonnement) module if Diego starts
+      preparing it manually and it hurts.
+- [ ] Direct tax (CIT / NWT) prep beyond the matrix — only if the
+      current Tax-Ops tabs are not enough.
 
-## ⚫ Out of scope (no se construye)
+## ⚫ Out of scope (not built)
 
-Confirmado fuera del alcance dogfood-first:
+Confirmed outside the dogfood-first scope:
 
-- Multi-user, roles (admin/junior/reviewer) — single-user solo.
-- Multi-tenant (firm A vs firm B isolation) — single-user solo.
-- Cliente approval portal (signed share links) — fuera, Diego revisa
-  él mismo.
-- Email drafter post-approval — fuera, los emails los escribe Diego.
-- Onboarding wizard / first-run UI — fuera, Diego conoce su data.
-- Landing page / marketing — fuera, no se va a vender pronto.
-- Chat in-product (Ask cifra) — fuera, se borró por mal construido.
-- Inbox / notifications page — fuera, se borró.
-- Vercel cron jobs — fuera, todos los automatismos quitados.
-- iCal feed / calendar subscription — fuera.
-- Sentry / PostHog / cualquier telemetría externa — fuera.
-- Scheduled tasks (morning brief, legal-watch scan, payment reminders,
-  deadline alerts, etc) — todos quitados.
-- ViDA Peppol e-invoicing — parqueado por completo. Si Diego acepta
-  facturación Peppol obligatoria en LU, lo retomamos como módulo nuevo,
-  no como feature.
-- AED XSD strict validation — el banner amarillo ("for inspection
-  only") se queda hasta que la AED publique un XSD estable. Fuera del
-  alcance.
+- Multi-user, roles (admin / junior / reviewer) — single-user only.
+- Multi-tenant (firm A vs firm B isolation) — single-user only.
+- Client approval portal (signed share links) — out, Diego reviews
+  himself.
+- Post-approval email drafter — out, Diego writes the emails.
+- Onboarding wizard / first-run UI — out, Diego knows his data.
+- Chat in-product (Ask cifra) — out, deleted as poorly built.
+- Inbox / notifications page — out, deleted.
+- Vercel cron jobs — out, all automations removed.
+- iCal feed / calendar subscription — out.
+- Sentry / PostHog / any external telemetry — out.
+- Scheduled tasks (morning brief, legal-watch scan, payment
+  reminders, deadline alerts, etc.) — all removed.
+- ViDA Peppol e-invoicing — fully parked. If Diego accepts mandatory
+  Peppol invoicing in LU, we pick it up as a new module, not as a
+  feature.
+- AED XSD strict validation — the yellow "for inspection only"
+  banner stays until the AED publishes a stable XSD. Out of scope.
 
-## 📐 Reglas de juego
+## 📐 Rules of the game
 
-- **Cualquier feature nueva pasa el filtro Rule §11 (actionable-first)**:
-  si no acciona algo concreto en el día-a-día de Diego, no se construye.
-- **Cualquier dependencia nueva** (npm package, env var, scheduled task,
-  servicio externo) requiere justificación; el default es no.
-- **Tests verde antes de cada commit**, sin excepción.
-- **Commits pequeños y atómicos** (1 fix = 1 commit) facilitan revertir
-  cuando algo se rompe.
+- **Every new feature passes Rule §11 (actionable-first):** if it
+  does not trigger a concrete action in Diego's day, it is not built.
+- **Every new dependency** (npm package, env var, scheduled task,
+  external service) requires justification; the default is no.
+- **Tests green before every commit**, no exceptions.
+- **Small atomic commits** (1 fix = 1 commit) make rollbacks
+  trivial when something breaks.
