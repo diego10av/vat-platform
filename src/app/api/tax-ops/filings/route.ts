@@ -232,9 +232,12 @@ export async function POST(request: NextRequest) {
     [obl.tax_type, obl.period_pattern],
   );
   let deadline: string | null = null;
+  let statutory: string | null = null;
   if (ruleRows[0]) {
     try {
-      deadline = computeDeadline(ruleRows[0], period_year as number, period_label).effective;
+      const computed = computeDeadline(ruleRows[0], period_year as number, period_label);
+      deadline  = computed.effective || null;
+      statutory = computed.statutory || null;
     } catch {
       deadline = null;
     }
@@ -250,11 +253,13 @@ export async function POST(request: NextRequest) {
     await execute(
       `INSERT INTO tax_filings
          (id, obligation_id, period_year, period_label, deadline_date,
+          statutory_deadline_date,
           status, prepared_with, comments, assigned_to,
           filed_at, draft_sent_at, last_action_at, import_source)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_DATE, 'manual')`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, CURRENT_DATE, 'manual')`,
       [
         id, obligation_id, period_year, period_label, deadline,
+        statutory,
         body.status ?? 'info_to_request',
         body.prepared_with ?? [],
         body.comments ?? null,

@@ -1,33 +1,45 @@
 'use client';
 
 // ════════════════════════════════════════════════════════════════════════
-// DeadlineWithTolerance — stint 37.C.
+// DeadlineWithTolerance — stint 37.C, refactored in mig 090.
 //
-// Replaces the generic <DateBadge mode="urgency"> for tax-ops deadlines:
-// Diego pointed out that "overdue" today ignores administrative tolerance.
-// For VAT annual in Luxembourg the statutory deadline is 1 March N+1 but
-// the AED routinely accepts filings until ~1 May (~60 days tolerance) with
-// no penalty. For CIT Form 500 there's a standard extension to 31 December
-// (~270 days). Rendering everything past statutory as red overdue makes
-// the deadline scan useless.
+// Renders a tax-ops filing deadline with two layers of context:
 //
-// Four states:
+//   1. `value` is the EFFECTIVE deadline (statutory + administrative
+//      tolerance). It drives the alert state — red when past, amber when
+//      ≤7 days away. This is what the home dashboard / sidebar badges
+//      key on, and what Diego cares about for "do I have to file this
+//      today?".
+//
+//   2. `statutoryValue` (optional) is the LEGAL deadline. Shown as a
+//      muted secondary line under the effective date so the legal date
+//      remains visible for audit / reference. Tooltip explains both.
+//
+// Four states for the effective value:
 //   value == null                        → "—" (ink-faint)
-//   daysUntilStatutory > 7               → neutral date
-//   0 < daysUntilStatutory <= 7          → amber "in Nd"
-//   daysUntilStatutory === 0             → amber "today"
-//   past statutory, within tolerance     → amber "within tolerance (Nd left)"
-//   past tolerance (daysPastTolerance>0) → red "overdue Nd"
+//   daysUntilEffective > 7               → neutral date
+//   0 < daysUntilEffective <= 7          → amber "in Nd"
+//   daysUntilEffective === 0             → amber "today"
+//   daysUntilEffective < 0               → red "overdue Nd"
+//
+// Legacy `toleranceDays` prop is preserved for callers that still pass
+// statutory-as-`value` (e.g. CIT today). When `toleranceDays > 0` and
+// no `statutoryValue` is given, the older "within tolerance (Nd left)"
+// state still renders. New call sites should pass `statutoryValue` and
+// leave `toleranceDays` at 0.
 // ════════════════════════════════════════════════════════════════════════
 
 import { formatDate } from '@/lib/crm-types';
 
 export function DeadlineWithTolerance({
-  value, toleranceDays = 0, label,
+  value, statutoryValue, toleranceDays = 0, label,
 }: {
   value: string | null | undefined;
-  /** Admin tolerance days past statutory before truly overdue. Pulled
-   *  from the deadline rule (MatrixResponse.admin_tolerance_days). */
+  /** Statutory legal deadline, when distinct from `value`. Renders as a
+   *  small muted secondary line under the effective date. */
+  statutoryValue?: string | null;
+  /** Legacy: admin tolerance days past statutory. Use only when `value`
+   *  is the statutory date and the rule has no separate effective. */
   toleranceDays?: number;
   label?: string;
 }) {
@@ -42,6 +54,10 @@ export function DeadlineWithTolerance({
 
   const msPerDay = 1000 * 60 * 60 * 24;
   const daysDelta = Math.round((d.getTime() - today.getTime()) / msPerDay);
+
+  // Two-layer mode: caller passed a separate statutory date. value IS the
+  // effective; alerts key on it directly with no overlay logic.
+  const hasStatutoryLayer = !!statutoryValue && statutoryValue !== value;
 
   let toneClass: string;
   let prefix: string;
@@ -58,9 +74,9 @@ export function DeadlineWithTolerance({
     toneClass = 'text-amber-700 font-semibold';
     prefix = 'Today · ';
   } else {
-    // Past statutory. Check tolerance window.
     const daysPast = Math.abs(daysDelta);
-    if (toleranceDays > 0 && daysPast <= toleranceDays) {
+    if (!hasStatutoryLayer && toleranceDays > 0 && daysPast <= toleranceDays) {
+      // Legacy single-layer: value = statutory + tolerance applied here.
       const daysLeft = toleranceDays - daysPast;
       toneClass = 'text-amber-700';
       prefix = '';
@@ -69,21 +85,34 @@ export function DeadlineWithTolerance({
         ? `${label}: statutory ${formatDate(value)}; admin tolerance +${toleranceDays}d`
         : `Statutory: ${formatDate(value)} · admin tolerance +${toleranceDays}d (AED usually accepts without penalty)`;
     } else {
-      // Real overdue — past statutory AND past tolerance.
-      const effectivePast = toleranceDays > 0 ? daysPast - toleranceDays : daysPast;
+      // Past effective deadline — truly overdue.
+      const effectivePast = (!hasStatutoryLayer && toleranceDays > 0)
+        ? daysPast - toleranceDays
+        : daysPast;
       toneClass = 'text-danger-700 font-semibold';
       prefix = `${effectivePast}d overdue · `;
     }
   }
 
+  if (!title && hasStatutoryLayer) {
+    title = label
+      ? `${label} · effective ${formatDate(value)} (admin tolerance) · statutory ${formatDate(statutoryValue!)}`
+      : `Effective: ${formatDate(value)} · statutory: ${formatDate(statutoryValue!)}`;
+  }
+
   return (
     <span
-      // Stint 64.X.8 — `whitespace-nowrap` so a deadline like
-      // "2026-12-31" doesn't wrap inside narrow Deadline columns.
-      className={`tabular-nums whitespace-nowrap ${toneClass}`}
+      className={`inline-flex flex-col items-start ${hasStatutoryLayer ? 'leading-tight' : ''}`}
       title={title ?? (label ? `${label}: ${formatDate(value)}` : undefined)}
     >
-      {prefix}{formatDate(value)}{suffix}
+      <span className={`tabular-nums whitespace-nowrap ${toneClass}`}>
+        {prefix}{formatDate(value)}{suffix}
+      </span>
+      {hasStatutoryLayer && (
+        <span className="text-2xs text-ink-faint tabular-nums whitespace-nowrap">
+          legal · {formatDate(statutoryValue!)}
+        </span>
+      )}
     </span>
   );
 }

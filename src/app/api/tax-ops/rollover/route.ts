@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
     tax_type: string;
     period_label: string;
     deadline_date: string | null;
+    statutory_deadline_date: string | null;
   }
   const toCreate: ToCreate[] = [];
   const skippedAdhoc: string[] = [];
@@ -110,14 +111,16 @@ export async function POST(request: NextRequest) {
     for (const label of labels) {
       if (existingKeys.has(`${ob.id}|${label}`)) continue;
       let deadlineIso: string | null = null;
+      let statutoryIso: string | null = null;
       if (rule) {
         try {
           // Empty string from adhoc_no_deadline rule_kind would be passed
           // to a DATE column; the pg driver chokes on '' with a RangeError
           // ("Invalid time value"). Coerce to null.
-          const eff = computeDeadline(rule, year, label).effective;
-          deadlineIso = eff || null;
-        } catch { deadlineIso = null; }
+          const computed = computeDeadline(rule, year, label);
+          deadlineIso  = computed.effective || null;
+          statutoryIso = computed.statutory || null;
+        } catch { /* coerced to null below */ }
       }
       toCreate.push({
         obligation_id: ob.id,
@@ -126,6 +129,7 @@ export async function POST(request: NextRequest) {
         tax_type: ob.tax_type,
         period_label: label,
         deadline_date: deadlineIso,
+        statutory_deadline_date: statutoryIso,
       });
     }
   }
@@ -151,11 +155,12 @@ export async function POST(request: NextRequest) {
       const res = await qTx<{ id: string }>(
         txSql,
         `INSERT INTO tax_filings (id, obligation_id, period_year, period_label,
-                                   deadline_date, status, import_source)
-         VALUES ($1, $2, $3, $4, $5, 'info_to_request', 'rollover')
+                                   deadline_date, statutory_deadline_date,
+                                   status, import_source)
+         VALUES ($1, $2, $3, $4, $5, $6, 'info_to_request', 'rollover')
          ON CONFLICT (obligation_id, period_label) DO NOTHING
          RETURNING id`,
-        [id, c.obligation_id, year, c.period_label, c.deadline_date],
+        [id, c.obligation_id, year, c.period_label, c.deadline_date, c.statutory_deadline_date],
       );
       if (res[0]) inserted += 1;
     }

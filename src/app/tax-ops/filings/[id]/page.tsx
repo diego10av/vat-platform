@@ -45,6 +45,7 @@ interface FilingDetail {
   period_year: number;
   period_label: string;
   deadline_date: string | null;
+  statutory_deadline_date: string | null;
   status: string;
   assigned_to: string | null;
   prepared_with: string[];
@@ -172,6 +173,14 @@ export default function FilingDetailPage({ params }: { params: Promise<{ id: str
           <div>
             <span className="text-ink-muted mr-1">Deadline:</span>
             <DateBadge value={data.deadline_date} mode="urgency" />
+            {data.statutory_deadline_date && data.statutory_deadline_date !== data.deadline_date && (
+              <span
+                className="ml-2 text-2xs text-ink-faint"
+                title="The administrative-tolerance deadline is what alerts fire on. The statutory date is the legal reference."
+              >
+                · legal {data.statutory_deadline_date}
+              </span>
+            )}
           </div>
           {data.assigned_to && (
             <div><span className="text-ink-muted mr-1">Assignee:</span>{data.assigned_to}</div>

@@ -63,9 +63,17 @@ export function computeDeadline(
   if (rule.rule_kind === 'days_after_period_end') {
     const periodEnd = parsePeriodEnd(periodLabel);
     const days = Number((rule.rule_params as { days_after?: number }).days_after ?? 15);
-    const deadline = addDays(periodEnd, days);
-    const iso = toIso(deadline);
-    return { statutory: iso, extension: null, effective: iso };
+    const tolerance = Number(rule.admin_tolerance_days ?? 0);
+    const statutoryDate = addDays(periodEnd, days);
+    const statutoryIso = toIso(statutoryDate);
+    // Admin tolerance (e.g. AED's ~2-month grace on monthly/quarterly
+    // VAT) is treated like an extension: alerts fire on the effective
+    // date, statutory stays visible as the legal reference.
+    if (tolerance > 0) {
+      const extensionIso = toIso(addDays(statutoryDate, tolerance));
+      return { statutory: statutoryIso, extension: extensionIso, effective: extensionIso };
+    }
+    return { statutory: statutoryIso, extension: null, effective: statutoryIso };
   }
 
   if (rule.rule_kind === 'fixed_md') {

@@ -78,6 +78,27 @@ describe('computeDeadline — days_after_period_end', () => {
     const d = computeDeadline(wht, 2026, '2026-01');
     expect(d.effective).toBe('2026-02-10');
   });
+
+  it('VAT quarterly + 60d admin tolerance — Q1 2026 → statutory 15 Apr, effective 14 Jun', () => {
+    // Mig 090: the AED's ~2-month grace on monthly/quarterly VAT is
+    // expressed via admin_tolerance_days. computeDeadline now treats it
+    // like an extension on days_after_period_end rules.
+    const withTolerance: DeadlineRule = { ...rule, admin_tolerance_days: 60 };
+    const d = computeDeadline(withTolerance, 2026, '2026-Q1');
+    expect(d.statutory).toBe('2026-04-15');
+    expect(d.extension).toBe('2026-06-14');
+    expect(d.effective).toBe('2026-06-14');
+  });
+
+  it('VAT monthly + 60d admin tolerance — Jan 2026 → statutory 15 Feb, effective 16 Apr', () => {
+    const monthly: DeadlineRule = {
+      ...rule, period_pattern: 'monthly', admin_tolerance_days: 60,
+    };
+    const d = computeDeadline(monthly, 2026, '2026-01');
+    expect(d.statutory).toBe('2026-02-15');
+    expect(d.extension).toBe('2026-04-16');
+    expect(d.effective).toBe('2026-04-16');
+  });
 });
 
 // ─── computeDeadline — fixed_md ─────────────────────────────────────

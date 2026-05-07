@@ -74,7 +74,63 @@ any of `vat_annual`, `vat_quarterly`, or `vat_monthly`.
 
 ---
 
-## 3 · Future rules to add here
+## 3 · VAT filing deadlines — statutory + administrative tolerance
+
+**Statement**: every VAT filing carries two deadlines: the **statutory**
+date (the legal deadline under LTVA) and the **effective** date
+(statutory + the AED's administrative tolerance). cifra stores both
+on `tax_filings` (`statutory_deadline_date` + `deadline_date`); the
+effective is what alerts/badges fire on, the statutory is shown as
+the legal reference.
+
+**Source**:
+- LTVA Art. 64 — monthly + quarterly returns due "le 15 du mois suivant
+  la période d'imposition" (15th of the month following the period).
+- LTVA Art. 64bis — annual recapitulative for régime ordinaire due
+  **1 May N+1**.
+- LTVA Art. 67bis — annual return for régime simplifié due
+  **1 March N+1**.
+- AED administrative practice (Diego, LU VAT expert, 2026-05-07):
+  - Annuals (both ordinaire and simplifié): tolerance until
+    **30 October N+1**.
+  - Periodic (monthly + quarterly): tolerance ≈ **+60 days** past
+    the legal deadline (~2 months).
+
+**Encoded in `tax_deadline_rules` (mig 090)**:
+
+| `id` | `rule_kind` | Statutory | Effective |
+|---|---|---|---|
+| `rule_vat_annual` | `fixed_md_with_extension` | 1 May N+1 | 30 Oct N+1 |
+| `rule_vat_simplified_annual` | `fixed_md_with_extension` | 1 March N+1 | 30 Oct N+1 |
+| `rule_vat_quarterly` | `days_after_period_end` (15) + `admin_tolerance_days = 60` | period_end + 15d | + 60d |
+| `rule_vat_monthly` | `days_after_period_end` (15) + `admin_tolerance_days = 60` | period_end + 15d | + 60d |
+
+**Enforcement points**:
+- `src/lib/tax-ops-deadlines.ts` `computeDeadline()` returns
+  `{ statutory, extension, effective }`. For
+  `days_after_period_end` rules with `admin_tolerance_days > 0` the
+  `extension` is `statutory + admin_tolerance_days * 1 day`. For
+  `fixed_md_with_extension` the extension is the explicit
+  `extension_month/extension_day` pair.
+- Writers (`/api/tax-ops/rollover`, `/api/tax-ops/filings` POST) write
+  both `deadline_date` (= effective) and `statutory_deadline_date`
+  (= statutory).
+- Readers (`/api/tax-ops/matrix`, `/api/tax-ops/filings/[id]`) expose
+  both. UI component `DeadlineWithTolerance` displays the effective as
+  the primary urgency-coloured date and the statutory as a small muted
+  secondary line ("legal · YYYY-MM-DD").
+- Home dashboard / sidebar badges read `deadline_date` only — alerts
+  fire as the *effective* approaches, not the statutory. This is the
+  behaviour Diego asked for ("alertas solo cuando se acerca la fecha
+  de la administrative tolerance").
+
+**Closed filings** (status ∈ `filed/paid/waived`) keep their historic
+deadline_date for audit; only OPEN filings are recomputed when a rule
+changes (mig 090 backfill).
+
+---
+
+## 4 · Future rules to add here
 
 Place-holder so this doc grows as we hit them. Each entry should
 include: statement, statutory cite, enforcement point, and the stint

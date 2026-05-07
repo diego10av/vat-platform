@@ -19,7 +19,10 @@ interface FilingDetail {
   period_pattern: string;
   period_year: number;
   period_label: string;
+  /** Effective deadline (statutory + admin tolerance). Drives alerts. */
   deadline_date: string | null;
+  /** Statutory legal deadline. Null on legacy rows pre-mig 090. */
+  statutory_deadline_date: string | null;
   status: string;
   assigned_to: string | null;
   prepared_with: string[];
@@ -69,6 +72,7 @@ export async function GET(
             o.tax_type, o.service_kind, o.period_pattern,
             f.period_year, f.period_label,
             f.deadline_date::text AS deadline_date,
+            f.statutory_deadline_date::text AS statutory_deadline_date,
             f.status, f.assigned_to, f.prepared_with,
             f.partner_in_charge, f.associates_working,
             f.draft_sent_at::text AS draft_sent_at,

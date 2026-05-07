@@ -22,20 +22,22 @@ describe('Deadline calculator (PRD §7.3)', () => {
     expect(d.bucket).toBe('soon');
   });
 
-  it('Ordinary quarterly Q1 2026 → 15 May 2026 (end of Mar + 1m + 15d)', () => {
+  it('Ordinary quarterly Q1 2026 → 15 April 2026 (LTVA Art. 64: quarter-end + 15d)', () => {
+    // Mig 090: previous "end-of-next-month + 15" formula was wrong;
+    // legal deadline is period_end + 15 days. Q1 ends 31 Mar → 15 Apr.
     const d = computeDeadline({
       regime: 'ordinary', frequency: 'quarterly',
       year: 2026, period: 'Q1', reference_date: REF,
     });
-    expect(d.due_date).toBe('2026-05-15');
+    expect(d.due_date).toBe('2026-04-15');
   });
 
-  it('Ordinary quarterly Q4 2025 → 15 Feb 2026', () => {
+  it('Ordinary quarterly Q4 2025 → 15 Jan 2026', () => {
     const d = computeDeadline({
       regime: 'ordinary', frequency: 'quarterly',
       year: 2025, period: 'Q4', reference_date: REF,
     });
-    expect(d.due_date).toBe('2026-02-15');
+    expect(d.due_date).toBe('2026-01-15');
     expect(d.is_overdue).toBe(true);
   });
 
@@ -49,8 +51,8 @@ describe('Deadline calculator (PRD §7.3)', () => {
     expect(d.bucket).toBe('urgent');
   });
 
-  it('buckets a 90-day-out deadline as "far"', () => {
-    // Ordinary monthly Apr 2026 → 15 May 2026 → 30 days from REF, so "soon"
+  it('buckets a 30-day-out deadline as "soon"', () => {
+    // Ordinary monthly Apr 2026 → 15 May 2026 → 30 days from REF (15 Apr)
     const d = computeDeadline({
       regime: 'ordinary', frequency: 'monthly',
       year: 2026, period: '04', reference_date: REF,

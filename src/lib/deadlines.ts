@@ -1,11 +1,18 @@
-// Deadline calculator per PRD §7.3.
+// Deadline calculator for the legacy /api/deadlines endpoint. The
+// authoritative VAT deadlines now live in `tax_deadline_rules` (mig
+// 045 + 090) and are computed via `tax-ops-deadlines.ts`. This file
+// is kept for the older VAT-module Deadlines page; statutory dates
+// only — administrative tolerance is not modelled here.
 //
-// Filing deadlines (Luxembourg AED, current practice — verify against AED
-// guidance for any cases at the edges):
-//   - Simplified annual:    1 March of the following year
-//   - Ordinary annual:      1 May of the following year
-//   - Ordinary quarterly:   end-of-quarter + 1 month + 15 days
-//   - Ordinary monthly:     end-of-month + 15 days
+// Statutory filing deadlines per LTVA Art. 64 / 64bis / 67bis:
+//   - Simplified annual:    1 March of the following year   (Art. 67bis)
+//   - Ordinary annual:      1 May  of the following year    (Art. 64bis)
+//   - Quarterly (ordinary): period_end + 15 days             (Art. 64)
+//                           Q1 ends 31 Mar → due 15 Apr (NOT 15 May —
+//                           the previous "end-of-next-month + 15"
+//                           formula was wrong and is fixed in mig 090).
+//   - Monthly (ordinary):   period_end + 15 days             (Art. 64)
+//                           e.g. period 2026-01 → due 15 Feb 2026.
 
 export type Frequency = 'annual' | 'quarterly' | 'monthly';
 export type Regime = 'simplified' | 'ordinary';
@@ -51,12 +58,13 @@ function computeDueDate(p: { regime: Regime; frequency: Frequency; year: number;
   if (frequency === 'quarterly') {
     const q = parseInt(period.replace(/[^0-9]/g, ''), 10);
     if (!q || q < 1 || q > 4) return new Date(Date.UTC(year + 1, 4, 1));
-    // PRD §7.3: end of quarter + 1 month + 15 days.
-    // Cleanly: end-of-(quarter-end-month + 1) + 15 days.
-    // Q1 ends in March → end-of-April + 15d = May 15.
+    // LTVA Art. 64: deadline = quarter_end + 15 days.
+    // Q1 ends 31 Mar → due 15 Apr. The earlier "end-of-(next month) + 15"
+    // formula yielded 15 May for Q1, which was wrong and over-allocated
+    // 30 days of slack. Mig 090 corrects this everywhere.
     const endMonth = q * 3 - 1;                       // 0-indexed month of quarter end
-    const endOfNextMonth = lastDayOfMonth(year, endMonth + 1);
-    return addDays(endOfNextMonth, 15);
+    const endOfQuarter = lastDayOfMonth(year, endMonth);
+    return addDays(endOfQuarter, 15);
   }
 
   if (frequency === 'monthly') {
@@ -84,8 +92,8 @@ function describe(p: { regime: Regime; frequency: Frequency }): string {
   if (p.frequency === 'annual') {
     return p.regime === 'simplified' ? '1 March of following year (simplified annual)' : '1 May of following year (ordinary annual)';
   }
-  if (p.frequency === 'quarterly') return 'End of quarter + 1 month + 15 days';
-  return 'End of month + 15 days';
+  if (p.frequency === 'quarterly') return 'Quarter end + 15 days (statutory, LTVA Art. 64)';
+  return 'Month end + 15 days (statutory, LTVA Art. 64)';
 }
 
 function bucketFor(days: number): DeadlineInfo['bucket'] {

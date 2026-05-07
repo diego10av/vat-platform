@@ -35,7 +35,12 @@ import { useToast } from '@/components/Toaster';
 export interface MatrixCell {
   filing_id: string;
   status: string;
+  /** Effective deadline (statutory + admin tolerance). Drives alerts. */
   deadline_date: string | null;
+  /** Statutory legal deadline. Shown as the legal reference; null on
+   *  legacy filings created before migration 090 (only OPEN ones were
+   *  back-filled) and on filings whose rule has no separate tolerance. */
+  statutory_deadline_date?: string | null;
   assigned_to: string | null;
   comments: string | null;
   filed_at: string | null;

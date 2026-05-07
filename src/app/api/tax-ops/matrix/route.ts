@@ -60,7 +60,12 @@ function periodLabelsFor(pattern: string, year: number): string[] {
 interface MatrixCell {
   filing_id: string;
   status: string;
+  /** Effective deadline (statutory + admin tolerance). What alerts fire on. */
   deadline_date: string | null;
+  /** Statutory (legal) deadline. Shown as legal reference; tolerance applied
+   *  to derive `deadline_date`. May be null on legacy filings created before
+   *  migration 090 (only OPEN filings were back-filled). */
+  statutory_deadline_date: string | null;
   assigned_to: string | null;
   comments: string | null;
   filed_at: string | null;
@@ -269,7 +274,9 @@ export async function GET(request: NextRequest) {
   const obligationIds = entities.map(e => e.obligation_id).filter((x): x is string => !!x);
   let filingRows: Array<{
     obligation_id: string; period_label: string;
-    filing_id: string; status: string; deadline_date: string | null;
+    filing_id: string; status: string;
+    deadline_date: string | null;
+    statutory_deadline_date: string | null;
     assigned_to: string | null; comments: string | null;
     filed_at: string | null; draft_sent_at: string | null;
     tax_assessment_received_at: string | null;
@@ -290,7 +297,9 @@ export async function GET(request: NextRequest) {
   if (obligationIds.length > 0 && periodLabels.length > 0) {
     filingRows = await query(
       `SELECT f.obligation_id, f.period_label,
-              f.id AS filing_id, f.status, f.deadline_date::text,
+              f.id AS filing_id, f.status,
+              f.deadline_date::text,
+              f.statutory_deadline_date::text AS statutory_deadline_date,
               f.assigned_to, f.comments,
               f.filed_at::text, f.draft_sent_at::text,
               f.tax_assessment_received_at::text,
@@ -320,6 +329,7 @@ export async function GET(request: NextRequest) {
       filing_id: f.filing_id,
       status: f.status,
       deadline_date: f.deadline_date,
+      statutory_deadline_date: f.statutory_deadline_date,
       assigned_to: f.assigned_to,
       comments: f.comments,
       filed_at: f.filed_at,

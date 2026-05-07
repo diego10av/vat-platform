@@ -46,6 +46,41 @@
 
 ## ✅ Done this week
 
+**2026-05-07** — VAT deadlines aligned with LTVA + statutory/effective surface (mig 090)
+
+- **Bug fix**: `rule_vat_annual` had statutory **1 March** N+1, but per
+  LTVA Art. 64bis the régime ordinaire is due **1 May** N+1. The
+  régime simplifié (Art. 67bis) is the one due 1 March. Both now carry
+  the **30 October** AED administrative tolerance as the effective
+  deadline. Mig 090 corrects the seed and recomputes `deadline_date` on
+  every OPEN VAT filing.
+- **Periodic VAT** (`vat_quarterly`, `vat_monthly`): legal deadline
+  unchanged (period_end + 15 days, LTVA Art. 64). Admin tolerance
+  bumped from 15d to **60d** (~2 months) per Diego's note. Effective
+  deadline propagated to OPEN filings.
+- **`tax_filings.statutory_deadline_date`** new column. Stores the
+  legal date alongside `deadline_date` (= effective). Writers
+  (rollover + manual create) populate both; readers (matrix + filing
+  detail) expose both.
+- `computeDeadline` (`tax-ops-deadlines.ts`) extended so
+  `days_after_period_end` rules with `admin_tolerance_days > 0`
+  produce a separate `extension` (= effective).
+- **`src/lib/deadlines.ts`** legacy quarterly bug fixed: was computing
+  "end-of-next-month + 15 days" (15 May for Q1) — now correctly
+  `period_end + 15 days` (15 April for Q1, LTVA Art. 64).
+- **UI**: `DeadlineWithTolerance` shows the effective date as primary
+  (urgency-coloured) and the statutory as a small muted secondary
+  line ("legal · YYYY-MM-DD"); tooltip explains both. Applied on
+  matrix Deadline + Next-deadline columns. Filing detail page also
+  displays the legal date next to the effective.
+- **Result**: home dashboard "Tax-Ops overdue filings" badge dropped
+  from **31 → 0**. The 30 false-positive annuals (statutory 1 Mar but
+  within AED tolerance until 30 Oct) and the 1 Q1 2026 quarterly
+  (within +60d tolerance) are no longer flagged. Real overdue stays
+  red as soon as effective passes.
+- Docs updated: `ltva-procedural-rules.md` §3 documents the
+  statutory/effective model with citations.
+
 **2026-05-06** — Persistent alert surface — sidebar badges + tab title (4th commit)
 
 - **Sidebar badges everywhere alerts live**: Tax-Ops > Overview shows
