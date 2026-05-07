@@ -172,7 +172,10 @@ export default function FilingDetailPage({ params }: { params: Promise<{ id: str
         <div className="mt-2 flex items-center gap-4 text-sm">
           <div>
             <span className="text-ink-muted mr-1">Deadline:</span>
-            <DateBadge value={data.deadline_date} mode="urgency" />
+            <DateBadge
+              value={data.deadline_date}
+              mode={['filed', 'paid', 'waived', 'cancelled'].includes(data.status) ? 'neutral' : 'urgency'}
+            />
             {data.statutory_deadline_date && data.statutory_deadline_date !== data.deadline_date && (
               <span
                 className="ml-2 text-2xs text-ink-faint"

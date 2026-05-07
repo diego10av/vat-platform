@@ -893,6 +893,7 @@ export function deadlineColumn(periodLabel: string, toleranceDays = 0): MatrixCo
           value={cell?.deadline_date ?? null}
           statutoryValue={cell?.statutory_deadline_date ?? null}
           toleranceDays={cell?.statutory_deadline_date ? 0 : toleranceDays}
+          status={cell?.status ?? null}
           label="Deadline"
         />
       );
@@ -926,6 +927,7 @@ export function nextDeadlineColumn(periodLabels: string[], toleranceDays = 0): M
           value={target?.cell?.deadline_date ?? null}
           statutoryValue={target?.cell?.statutory_deadline_date ?? null}
           toleranceDays={target?.cell?.statutory_deadline_date ? 0 : toleranceDays}
+          status={target?.cell?.status ?? null}
           label="Next deadline"
         />
       );

@@ -31,8 +31,13 @@
 
 import { formatDate } from '@/lib/crm-types';
 
+// Filing statuses that mean "the work is closed" — deadline is no
+// longer actionable, render neutral so a historical row past its
+// deadline doesn't keep blaring "overdue" in red.
+const CLOSED_STATUSES = new Set(['filed', 'paid', 'waived', 'cancelled']);
+
 export function DeadlineWithTolerance({
-  value, statutoryValue, toleranceDays = 0, label,
+  value, statutoryValue, toleranceDays = 0, label, status,
 }: {
   value: string | null | undefined;
   /** Statutory legal deadline, when distinct from `value`. Renders as a
@@ -42,6 +47,10 @@ export function DeadlineWithTolerance({
    *  is the statutory date and the rule has no separate effective. */
   toleranceDays?: number;
   label?: string;
+  /** Filing status. When closed (filed/paid/waived/cancelled) the
+   *  deadline renders in neutral grey — the work is done, no alert
+   *  state matters. */
+  status?: string | null;
 }) {
   if (!value) return <span className="text-ink-muted">—</span>;
 
@@ -58,13 +67,18 @@ export function DeadlineWithTolerance({
   // Two-layer mode: caller passed a separate statutory date. value IS the
   // effective; alerts key on it directly with no overlay logic.
   const hasStatutoryLayer = !!statutoryValue && statutoryValue !== value;
+  const isClosed = !!status && CLOSED_STATUSES.has(status);
 
   let toneClass: string;
   let prefix: string;
   let suffix: string | null = null;
   let title: string | undefined;
 
-  if (daysDelta > 7) {
+  if (isClosed) {
+    // Work is done — no alert state, just the historical date in muted grey.
+    toneClass = 'text-ink-muted';
+    prefix = '';
+  } else if (daysDelta > 7) {
     toneClass = 'text-ink-soft';
     prefix = '';
   } else if (daysDelta > 0) {
