@@ -46,6 +46,41 @@
 
 ## ✅ Done this week
 
+**2026-05-16** — CRM Opportunities fix + audits + free security fixes (stint 91)
+
+- **CRM Opportunities** (commit `7098176`): añadidos pickers
+  `company_id` + `primary_contact_id` al modal de New / Edit
+  (schema + API ya soportaban, sólo el form no los exponía); nuevo
+  `InlineEntitySelect` para edit-in-place de Company en lista +
+  Company / Primary contact en detail page; añadido `won_reason` con
+  visibleWhen=won (symétrico a loss_reason); extendido
+  `entity-select` para soportar `'contact'` como source.
+- **CRM audit doc** `docs/CRM_AUDIT_2026-05-16.md`: revisión
+  transversal del módulo. Resume bugs concretos (lifecycle bulk
+  update missing, engagement_override sin UI, /crm/outreach dead
+  redirect), gaps vs estándar (reporting win/loss, velocity por
+  etapa, source attribution todos ❌ MISSING), clutter por
+  retar (FirstTimeBanner, calendar cross-module, lead_score sin UI,
+  /crm/help inflado), y top-5 cambios priorizados — Diego decide
+  cuál atacar next.
+- **Security audit doc** `docs/SECURITY_AUDIT_2026-05-16.md`:
+  posture 12-dim, lo que NO se ejecuta (rotación, MFA, costes),
+  lo que SÍ se aplica €0, plantilla email DPA Anthropic, referencia
+  a opciones que cuestan dinero (€500 → €25k). Honestly check vs
+  Legora/Harvey al final.
+- **Free security fixes aplicados**:
+  - CSP producción: dropped `'unsafe-eval'` + `vercel.live` +
+    `va.vercel-scripts.com` del `script-src`; mismo con `vercel.live`
+    + `vitals.vercel-insights.com` en `connect-src`. Preview deploys
+    mantienen el set completo (Vercel toolbar). `'unsafe-inline'`
+    permanece por necesidad de Next.js 16.
+  - Login audit log (mig 091, table `auth_login_log`): cada POST
+    `/api/auth/login` graba IP + user-agent + success + failure_reason.
+    Verificado end-to-end con 1 bad_password + 1 success.
+  - Docs `docs/SECURITY.md` + `docs/INCIDENT_RESPONSE.md` añadidos
+    al índice §9 de CLAUDE.md.
+
+
 **2026-05-07** — VAT deadlines aligned with LTVA + statutory/effective surface (mig 090)
 
 - **Bug fix**: `rule_vat_annual` had statutory **1 March** N+1, but per

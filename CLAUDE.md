@@ -358,6 +358,17 @@ Every doc in `docs/` is actively maintained. Read as needed:
 - **`docs/ECDF_XSD_RECONCILIATION.md`** — XSD reconciliation status.
   5 unverified items vs current AED schema; banner warns "for
   inspection only" until resolved.
+- **`docs/SECURITY.md`** — auth model, data-flow (who sees what),
+  secrets, transport headers, audit log. Living reference.
+- **`docs/INCIDENT_RESPONSE.md`** — 1-page playbook for the realistic
+  incidents (API-key leak, unauthorised login, Supabase compromise,
+  Anthropic spend spike, Vercel outage).
+- **`docs/SECURITY_AUDIT_2026-05-16.md`** — snapshot of the 12-dim
+  posture audit. Re-run every 6-9 months. Notes the €0 fixes
+  applied (CSP tightening, login audit log) and the "costs money"
+  backlog Diego declined.
+- **`docs/CRM_AUDIT_2026-05-16.md`** — opinionated audit of the
+  CRM module (bugs / gaps / clutter / top-5 priorities).
 - **`docs/VIDA.md`** — ViDA strategic briefing (parked but kept for
   reference).
 - **`docs/test-sandbox-design.md`** — test-sandbox design (deferred).
