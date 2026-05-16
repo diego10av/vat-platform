@@ -20,6 +20,7 @@ import {
   XIcon,
 } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
+import { PageContainer } from '@/components/ui/PageContainer';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { DateBadge } from '@/components/crm/DateBadge';
 import { useToast } from '@/components/Toaster';
@@ -252,7 +253,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const isEngagementPage = data.subtasks.length > 0;
 
   return (
-    <div className="space-y-4 max-w-5xl">
+    <PageContainer width="medium">
+      <div className="space-y-4">
       <Link href="/tax-ops/tasks" className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
         <ArrowLeftIcon size={12} /> Back to tasks
       </Link>
@@ -688,7 +690,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </PageContainer>
   );
 }
 

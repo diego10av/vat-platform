@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeftIcon, PencilIcon } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
+import { PageContainer } from '@/components/ui/PageContainer';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { useToast } from '@/components/Toaster';
 import { CspContactsEditor, type CspContact } from '@/components/tax-ops/CspContactsEditor';
@@ -169,7 +170,8 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
   })();
 
   return (
-    <div className="space-y-4 max-w-5xl">
+    <PageContainer width="medium">
+      <div className="space-y-4">
       {/* Stint 40.H — back button uses router.back() so Diego returns
           to the page he came from (VAT quarterly, CIT, Tasks, etc.),
           not always /tax-ops/entities. Fallback link if there's no
@@ -476,7 +478,8 @@ export default function EntityDetailPage({ params }: { params: Promise<{ id: str
         </p>
         <EntityTimeline entityId={id} />
       </div>
-    </div>
+      </div>
+    </PageContainer>
   );
 }
 

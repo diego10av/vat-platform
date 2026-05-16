@@ -17,6 +17,7 @@ import { useEffect, useState, useCallback, use } from 'react';
 import Link from 'next/link';
 import { ArrowLeftIcon, UsersIcon, CopyIcon, XIcon } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
+import { PageContainer } from '@/components/ui/PageContainer';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useToast } from '@/components/Toaster';
@@ -154,7 +155,8 @@ export default function FamilyDetailPage({ params }: { params: Promise<{ id: str
   const source = copySourceId ? entities.find(e => e.id === copySourceId) ?? null : null;
 
   return (
-    <div className="space-y-4">
+    <PageContainer width="medium">
+      <div className="space-y-4">
       <Link href="/tax-ops/entities" className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
         <ArrowLeftIcon size={12} /> Back to entities
       </Link>
@@ -371,6 +373,7 @@ export default function FamilyDetailPage({ params }: { params: Promise<{ id: str
         then tick the entities that share the same contacts, and Apply. It replaces the
         target entities&apos; csp_contacts in one atomic update (audit-logged).
       </div>
-    </div>
+      </div>
+    </PageContainer>
   );
 }

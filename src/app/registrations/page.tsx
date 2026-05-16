@@ -1,9 +1,21 @@
 'use client';
 
+// VAT registrations — Service Line B
+//
+// Stint 92 polish (post-audit): page migrated to design primitives
+// (PageContainer + PageHeader + Field + Input/Select/Textarea + Button +
+// Badge) and the vanity KPI row was deleted per Rule §11. The detail
+// page lives at /registrations/[id].
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/Toaster';
+import { PageContainer } from '@/components/ui/PageContainer';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
+import { Field, Input, Select, Textarea } from '@/components/ui/Input';
 
 interface Registration {
   id: string; entity_id: string; entity_name: string;
@@ -59,92 +71,93 @@ export default function RegistrationsPage() {
     }
   }
 
-  const open = regs.filter(r => r.status !== 'vat_received').length;
-
   return (
-    <div>
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-lg font-semibold tracking-tight">VAT registrations</h1>
-          <p className="text-sm text-ink-muted mt-1">
-            Service Line B — register new entities with the AED. Tracks document collection, form filing, and VAT-number issuance.
-          </p>
-        </div>
-        <button
-          onClick={() => setShowForm(s => !s)}
-          className="h-8 px-3 rounded bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition-all duration-150 cursor-pointer"
-        >
-          {showForm ? 'Cancel' : '+ New registration'}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3 mb-5">
-        <KPI label="Total" value={regs.length} />
-        <KPI label="In progress" value={open} color={open > 0 ? 'text-orange-600' : 'text-ink-faint'} />
-        <KPI label="Completed" value={regs.length - open} color="text-emerald-600" />
-      </div>
+    <PageContainer width="medium">
+      <PageHeader
+        title="VAT registrations"
+        subtitle="Service Line B — register new entities with the AED. Tracks document collection, form filing, and VAT-number issuance."
+        actions={
+          <Button
+            variant={showForm ? 'secondary' : 'primary'}
+            onClick={() => setShowForm(s => !s)}
+          >
+            {showForm ? 'Cancel' : '+ New registration'}
+          </Button>
+        }
+      />
 
       {showForm && (
         <form onSubmit={create} className="bg-surface border border-border rounded-lg p-4 mb-5">
-          <h3 className="text-sm font-semibold mb-3">New registration</h3>
-          <div className="grid grid-cols-3 gap-3">
+          <h3 className="text-sm font-semibold text-ink mb-3">New registration</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Field label="Entity *">
-              <select required value={form.entity_id}
+              <Select
+                required
+                value={form.entity_id}
                 onChange={e => setForm({ ...form, entity_id: e.target.value })}
-                className="w-full border border-border-strong rounded px-2 py-1.5 text-sm">
+              >
                 <option value="">Select entity…</option>
                 {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-              </select>
+              </Select>
             </Field>
             <Field label="Regime requested *">
-              <select value={form.regime_requested}
+              <Select
+                value={form.regime_requested}
                 onChange={e => setForm({ ...form, regime_requested: e.target.value })}
-                className="w-full border border-border-strong rounded px-2 py-1.5 text-sm">
+              >
                 <option value="simplified">Simplified (assujetti simplifié)</option>
                 <option value="ordinary">Ordinary (assujetti normal)</option>
-              </select>
+              </Select>
             </Field>
             <Field label="Frequency">
-              <select value={form.frequency_requested}
+              <Select
+                value={form.frequency_requested}
                 onChange={e => setForm({ ...form, frequency_requested: e.target.value })}
-                className="w-full border border-border-strong rounded px-2 py-1.5 text-sm">
+              >
                 <option value="annual">Annual</option>
                 <option value="quarterly">Quarterly</option>
                 <option value="monthly">Monthly</option>
-              </select>
+              </Select>
             </Field>
             <Field label="Triggered by">
-              <select value={form.triggered_by}
+              <Select
+                value={form.triggered_by}
                 onChange={e => setForm({ ...form, triggered_by: e.target.value })}
-                className="w-full border border-border-strong rounded px-2 py-1.5 text-sm">
+              >
                 <option value="incorporation">Incorporation</option>
                 <option value="activity_start">Activity start</option>
                 <option value="client_request">Client request</option>
                 <option value="other">Other</option>
-              </select>
+              </Select>
             </Field>
             <Field label="Tax office">
-              <input value={form.tax_office}
+              <Input
+                value={form.tax_office}
                 onChange={e => setForm({ ...form, tax_office: e.target.value })}
                 placeholder="e.g. Luxembourg 3"
-                className="w-full border border-border-strong rounded px-2 py-1.5 text-sm" />
+              />
             </Field>
             <Field label="Expected turnover (EUR)">
-              <input type="number" value={form.expected_turnover}
+              <Input
+                type="number"
+                value={form.expected_turnover}
                 onChange={e => setForm({ ...form, expected_turnover: e.target.value })}
-                className="w-full border border-border-strong rounded px-2 py-1.5 text-sm" />
+              />
             </Field>
           </div>
-          <Field label="Comments (Section 31 of AED form)">
-            <textarea value={form.comments_field}
-              onChange={e => setForm({ ...form, comments_field: e.target.value })}
-              rows={2}
-              placeholder="For simplified: invoke Circular 723 (29 December 2006), state no output VAT, request simplified regime."
-              className="w-full border border-border-strong rounded px-2 py-1.5 text-sm" />
-          </Field>
-          <button type="submit" className="mt-3 h-9 px-4 rounded bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600 transition-all duration-150 cursor-pointer">
+          <div className="mt-3">
+            <Field label="Comments (Section 31 of AED form)">
+              <Textarea
+                value={form.comments_field}
+                onChange={e => setForm({ ...form, comments_field: e.target.value })}
+                rows={2}
+                placeholder="For simplified: invoke Circular 723 (29 December 2006), state no output VAT, request simplified regime."
+              />
+            </Field>
+          </div>
+          <Button type="submit" className="mt-3">
             Create registration
-          </button>
+          </Button>
         </form>
       )}
 
@@ -176,10 +189,10 @@ export default function RegistrationsPage() {
                   <td className="px-3 py-2 font-medium text-ink">{r.entity_name}</td>
                   <td className="px-3 py-2 text-ink-soft capitalize">{r.regime_requested || '—'}</td>
                   <td className="px-3 py-2 text-ink-soft capitalize">{r.frequency_requested || '—'}</td>
-                  <td className="px-3 py-2"><RegStatusPill status={r.status} /></td>
+                  <td className="px-3 py-2"><RegStatusBadge status={r.status} /></td>
                   <td className="px-3 py-2 font-mono text-ink-soft">{r.issued_vat_number || '—'}</td>
                   <td className="px-3 py-2 text-right">
-                    <Link href={`/registrations/${r.id}`} className="text-brand-600 hover:underline text-xs font-medium">Open</Link>
+                    <Link href={`/registrations/${r.id}`} className="text-brand-700 hover:underline text-xs font-medium">Open</Link>
                   </td>
                 </tr>
               ))}
@@ -187,33 +200,23 @@ export default function RegistrationsPage() {
           </table>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-xs uppercase tracking-wide font-semibold text-ink-muted mb-1">{label}</span>
-      {children}
-    </label>
-  );
-}
-function KPI({ label, value, color }: { label: string; value: number | string; color?: string }) {
-  return (
-    <div className="bg-surface border border-border rounded-lg p-3">
-      <div className="text-2xs text-ink-muted uppercase tracking-wide font-semibold">{label}</div>
-      <div className={`text-2xl font-bold mt-1 tabular-nums ${color || 'text-ink'}`}>{value}</div>
-    </div>
-  );
-}
-function RegStatusPill({ status }: { status: string }) {
-  const colors: Record<string, string> = {
-    docs_requested: 'bg-surface-alt text-ink-soft',
-    docs_received: 'bg-blue-100 text-blue-700',
-    form_prepared: 'bg-purple-100 text-purple-700',
-    filed: 'bg-emerald-100 text-emerald-800',
-    vat_received: 'bg-teal-100 text-teal-800',
+// Tones taken from the Badge token palette so the registration lifecycle
+// reads consistently with the rest of the design system. Stint 92.
+function RegStatusBadge({ status }: { status: string }) {
+  const TONE: Record<string, React.ComponentProps<typeof Badge>['tone']> = {
+    docs_requested: 'neutral',
+    docs_received:  'info',
+    form_prepared:  'violet',
+    filed:          'success',
+    vat_received:   'teal',
   };
-  return <span className={`text-2xs px-2 py-0.5 rounded font-semibold uppercase tracking-wide ${colors[status] || 'bg-surface-alt'}`}>{status.replace('_', ' ')}</span>;
+  return (
+    <Badge tone={TONE[status] ?? 'neutral'} size="xs">
+      {status.replace('_', ' ')}
+    </Badge>
+  );
 }

@@ -21,6 +21,7 @@ import Link from 'next/link';
 import { ArrowLeftIcon, CheckIcon, HistoryIcon } from 'lucide-react';
 import { PageSkeleton } from '@/components/ui/Skeleton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
+import { PageContainer } from '@/components/ui/PageContainer';
 import { DateBadge } from '@/components/crm/DateBadge';
 import { useToast } from '@/components/Toaster';
 import {
@@ -131,7 +132,8 @@ export default function FilingDetailPage({ params }: { params: Promise<{ id: str
   if (!data) return <PageSkeleton />;
 
   return (
-    <div className="space-y-4 max-w-5xl">
+    <PageContainer width="medium">
+      <div className="space-y-4">
       <Link href="/tax-ops/filings" className="inline-flex items-center gap-1 text-sm text-ink-muted hover:text-ink">
         <ArrowLeftIcon size={12} /> Back to filings
       </Link>
@@ -333,7 +335,8 @@ export default function FilingDetailPage({ params }: { params: Promise<{ id: str
         targetId={data.id}
         targetLabel={`${humanTaxType(data.tax_type)} · ${data.period_label} · ${data.entity_name}`}
       />
-    </div>
+      </div>
+    </PageContainer>
   );
 }
 
