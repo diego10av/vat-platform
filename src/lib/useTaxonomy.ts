@@ -13,7 +13,7 @@ import { useEffect, useState } from 'react';
 
 export type TaxonomyKind =
   | 'country' | 'industry' | 'practice_area' | 'fee_type'
-  | 'role_tag' | 'source' | 'loss_reason';
+  | 'role_tag' | 'source' | 'loss_reason' | 'won_reason';
 
 interface TaxonomyOption { value: string; label: string; }
 

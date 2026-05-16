@@ -28,6 +28,8 @@ import { useConfirm } from '@/lib/use-confirm';
 // Stint 63.A.2 — port Tax-Ops inline editors to opportunities table.
 import { InlineTextCell, InlineDateCell } from '@/components/tax-ops/inline-editors';
 import { ChipSelect } from '@/components/tax-ops/ChipSelect';
+// Stint 91 — inline reassign of company on opportunity rows.
+import { InlineEntitySelect } from '@/components/crm/InlineEntitySelect';
 import {
   LABELS_STAGE, OPPORTUNITY_STAGES, formatEur, formatDate,
   type OpportunityStage,
@@ -63,6 +65,11 @@ interface Opportunity {
   company_name: string | null;
   company_id: string | null;
   primary_contact_name: string | null;
+  // Stint 91 — surfaced by GET /api/crm/opportunities but the
+  // list page wasn't reading it. Needed for the inline Primary
+  // contact picker on the detail page (the list still keeps the
+  // column count compact).
+  primary_contact_id: string | null;
 }
 
 // Stint 67.C: Suspense wrapper removed (see /clients/page.tsx).
@@ -412,10 +419,19 @@ function OpportunitiesPageContent() {
                       <Link href={`/crm/opportunities/${r.id}`} className="font-medium text-brand-700 hover:underline">{r.name}</Link>
                     </OpportunityHoverPreview>
                   </td>
-                  {/* Company → link, not editable inline (changing the
-                      parent company is a heavy action). */}
+                  {/* Company → inline-editable picker (stint 91). Pre-91
+                      this was a read-only link with the comment "not
+                      editable inline — heavy action"; Diego asked to
+                      be able to reassign without going to the detail
+                      page. Cmd-click on the link text still navigates. */}
                   <td className="px-3 py-2">
-                    {r.company_id ? <Link href={`/crm/companies/${r.company_id}`} className="text-ink-muted hover:underline">{r.company_name}</Link> : <span className="text-ink-muted">—</span>}
+                    <InlineEntitySelect
+                      source="company"
+                      value={r.company_id}
+                      displayLabel={r.company_name}
+                      href={r.company_id ? `/crm/companies/${r.company_id}` : null}
+                      onSave={async next => { await patchOpportunity(r.id, 'company_id', next); }}
+                    />
                   </td>
                   {/* Stage — ChipSelect with pipeline-stage tones. */}
                   <td className="px-3 py-2">

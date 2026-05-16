@@ -42,10 +42,12 @@ export interface FieldSchema {
    *  The static `options` array becomes the SSR-friendly fallback used
    *  until the fetch resolves. */
   taxonomyKind?: 'country' | 'industry' | 'practice_area' | 'fee_type'
-              | 'role_tag' | 'source' | 'loss_reason';
+              | 'role_tag' | 'source' | 'loss_reason' | 'won_reason';
   /** For 'entity-select' — which collection to async-load. Each source
-   *  maps a known API endpoint + label format (see useEntityOptions). */
-  entitySource?: 'company' | 'matter';
+   *  maps a known API endpoint + label format (see useEntityOptions).
+   *  Stint 91 — added 'contact' for the Opportunity primary contact
+   *  picker; previously only company + matter were supported. */
+  entitySource?: 'company' | 'matter' | 'contact';
   placeholder?: string;
   help?: string;
   /** For number: number format hint. For text: maxLength. */
@@ -187,6 +189,9 @@ export function CrmFormModal({
 
 interface CompanyRow { id: string; company_name: string }
 interface MatterRow  { id: string; matter_reference: string | null; title: string | null }
+// Stint 91 — contact picker source. Reuses GET /api/crm/contacts
+// which already returns full_name + company_name on each row.
+interface ContactRow { id: string; full_name: string | null; company_name: string | null }
 
 function useEntityOptions(source: FieldSchema['entitySource'] | undefined): {
   options: SearchableOption[];
@@ -202,23 +207,34 @@ function useEntityOptions(source: FieldSchema['entitySource'] | undefined): {
     if (!source) { setOptions([]); setLoading(false); return; }
     let alive = true;
     setLoading(true);
-    const url = source === 'company'
-      ? '/api/crm/companies?limit=500'
-      : '/api/crm/matters?limit=500';
+    const url =
+      source === 'company' ? '/api/crm/companies?limit=500' :
+      source === 'matter'  ? '/api/crm/matters?limit=500' :
+      /* contact */          '/api/crm/contacts?limit=500';
     fetch(url, { cache: 'no-store' })
       .then(r => r.ok ? r.json() : [])
       .then((rows: unknown) => {
         if (!alive) return;
         if (!Array.isArray(rows)) { setOptions([]); return; }
-        const opts: SearchableOption[] = source === 'company'
-          ? (rows as CompanyRow[]).map(r => ({
-              value: r.id,
-              label: r.company_name ?? r.id,
-            }))
-          : (rows as MatterRow[]).map(r => ({
-              value: r.id,
-              label: [r.matter_reference, r.title].filter(Boolean).join(' · ') || r.id,
-            }));
+        let opts: SearchableOption[];
+        if (source === 'company') {
+          opts = (rows as CompanyRow[]).map(r => ({
+            value: r.id,
+            label: r.company_name ?? r.id,
+          }));
+        } else if (source === 'matter') {
+          opts = (rows as MatterRow[]).map(r => ({
+            value: r.id,
+            label: [r.matter_reference, r.title].filter(Boolean).join(' · ') || r.id,
+          }));
+        } else {
+          opts = (rows as ContactRow[]).map(r => ({
+            value: r.id,
+            // "Maria González · Allen Overy" so two Marias at different
+            // firms stay disambiguated in the dropdown.
+            label: [r.full_name, r.company_name].filter(Boolean).join(' · ') || r.id,
+          }));
+        }
         setOptions(opts);
       })
       .catch(() => { if (alive) setOptions([]); })

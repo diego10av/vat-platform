@@ -13,6 +13,8 @@ import { RecordHistory } from '@/components/crm/RecordHistory';
 import { OPPORTUNITY_FIELDS } from '@/components/crm/schemas';
 // Stint 63.M — inline-edit primitives on the detail Cards.
 import { InlineTextCell, InlineDateCell } from '@/components/tax-ops/inline-editors';
+// Stint 91 — inline reassign of company + primary contact on detail page.
+import { InlineEntitySelect } from '@/components/crm/InlineEntitySelect';
 import {
   LABELS_STAGE, LABELS_ACTIVITY_TYPE, formatEur, formatDate,
   type ActivityType,
@@ -139,6 +141,12 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
         fields={OPPORTUNITY_FIELDS}
         initial={{
           name: o.name,
+          // Stint 91 — surface company + primary contact in the Edit
+          // modal. Both columns existed in DB + API; just the modal
+          // wasn't pre-populating them, so opening Edit silently
+          // cleared the link on save.
+          company_id: o.company_id,
+          primary_contact_id: o.primary_contact_id,
           stage: o.stage,
           practice_areas: o.practice_areas ?? [],
           source: o.source,
@@ -149,6 +157,9 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
           next_action: (o as Record<string, string | null>).next_action,
           next_action_due: (o as Record<string, string | null>).next_action_due,
           loss_reason: (o as Record<string, string | null>).loss_reason,
+          // Stint 91 — won_reason was accepted by API but never carried
+          // through the form. Now visible when stage === 'won'.
+          won_reason: (o as Record<string, string | null>).won_reason,
           tags: o.tags ?? [],
           notes: o.notes,
         }}
@@ -182,10 +193,24 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
         <Card title="Company">
-          {o.company_id ? <Link href={`/crm/companies/${o.company_id}`} className="text-brand-700 hover:underline">{o.company_name ?? '—'}</Link> : '—'}
+          {/* Stint 91 — inline edit, with the historic link behaviour
+              preserved on the label (cmd-click navigates). */}
+          <InlineEntitySelect
+            source="company"
+            value={o.company_id ?? null}
+            displayLabel={o.company_name ?? null}
+            href={o.company_id ? `/crm/companies/${o.company_id}` : null}
+            onSave={async next => { await patchField('company_id', next); }}
+          />
         </Card>
         <Card title="Primary contact">
-          {o.primary_contact_id ? <Link href={`/crm/contacts/${o.primary_contact_id}`} className="text-brand-700 hover:underline">{o.primary_contact_name ?? '—'}</Link> : '—'}
+          <InlineEntitySelect
+            source="contact"
+            value={o.primary_contact_id ?? null}
+            displayLabel={o.primary_contact_name ?? null}
+            href={o.primary_contact_id ? `/crm/contacts/${o.primary_contact_id}` : null}
+            onSave={async next => { await patchField('primary_contact_id', next); }}
+          />
         </Card>
       </div>
 

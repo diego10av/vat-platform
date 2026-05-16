@@ -73,6 +73,19 @@ const LOSS_REASONS = [
   { value: 'other',                label: 'Other' },
 ];
 
+// Stint 91 — won_reason taxonomy. Symmetric to LOSS_REASONS so closed-won
+// opportunities can capture "what actually won this deal" for the playbook
+// reporting widget that Workstream B will surface later.
+const WON_REASONS = [
+  { value: 'referral',          label: 'Referral' },
+  { value: 'existing_client',   label: 'Existing client relationship' },
+  { value: 'pricing',           label: 'Pricing' },
+  { value: 'expertise',         label: 'Expertise / track record' },
+  { value: 'timing',            label: 'Timing / availability' },
+  { value: 'incumbent_problem', label: 'Incumbent counsel issue' },
+  { value: 'other',             label: 'Other' },
+];
+
 const AREAS = [
   { value: 'real_estate',     label: 'Real Estate' },
   { value: 'litigation',      label: 'Litigation' },
@@ -350,6 +363,24 @@ export const OPPORTUNITY_FIELDS: FieldSchema[] = [
     required: true,
     placeholder: 'e.g. Fund II formation — Q4 2025',
   },
+  // Stint 91 — company + primary contact pickers. Schema + API have
+  // supported them since migration 031, but the form schema didn't
+  // expose them so a user could only set them by direct SQL. Reusing
+  // the same entity-select primitive that CONTACT_FIELDS uses.
+  {
+    name: 'company_id',
+    label: 'Company',
+    type: 'entity-select',
+    entitySource: 'company',
+    help: 'Pick the existing CRM company this opportunity is with.',
+  },
+  {
+    name: 'primary_contact_id',
+    label: 'Primary contact',
+    type: 'entity-select',
+    entitySource: 'contact',
+    help: 'Lead contact at the company for this opportunity.',
+  },
   {
     name: 'stage',
     label: 'Stage',
@@ -414,6 +445,16 @@ export const OPPORTUNITY_FIELDS: FieldSchema[] = [
     options: LOSS_REASONS,
     taxonomyKind: 'loss_reason',
     visibleWhen: { field: 'stage', equals: 'lost' },
+  },
+  // Stint 91 — won_reason for closed-won opps. Same visibleWhen pattern.
+  // DB column + API whitelist already accept it; only the form was missing.
+  {
+    name: 'won_reason',
+    label: 'Won reason',
+    type: 'select',
+    options: WON_REASONS,
+    taxonomyKind: 'won_reason',
+    visibleWhen: { field: 'stage', equals: 'won' },
   },
   {
     name: 'tags',
