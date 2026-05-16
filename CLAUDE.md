@@ -107,6 +107,12 @@ Each module owns its own contacts/companies/entities lists. Diego
   removed in stint 67.F).
 - Cross-module widgets (e.g. tax filings on CRM "Upcoming this week").
 
+**Documented exception** (stint 92): `/crm/calendar` UNIONs Tax-Ops
+`tax_filings` deadlines into a single temporal view. No cross-module
+FK, no auto-sync, no mixed lists — read-only UNION at the query
+layer for a single calendar surface. Diego's call: a calendar is a
+lens, not a dependency. See `docs/SOFTWARE_AUDIT_2026-05-16.md` §4.
+
 ### Rule §15 — **Mac performance hygiene** (2026-05-05)
 
 Diego's dev Mac is 8 GB RAM. Before opening dev server, kill orphan
@@ -311,7 +317,8 @@ back without explicit greenlight:
 - **Cliente approval portal** (signed share links) — fuera.
 - **Email drafter** post-approval — fuera.
 - **Onboarding wizard** / first-run UI — fuera.
-- **Landing page / marketing** — fuera.
+- **Landing page / marketing** — fuera. `cifracompliance.com` 308-redirects
+  to `app.cifracompliance.com/login` (stint 92). No public surface.
 - **Chat in-product** (Ask cifra) — fuera (Diego: "mal construido").
 - **Inbox / notifications page** — fuera.
 - **Vercel cron jobs** — fuera, sin scheduled tasks.
@@ -369,6 +376,9 @@ Every doc in `docs/` is actively maintained. Read as needed:
   backlog Diego declined.
 - **`docs/CRM_AUDIT_2026-05-16.md`** — opinionated audit of the
   CRM module (bugs / gaps / clutter / top-5 priorities).
+- **`docs/SOFTWARE_AUDIT_2026-05-16.md`** — software-wide audit
+  consolidating VAT + Tax-Ops + CRM visual / format / consistency
+  findings, plus the Rule §11/§14 scorecard. Re-run every 6-9 months.
 - **`docs/VIDA.md`** — ViDA strategic briefing (parked but kept for
   reference).
 - **`docs/test-sandbox-design.md`** — test-sandbox design (deferred).

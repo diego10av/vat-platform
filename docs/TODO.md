@@ -46,6 +46,35 @@
 
 ## ✅ Done this week
 
+**2026-05-16** — CRM useful follow-ups + landing kill + visual polish + audit doc (stint 92)
+
+- **Landing page eliminada**: `src/app/marketing/` borrado entero;
+  `src/middleware.ts` simplificado para 308-redirect del root domain
+  a `app.cifracompliance.com/login`. Superficie de ataque reducida.
+  CLAUDE.md §14 anti-patterns actualizado.
+- **CRM cleanup**: `/crm/outreach` dead redirect borrado;
+  `FirstTimeBanner` borrado (onboarding-nudge post-su-utilidad);
+  focus halo duplicado en `/declarations` search input quitado.
+- **Win/loss reporting widget**: nuevo
+  [`WinLossWidget`](../src/components/crm/WinLossWidget.tsx) +
+  endpoint `/api/crm/reporting/win-loss`. Surface YTD won/lost,
+  win rate, avg won value, top reasons + source. Embebido en /crm
+  home, drill-through a listas filtradas.
+- **Tax-Ops detail pages** envueltos en `<PageContainer width="medium">`
+  (filings/entities/families/tasks `[id]/page.tsx`) — consistente
+  con list pages.
+- **VAT registrations migrated to primitives**: `PageContainer` +
+  `PageHeader` + `Field` + `Input/Select/Textarea` + `Button` +
+  `Badge`. Vanity KPI row eliminada (Rule §11).
+- **Audit findings que el agente reportó MAL** (verificadas en
+  código): `/registrations/[id]` ya existía, `engagement_override` UI
+  ya estaba en contact detail. Sin acción.
+- **`/crm/calendar`**: documentada como única excepción explícita a
+  Rule §14 (es una lente temporal, no una dependencia de datos).
+- `docs/SOFTWARE_AUDIT_2026-05-16.md` nuevo — consolida los tres
+  audits (CRM ya estaba, VAT + Tax-Ops + visual consistency
+  añadidos).
+
 **2026-05-16** — CRM Opportunities fix + audits + free security fixes (stint 91)
 
 - **CRM Opportunities** (commit `7098176`): añadidos pickers
