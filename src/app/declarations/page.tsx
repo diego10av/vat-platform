@@ -196,7 +196,7 @@ function DeclarationsContent() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search by entity / year / period"
-              className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-surface text-sm placeholder:text-ink-muted focus-visible:ring-2 focus-visible:ring-brand-500/20"
+              className="w-full h-9 pl-9 pr-3 rounded-md border border-border bg-surface text-sm placeholder:text-ink-muted"
             />
           </div>
         </div>

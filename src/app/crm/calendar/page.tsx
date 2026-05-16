@@ -8,6 +8,16 @@
 //
 // Zero chart/calendar dependencies; pure CSS grid + simple day cells.
 // Click a day → side panel with every event on that date.
+//
+// ── Rule §14 exception (documented 2026-05-16, stint 92) ──
+// This is the ONLY surface in the codebase that intentionally UNIONs
+// data from another module (Tax-Ops `tax_filings` deadlines) into a
+// CRM view. Diego's call: a calendar is a temporal lens, not a data
+// dependency. The data still lives in tax_filings; no cross-module
+// foreign key exists. The anti-patterns Rule §14 forbids (auto-sync,
+// cross-module FKs, mixing entity/contact lists across modules) are
+// not violated here — it's a read-only UNION at the query layer for
+// a single calendar surface. See docs/SOFTWARE_AUDIT_2026-05-16.md.
 // ════════════════════════════════════════════════════════════════════════
 
 import { useState, useMemo } from 'react';

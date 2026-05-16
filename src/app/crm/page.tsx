@@ -4,20 +4,22 @@ import { WipWidget } from '@/components/crm/WipWidget';
 import { UpcomingThisWeekWidget } from '@/components/crm/UpcomingThisWeekWidget';
 import { KeyAccountHealthWidget } from '@/components/crm/KeyAccountHealthWidget';
 import { DealsAtRiskWidget } from '@/components/crm/DealsAtRiskWidget';
-import { FirstTimeBanner } from '@/components/crm/FirstTimeBanner';
+import { WinLossWidget } from '@/components/crm/WinLossWidget';
 
 // /crm — the operational landing view of the CRM module.
-// Six widgets in priority order: FirstTimeBanner (dismissible tutorial
-// nudge) → Forecast+WIP (money) → Key-Account Health (relationships)
-// → Deals at Risk + Actions Due (hot items) → Upcoming (week plan).
 //
-// The old "JUMP INTO" grid was removed in stint 33.B — it duplicated
-// the top-nav tabs and contributed no signal. The home is now pure
-// operational dashboard (no navigation).
+// Stint 92 (post-CRM-audit): FirstTimeBanner removed — Diego is past
+// onboarding and the banner was Rule §11 noise.
+//
+// Layout (priority order):
+//   Forecast + WIP                          → money
+//   Key-Account Health                      → relationships
+//   Deals at Risk + Actions Due             → hot items
+//   Upcoming This Week                      → week plan
+//   Win/Loss reporting (YTD funnel signal)  → playbook insight
 export default function CrmHomePage() {
   return (
     <div className="space-y-5">
-      <FirstTimeBanner />
       <div>
         <h1 className="text-lg font-semibold text-ink">CRM home</h1>
         {/* Stint 65.F — mental-model statement matching the one on
@@ -42,6 +44,8 @@ export default function CrmHomePage() {
       </div>
 
       <UpcomingThisWeekWidget />
+
+      <WinLossWidget />
     </div>
   );
 }
