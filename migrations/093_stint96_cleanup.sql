@@ -50,7 +50,7 @@ ALTER TABLE crm_matters       DROP COLUMN IF EXISTS deleted_at;
 ALTER TABLE crm_opportunities DROP COLUMN IF EXISTS deleted_at;
 
 -- ─── Note ──────────────────────────────────────────────────────────
--- Sign-off DB columns on tax_filings (preparer, preparer_at, reviewer,
+-- Sign-off DB columns on tax_ops_tasks (preparer, preparer_at, reviewer,
 -- reviewer_at, partner_sign_off, partner_sign_off_at) are kept on
 -- purpose. The TaskSignoffCard UI was removed (3-person cascade is
 -- ceremony for solo work), but the columns can host a simpler
