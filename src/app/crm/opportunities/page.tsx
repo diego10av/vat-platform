@@ -238,10 +238,19 @@ function OpportunitiesPageContent() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error?.message ?? `Save failed (${res.status})`);
       }
-      // Optimistic local update. We reload from server only when the
-      // weighted_value_eur generated column needs to recompute (changes
-      // to estimated_value_eur or probability_pct).
-      if (field === 'estimated_value_eur' || field === 'probability_pct') {
+      // Optimistic local update. We reload from server when:
+      //   - weighted_value_eur generated column needs to recompute
+      //     (changes to estimated_value_eur or probability_pct), OR
+      //   - the patched field is an entity FK (stint 93) — the row
+      //     also carries the JOIN-derived display name (company_name /
+      //     primary_contact_name) which optimistic patching can't infer
+      //     from the id alone.
+      const needsReload =
+        field === 'estimated_value_eur' ||
+        field === 'probability_pct' ||
+        field === 'company_id' ||
+        field === 'primary_contact_id';
+      if (needsReload) {
         await load();
       } else {
         setRows(prev => prev?.map(r =>
@@ -384,6 +393,7 @@ function OpportunitiesPageContent() {
                 </th>
                 <th className="text-left px-3 py-2 font-medium">Name</th>
                 <th className="text-left px-3 py-2 font-medium">Company</th>
+                <th className="text-left px-3 py-2 font-medium">Primary contact</th>
                 <th className="text-left px-3 py-2 font-medium">Stage</th>
                 <th className="text-right px-3 py-2 font-medium">Value</th>
                 <th className="text-right px-3 py-2 font-medium">Prob.</th>
@@ -431,6 +441,18 @@ function OpportunitiesPageContent() {
                       displayLabel={r.company_name}
                       href={r.company_id ? `/crm/companies/${r.company_id}` : null}
                       onSave={async next => { await patchOpportunity(r.id, 'company_id', next); }}
+                    />
+                  </td>
+                  {/* Stint 93 — Primary contact column. Diego: "que
+                      pudiese poner en Opportunities el nombre de la
+                      persona y que apareciese en la tabla inicial". */}
+                  <td className="px-3 py-2">
+                    <InlineEntitySelect
+                      source="contact"
+                      value={r.primary_contact_id}
+                      displayLabel={r.primary_contact_name}
+                      href={r.primary_contact_id ? `/crm/contacts/${r.primary_contact_id}` : null}
+                      onSave={async next => { await patchOpportunity(r.id, 'primary_contact_id', next); }}
                     />
                   </td>
                   {/* Stage — ChipSelect with pipeline-stage tones. */}
