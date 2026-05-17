@@ -46,6 +46,49 @@
 
 ## ✅ Done this week
 
+**2026-05-17** — Fresh-start cleanup pass (stint 96)
+
+Diego pidió un barrido sistemático de dead weight tras los recortes
+previos: "como si empezáramos de cero a iterar con el producto.
+teniendo claro que el roadmap a día de hoy es dogfooding". Tres
+workstreams, tres commits, una migración (093).
+
+- **Workstream A — Tax-Ops multi-user residuals**:
+  - `tax-ops/settings/team` (UI + `/api/tax-ops/team` endpoint) y
+    `tax_team_members` (mig 093). Era un roster de 8 short_names
+    para una práctica de varias personas. `assigned_to` sigue como
+    free-text donde aplica.
+  - `tax-ops/settings/dedupe` — herramienta one-shot del stint 40.A;
+    cumplió su propósito.
+  - `TaskSignoffCard` — cascada preparer → reviewer → partner; era
+    ceremonia para single-user. **Las columnas DB del sign-off se
+    mantienen** por si más adelante se reintroduce un flag simple.
+  - `/api/crm/debug/self-check` (dev-only nunca usado), alias
+    `preparedWithColumn` en matrix-row-columns (jsdoc decía "safe to
+    remove"), deps npm muertas (`@neondatabase/serverless`,
+    `@types/pg`).
+  - Tax-Ops settings index reescrito (drops Team + Dedupe + greyed
+    Templates cards).
+- **Workstream B — CRM dogfood prune**:
+  - `CrmSavedViews` quitado de 4 list pages + componente borrado.
+  - `CRM Automations` (page + API + `runAutomations()` runner +
+    `crm_automation_rules` tabla en mig 093). 3 reglas hard-coded
+    spawneaban tasks que Diego no quería; stage/invoice transitions
+    siguen en audit_log.
+  - **soft-delete → hard-delete en 4 tablas CRM** (companies,
+    contacts, matters, opportunities). `/crm/trash` + `/api/crm/trash`
+    fuera. ~40 filtros `WHERE deleted_at IS NULL` removidos en ~20
+    endpoints. Confirmación modal antes de cada DELETE; audit_log
+    conserva el row histórico. **VAT side intocado** (entities,
+    invoice_lines, invoice_attachments mantienen `deleted_at` por
+    defensibilidad de auditoría AED).
+- **Migración 093**: DROP TABLE tax_team_members CASCADE; DROP TABLE
+  crm_automation_rules CASCADE; DROP COLUMN deleted_at en 4 tablas
+  CRM. Aplicada en producción Supabase antes del push.
+
+Resultado: 617/617 tests verde, design-lint 0/468, typecheck limpio,
+3 commits separados por workstream.
+
 **2026-05-16** — CRM useful follow-ups + landing kill + visual polish + audit doc (stint 92)
 
 - **Landing page eliminada**: `src/app/marketing/` borrado entero;
