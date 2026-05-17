@@ -13,8 +13,6 @@ import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/Toaster';
 import { CrmFormModal } from '@/components/crm/CrmFormModal';
 import { RecordHistory } from '@/components/crm/RecordHistory';
-import { MeetingBriefButton } from '@/components/crm/MeetingBriefButton';
-import { DraftEmailButton } from '@/components/crm/DraftEmailButton';
 import { CONTACT_FIELDS } from '@/components/crm/schemas';
 // Stint 63.M — inline-edit primitives on contact detail Cards.
 import { InlineDateCell } from '@/components/tax-ops/inline-editors';
@@ -213,10 +211,12 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
             </div>
           </div>
           <div className="shrink-0 flex items-center gap-2">
-            <MeetingBriefButton contactId={id} contactName={String(c.full_name ?? 'contact')} />
-            {eng === 'dormant' || eng === 'lapsed'
-              ? <DraftEmailButton targetType="crm_contact" targetId={id} intent="check_in" label="Draft check-in" />
-              : <DraftEmailButton targetType="crm_contact" targetId={id} intent="follow_up" label="Draft follow-up" />}
+            {/* Stint 95 — removed MeetingBriefButton + DraftEmailButton.
+                Diego: "no lo voy a utilizar al no tener vinculado el
+                CRM con outlook". Both generated content meant to be
+                copy-pasted into an external mail client; without that
+                workflow they were noise on every contact detail
+                page. */}
             <Button variant="secondary" size="sm" icon={<PencilIcon size={13} />} onClick={() => setEditOpen(true)}>
               Edit
             </Button>

@@ -283,7 +283,7 @@ export const CONTACT_FIELDS: FieldSchema[] = [
     label: 'Preferred language',
     type: 'select',
     options: LANGUAGES,
-    help: 'Language used when drafting emails to this contact.',
+    help: "Contact's preferred working language (useful for greetings / meetings).",
   },
   {
     name: 'lifecycle_stage',

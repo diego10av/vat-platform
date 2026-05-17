@@ -2,15 +2,15 @@
 
 // ════════════════════════════════════════════════════════════════════════
 // ActionsDueWidget — successor to NextBestActionWidget. Same ranked
-// NBA feed, but with execution controls inline on each row:
+// NBA feed, with execution controls inline on each row:
 //   - Tasks:   checkbox to mark done + snooze 3 days
-//   - All:     "Draft email" button when target has a relationship
-//              context (contact, invoice, matter with contact, opp).
-//              Delegates to <DraftEmailButton /> for the AI work.
 //   - All:     click-through to the record itself.
 //
-// The goal is to close the action loop: scan → act, not scan →
-// navigate-away → act → navigate-back.
+// Stint 95 — removed the "Draft email" button that delegated to
+// DraftEmailButton (Haiku-generated email body, copy-paste flow).
+// Diego doesn't have Outlook integration and never used the AI-drafted
+// bodies — they were noise per row. The click-through to the record
+// remains, so Diego can navigate + take action manually.
 // ════════════════════════════════════════════════════════════════════════
 
 import { useState } from 'react';
@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 import { useCrmFetch } from '@/lib/useCrmFetch';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
-import { DraftEmailButton } from '@/components/crm/DraftEmailButton';
 import { useToast } from '@/components/Toaster';
 
 type ActionType =
@@ -60,14 +59,6 @@ const TONE_CLASSES = {
   amber: 'border-l-amber-500  bg-amber-50/30',
   blue:  'border-l-brand-500  bg-brand-50/30',
 };
-
-// Email-drafting is only valuable when the target carries a
-// relationship context. Tasks and matter-closing don't auto-imply
-// a recipient; we hide Draft for those.
-const DRAFT_EMAIL_TYPES = new Set<ActionType>([
-  'contact_follow_up', 'dormant_key_account', 'invoice_overdue',
-  'opp_stuck', 'opp_close_overdue', 'opp_next_action',
-]);
 
 export function ActionsDueWidget() {
   const toast = useToast();
@@ -142,7 +133,6 @@ export function ActionsDueWidget() {
           const meta = TYPE_META[a.type];
           const Icon = meta.icon;
           const isTask = a.type === 'task';
-          const canDraft = DRAFT_EMAIL_TYPES.has(a.type);
           const taskId = a.target_type === 'crm_task' ? a.target_id : null;
 
           return (
@@ -174,14 +164,6 @@ export function ActionsDueWidget() {
                       </button>
                     </>
                   )}
-                  {canDraft && (
-                    <DraftEmailButton
-                      targetType={a.target_type as 'crm_contact' | 'crm_invoice' | 'crm_opportunity' | 'crm_matter'}
-                      targetId={a.target_id}
-                      intent={inferIntent(a.type)}
-                      compact
-                    />
-                  )}
                   <span className="ml-1 text-2xs uppercase tracking-wide tabular-nums text-ink-muted">
                     {a.priority}
                   </span>
@@ -198,16 +180,3 @@ export function ActionsDueWidget() {
   );
 }
 
-// Pick the right email framing based on the action type so the AI
-// prompt is tight and the subject line feels natural.
-function inferIntent(type: ActionType): 'follow_up' | 'overdue_chase' | 'check_in' | 'next_step' {
-  switch (type) {
-    case 'invoice_overdue':     return 'overdue_chase';
-    case 'dormant_key_account': return 'check_in';
-    case 'contact_follow_up':   return 'follow_up';
-    case 'opp_stuck':
-    case 'opp_close_overdue':
-    case 'opp_next_action':     return 'next_step';
-    default:                    return 'follow_up';
-  }
-}

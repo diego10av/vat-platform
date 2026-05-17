@@ -130,10 +130,6 @@ export default function HelpPage() {
           body="g c → Companies, g o → Opportunities, g m → Matters, g a → Activities, g t → Tasks, g b → Billing. Learn once, use forever." />
         <Power icon={ZapIcon} title="Automations"
           body={<>Rules in <Link href="/crm/settings/automations" className="text-brand-700 hover:underline">/crm/settings/automations</Link>. Three pre-seeded: proposal_sent → follow-up in 5 days, opp won → open matter task, invoice sent → confirm-receipt task. Toggle them off if they don&apos;t fit your flow.</>} />
-        <Power icon={SparklesIcon} title="AI meeting brief"
-          body={<>Any contact detail page → &quot;Meeting brief&quot; button. Opus 4.7 generates a 1-page prep doc from the contact&apos;s history, companies, open opps, invoice trail. Costs ~€0.01 per brief. Copy + download .md supported.</>} />
-        <Power icon={SparklesIcon} title="Monthly lead scoring"
-          body={<>First of every month, Haiku 4.5 scores up to 50 lead/prospect contacts 0-100 with reasoning. Badge appears on the contact detail page with the reasoning text. Zero manual work — flag shows up overnight.</>} />
         <Power icon={CheckSquareIcon} title="Task templates"
           body={<>&quot;Apply template&quot; button on matter + company detail pages. 3 pre-seeded: client onboarding (7 tasks), matter closing (7 steps), M&amp;A deal kickoff (7 tasks). Each task gets a due date offset from today. One click to seed 7 to-dos.</>} />
         <Power icon={CalendarDaysIcon} title="Full calendar view"
