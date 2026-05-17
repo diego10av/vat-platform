@@ -105,11 +105,27 @@ export function InlineCellEditor<T>({
   }, [isEditing, cancel]);
 
   // Click-outside = save (unless busy). Standard Linear/Notion pattern.
+  //
+  // Stint 93 — portal-aware: when the inner editor renders a popover-
+  // style popup that's portaled OUT of `wrapperRef` (the canonical
+  // example is `SearchableSelect`, which portals to `document.body`
+  // so overflow-auto ancestors don't clip it), a click on the popup
+  // looks "outside" from this listener's POV. Without the guard
+  // below, that click race-commits the stale draft and unmounts the
+  // editor before the inner picker can fire its own `onChange`. The
+  // inner popup must opt in by tagging itself with
+  // `data-popover-portal`; outer click-outside then defers to the
+  // popup's own commit lifecycle.
   useEffect(() => {
     if (!isEditing) return;
     const handler = (e: MouseEvent) => {
       if (!wrapperRef.current) return;
       if (wrapperRef.current.contains(e.target as Node)) return;
+      const target = e.target as Element | null;
+      if (target && typeof target.closest === 'function'
+          && target.closest('[data-popover-portal]')) {
+        return;
+      }
       if (busy) return;
       void commit();
     };

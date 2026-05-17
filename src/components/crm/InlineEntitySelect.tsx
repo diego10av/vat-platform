@@ -144,9 +144,14 @@ export function InlineEntitySelect({
           value={editorValue}
           onPick={(next) => {
             setValue(next);
-            // Defer commit until after setValue settles, mirroring the
-            // pattern used by InlineStatusCell — avoids React batching
-            // committing a stale value.
+            // Stint 93 — pass `next` explicitly to commit so we don't
+            // race React's async batching of setValue. The setTimeout
+            // is intentional: it lets the inner SearchableSelect close
+            // its own popup before the editor unmounts (better UX,
+            // and avoids React unmount-during-handler warnings).
+            // Click-outside on the portal popup is now guarded by
+            // InlineCellEditor's data-popover-portal check, so this
+            // path is no longer racing with a premature outer commit.
             setTimeout(() => commit(next), 0);
           }}
         />

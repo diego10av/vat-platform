@@ -176,8 +176,17 @@ export function SearchableSelect({
 
   // Stint 49.B2 — popup portaled to body so overflow-auto ancestors
   // (matrix wrapper) cannot clip it.
+  //
+  // Stint 93 — marked with `data-popover-portal` so an outer
+  // click-outside handler (e.g. InlineCellEditor when this picker is
+  // mounted inside an inline cell) can opt out of its
+  // commit-on-outside-click. Without this marker, the editor's
+  // document-level mousedown handler treats a click on the portaled
+  // popup as "outside the cell" and commits the OLD value before the
+  // SearchableSelect's onChange even fires.
   const popup = open && popupPos && typeof document !== 'undefined' ? createPortal(
     <div
+      data-popover-portal="searchable-select"
       className="fixed z-popover bg-surface border border-border rounded-md shadow-lg overflow-hidden"
       style={{
         left: popupPos.left,
