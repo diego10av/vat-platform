@@ -3,7 +3,7 @@
 import { useEffect, useState, use, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { PencilIcon, Trash2Icon } from 'lucide-react';
+import { PencilIcon, Trash2Icon, ArrowRightIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Breadcrumbs } from '@/components/ui/Breadcrumbs';
 import { PageSkeleton } from '@/components/ui/Skeleton';
@@ -210,6 +210,19 @@ export default function MatterDetailPage({ params }: { params: Promise<{ id: str
         </Card>
       </div>
 
+      {/* Stint 94 — Engagement bridge CRM → Tax-Ops. Diego closes a
+          matter, but the compliance follow-up work lives in Tax-Ops.
+          Rule §14 forbids auto-sync / cross-module FKs, so this is a
+          UX affordance only: a single click creates a parent task in
+          Tax-Ops with the matter's title + client + reference pre-
+          filled into the description, then redirects there for Diego
+          to flesh out sub-tasks and counterparties. Idempotency is
+          NOT enforced (clicking twice creates two tasks); for dogfood
+          single-user that's an acceptable trade. */}
+      <EngagementBridge matterId={id} matter={m} />
+
+
+
       {m.documents_link && (
         <div className="mb-5">
           <a href={String(m.documents_link)} target="_blank" rel="noopener noreferrer" className="text-sm text-brand-700 hover:underline">📁 Documents folder →</a>
@@ -266,6 +279,100 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <div className="mb-5">
       <h3 className="text-sm uppercase tracking-wide font-semibold text-ink-muted mb-2">{title}</h3>
       {children}
+    </div>
+  );
+}
+
+// Stint 94 — Engagement bridge card. Sends the user from a CRM matter
+// to a freshly-created Tax-Ops parent task in one click. Pre-fills the
+// task title + description with matter ref / client / practice areas.
+// Respects Rule §14 (no auto-sync, no cross-module FK): a click is a
+// user-confirmed manual creation; the matter does not "remember" the
+// task. If Diego later wants persistent linkage we add a denormalised
+// reference column on crm_matters; for dogfood the lazy approach works.
+function EngagementBridge({
+  matterId, matter,
+}: {
+  matterId: string;
+  matter: Record<string, string | number | boolean | string[] | null> & {
+    client_name?: string;
+    matter_reference?: string;
+  };
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [creating, setCreating] = useState(false);
+
+  async function createEngagement() {
+    setCreating(true);
+    try {
+      const matterRef = String(matter.matter_reference ?? '');
+      const matterTitle = String(matter.title ?? '(untitled matter)');
+      const clientName = matter.client_name ? String(matter.client_name) : '';
+      const practiceAreas = Array.isArray(matter.practice_areas) ? matter.practice_areas as string[] : [];
+      const taskTitle = clientName
+        ? `${clientName} — ${matterTitle}`
+        : matterTitle;
+      const description = [
+        `Engagement spun off from CRM matter ${matterRef}.`,
+        clientName ? `Client: ${clientName}.` : null,
+        practiceAreas.length ? `Practice areas: ${practiceAreas.join(', ')}.` : null,
+        '',
+        `Source matter: /crm/matters/${matterId}`,
+        '',
+        'Add sub-tasks for each compliance workstream, counterparties (CSP, AED, etc.), and deliverables as the engagement progresses.',
+      ].filter(Boolean).join('\n');
+
+      const res = await fetch('/api/tax-ops/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: taskTitle,
+          description,
+          status: 'queued',
+          priority: 'medium',
+          tags: ['crm-engagement', ...practiceAreas],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error ?? `HTTP ${res.status}`);
+      }
+      const body = await res.json() as { id: string };
+      toast.success('Tax-Ops engagement created');
+      router.push(`/tax-ops/tasks/${body.id}`);
+    } catch (e) {
+      toast.error(String(e instanceof Error ? e.message : e));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="mb-5 rounded-md border border-brand-200 bg-brand-50/50 px-4 py-3 flex items-start gap-3">
+      <div className="flex-1 min-w-0">
+        <div className="text-2xs uppercase tracking-wide font-semibold text-brand-700 mb-1">
+          Next step · Tax-Ops engagement
+        </div>
+        <div className="text-sm text-ink leading-snug">
+          Spin off the compliance side of this matter into a Tax-Ops parent
+          task. Title, client and practice areas are pre-filled; add
+          sub-tasks, counterparties and deliverables there.
+        </div>
+        <div className="text-xs text-ink-muted mt-1">
+          No auto-sync (Rule §14): each click creates a new task you can
+          flesh out manually.
+        </div>
+      </div>
+      <Button
+        variant="primary"
+        size="sm"
+        iconRight={<ArrowRightIcon size={13} />}
+        loading={creating}
+        onClick={createEngagement}
+      >
+        Create engagement
+      </Button>
     </div>
   );
 }
