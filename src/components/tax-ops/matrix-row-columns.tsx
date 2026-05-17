@@ -141,13 +141,6 @@ export function associatesWorkingColumn(periodLabels: string[], refetch: () => v
 }
 
 /**
- * @deprecated Stint 43.D11 — superseded by `partnerInChargeColumn`.
- * Kept temporarily so any external code referencing the old name keeps
- * compiling. Internal call sites all migrated; safe to remove next stint.
- */
-export const preparedWithColumn = partnerInChargeColumn;
-
-/**
  * Stint 43.D6 — "Last action" date column (renamed from "Last chased").
  *
  * Diego: "Last Chase no me pega como nombre, porque tiene que ser en

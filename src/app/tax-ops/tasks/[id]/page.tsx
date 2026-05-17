@@ -28,7 +28,6 @@ import {
   RecurrenceEditor, describeRecurrence, type RecurrenceRule,
 } from '@/components/tax-ops/RecurrenceEditor';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
-import { TaskSignoffCard } from '@/components/tax-ops/TaskSignoffCard';
 import { TaskTimeline } from '@/components/tax-ops/TaskTimeline';
 import { TaskAttachmentsPanel } from '@/components/tax-ops/TaskAttachmentsPanel';
 import {
@@ -413,21 +412,12 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
         </div>
       </div>
 
-      {/* Stint 56.A — sign-off cascade card right under the header so
-          the formal approval path is impossible to miss. */}
-      <TaskSignoffCard
-        taskId={id}
-        snapshot={{
-          preparer: t.preparer,
-          preparer_at: t.preparer_at,
-          reviewer: t.reviewer,
-          reviewer_at: t.reviewer_at,
-          partner_sign_off: t.partner_sign_off,
-          partner_sign_off_at: t.partner_sign_off_at,
-        }}
-        defaultSigner={t.assignee ?? 'Diego'}
-        onChanged={load}
-      />
+      {/* Stint 96 — TaskSignoffCard removed. 3-person sign-off
+          cascade (preparer → reviewer → partner) was built for a
+          firm with role separation; for Diego solo it was ceremony.
+          The DB columns are kept (API still exposes them) so a
+          simpler "sign-off done" flag can be reintroduced later
+          without a migration. */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left column */}

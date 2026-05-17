@@ -14,8 +14,9 @@ import { query } from '@/lib/db';
 // SQL dump use Supabase's PITR / `pg_dump`.
 //
 // Tables included (always): tax_client_groups, tax_entities,
-// tax_obligations, tax_filings, tax_ops_tasks, tax_deadline_rules,
-// tax_team_members.
+// tax_obligations, tax_filings, tax_ops_tasks, tax_deadline_rules.
+//
+// Stint 96 — tax_team_members removed (table dropped in migration 093).
 //
 // Optional (?include_audit=1): every audit_log row whose target_type
 // starts with 'tax_'. Big — probably MB-scale once we've been
@@ -25,14 +26,13 @@ export async function GET(request: NextRequest): Promise<Response> {
   const url = new URL(request.url);
   const includeAudit = url.searchParams.get('include_audit') === '1';
 
-  const [groups, entities, obligations, filings, tasks, rules, team] = await Promise.all([
+  const [groups, entities, obligations, filings, tasks, rules] = await Promise.all([
     query(`SELECT * FROM tax_client_groups ORDER BY name`),
     query(`SELECT * FROM tax_entities ORDER BY legal_name`),
     query(`SELECT * FROM tax_obligations ORDER BY entity_id, tax_type, period_pattern`),
     query(`SELECT * FROM tax_filings ORDER BY obligation_id, period_year, period_label`),
     query(`SELECT * FROM tax_ops_tasks ORDER BY created_at DESC`),
     query(`SELECT * FROM tax_deadline_rules ORDER BY tax_type, period_pattern`),
-    query(`SELECT * FROM tax_team_members ORDER BY short_name`),
   ]);
 
   let auditLog: unknown[] = [];
@@ -55,7 +55,6 @@ export async function GET(request: NextRequest): Promise<Response> {
       tax_filings: filings.length,
       tax_ops_tasks: tasks.length,
       tax_deadline_rules: rules.length,
-      tax_team_members: team.length,
       audit_log: includeAudit ? auditLog.length : 'omitted',
     },
     tables: {
@@ -65,7 +64,6 @@ export async function GET(request: NextRequest): Promise<Response> {
       tax_filings: filings,
       tax_ops_tasks: tasks,
       tax_deadline_rules: rules,
-      tax_team_members: team,
       ...(includeAudit ? { audit_log: auditLog } : {}),
     },
   };

@@ -55,7 +55,6 @@ export default function BackupPage() {
               <li><code className="text-xs bg-surface-alt px-1 rounded">tax_filings</code> — every filing row including status, deadlines, prices, contacts</li>
               <li><code className="text-xs bg-surface-alt px-1 rounded">tax_ops_tasks</code> — every task and follow-up</li>
               <li><code className="text-xs bg-surface-alt px-1 rounded">tax_deadline_rules</code> — your editable deadline rules</li>
-              <li><code className="text-xs bg-surface-alt px-1 rounded">tax_team_members</code> — your team roster</li>
             </ul>
           </div>
         </div>
