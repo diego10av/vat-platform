@@ -392,7 +392,11 @@ function TasksListContent() {
       try {
         const kids = await loadChildren(parentId);
         setChildrenByParent(prev => ({ ...prev, [parentId]: kids }));
-      } catch { /* ignore */ }
+      } catch (e) {
+        // Stint 94 — log for dev visibility. Falling through is OK:
+        // load() below refetches the parent counts anyway.
+        console.error('[tax-ops/tasks] child refresh failed', e);
+      }
       load();
       setSubtaskDraft('');
       setSubtaskDraftFor(parentId); // keep the input open so user can add another
@@ -420,17 +424,25 @@ function TasksListContent() {
     // until reload because `load()` only refetches root tasks. Sub-tasks
     // live in `childrenByParent[parentId]`, which we now refresh in
     // parallel for every expanded parent so the UI stays in sync.
-    load();
-    if (expanded.size > 0) {
-      const refreshes = await Promise.allSettled(
-        [...expanded].map(async (pid) => ({ pid, kids: await loadChildren(pid) })),
-      );
-      const next: Record<string, TaskFull[]> = { ...childrenByParent };
-      for (const r of refreshes) {
-        if (r.status === 'fulfilled') next[r.value.pid] = r.value.kids;
-      }
-      setChildrenByParent(next);
-    }
+    //
+    // Stint 94 — `load()` was fire-and-forget previously, so the
+    // parent's `effective_status` badge could lag the children update
+    // by however long the parent refetch took. Run parent reload +
+    // expanded-children refresh in parallel and await both before
+    // returning, so the caller's optimistic UI is consistent.
+    const parentReload = load();
+    const childrenReload = expanded.size > 0
+      ? Promise.allSettled(
+          [...expanded].map(async (pid) => ({ pid, kids: await loadChildren(pid) })),
+        ).then(refreshes => {
+          const next: Record<string, TaskFull[]> = { ...childrenByParent };
+          for (const r of refreshes) {
+            if (r.status === 'fulfilled') next[r.value.pid] = r.value.kids;
+          }
+          setChildrenByParent(next);
+        })
+      : Promise.resolve();
+    await Promise.all([parentReload, childrenReload]);
   }
 
   async function moveTaskStatus(taskId: string, newStatus: string) {

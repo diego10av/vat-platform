@@ -143,8 +143,14 @@ Role: ${c.job_title ?? 'unknown'}
 Email: ${c.email ?? 'not on file'}
 Lifecycle stage: ${c.lifecycle_stage ?? 'unknown'}
 Engagement: ${engagement}
-Last activity: ${c.last_activity_at ?? 'never recorded'}
-Lead score: ${c.lead_score ?? 'not scored'}${c.lead_score_reasoning ? ' (' + c.lead_score_reasoning + ')' : ''}
+Last activity: ${c.last_activity_at ?? 'never recorded'}${
+  // Stint 94 — only include lead_score if it's actually populated.
+  // The monthly batch that filled it was deleted; leaving "not scored"
+  // permanently in the briefing was noise.
+  c.lead_score != null
+    ? `\nLead score: ${c.lead_score}${c.lead_score_reasoning ? ' (' + c.lead_score_reasoning + ')' : ''}`
+    : ''
+}
 
 === COMPANIES (${cos.length}) ===
 ${cos.map(co => `- ${co.company_name}${co.classification ? ` [${co.classification}]` : ''}${co.role ? ` · ${co.role}` : ''}`).join('\n') || '(none linked)'}

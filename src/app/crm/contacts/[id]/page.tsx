@@ -303,28 +303,12 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
             </div>
           ) : null}
 
-          {/* Lead score badge — only when scored */}
-          {(c.lifecycle_stage === 'lead' || c.lifecycle_stage === 'prospect') && c.lead_score !== null && c.lead_score !== undefined && (
-            <div className="rounded-md border border-border bg-surface p-3 flex items-start gap-3">
-              <div
-                className={`shrink-0 w-12 h-12 rounded-full flex items-center justify-center font-semibold text-base tabular-nums ${
-                  Number(c.lead_score) >= 70 ? 'bg-emerald-100 text-emerald-800'
-                  : Number(c.lead_score) >= 40 ? 'bg-amber-100 text-amber-800'
-                  : 'bg-danger-50 text-danger-700'
-                }`}
-              >
-                {Number(c.lead_score)}
-              </div>
-              <div className="flex-1">
-                <div className="text-2xs uppercase tracking-wide font-semibold text-ink-muted">
-                  Lead score{c.lead_score_updated_at ? ` · updated ${new Date(String(c.lead_score_updated_at)).toLocaleDateString('en-GB')}` : ''}
-                </div>
-                <p className="text-sm text-ink-soft whitespace-pre-wrap mt-0.5">
-                  {c.lead_score_reasoning ? String(c.lead_score_reasoning) : <span className="italic text-ink-muted">Will be scored on next monthly run.</span>}
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Stint 94 — lead score badge removed. The monthly Haiku
+              batch that populated it (`/api/crm/scheduled/lead-scoring`)
+              was deleted in stint 94 (no Vercel cron survived the
+              2026-05-05 reset). The DB columns + types stay for now
+              (cost-free to keep + safer than DROP COLUMN). If lead
+              scoring resurrects, re-introduce the chip here. */}
 
           {/* Activity timeline — visual, with icons by type */}
           <ActivityTimeline activities={data.activities} />

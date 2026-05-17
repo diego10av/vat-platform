@@ -174,9 +174,16 @@ function ContactsPageContent() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error?.message ?? `Save failed (${res.status})`);
       }
-      setRows(prev => prev?.map(r =>
-        r.id === id ? { ...r, [field]: value as never } : r
-      ) ?? null);
+      // Stint 94 — engagement_override drives a server-side recompute
+      // of engagement_level. Optimistic local update can't infer the
+      // new derived value, so reload to pick it up.
+      if (field === 'engagement_override') {
+        await load();
+      } else {
+        setRows(prev => prev?.map(r =>
+          r.id === id ? { ...r, [field]: value as never } : r
+        ) ?? null);
+      }
     } catch (e) {
       toast.error(`Save failed: ${String(e instanceof Error ? e.message : e)}`);
       await load();

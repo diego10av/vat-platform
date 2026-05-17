@@ -318,7 +318,16 @@ function ClientCard({ client }: { client: Client }) {
       const res = await fetch(`/api/clients/${client.id}`);
       const data = await res.json();
       if (res.ok) setEntities(data.entities ?? []);
-    } catch { /* silent */ }
+      // Stint 94 — non-OK still resolves the spinner: empty array
+      // instead of leaving entities=null → "Loading entities…" forever.
+      else setEntities([]);
+    } catch (e) {
+      // Stint 94 — visible failure: log to dev console + degrade to
+      // empty list (so the expand panel renders an empty state instead
+      // of an infinite spinner).
+      console.error('[clients] entity fetch failed', e);
+      setEntities([]);
+    }
   }
 
   function toggle() {
