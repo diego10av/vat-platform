@@ -486,6 +486,24 @@ export const MATTER_FIELDS: FieldSchema[] = [
     placeholder: 'e.g. Acquisition of PortCo X — Tax & Structuring',
     maxLength: 200,
   },
+  // Stint 93 — expose the client + primary contact pickers in the
+  // Quick-add modal so a matter can carry its key relationships from
+  // creation. Schema columns existed since mig 032; API whitelist
+  // accepts them; the modal simply wasn't surfacing them.
+  {
+    name: 'client_company_id',
+    label: 'Client company',
+    type: 'entity-select',
+    entitySource: 'company',
+    help: 'The company this matter is for.',
+  },
+  {
+    name: 'primary_contact_id',
+    label: 'Primary contact',
+    type: 'entity-select',
+    entitySource: 'contact',
+    help: 'Lead contact at the client for this matter.',
+  },
   {
     name: 'status',
     label: 'Status',

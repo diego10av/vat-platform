@@ -18,6 +18,8 @@ import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
 import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
+// Stint 93 — inline reassign of client + primary contact on matter rows.
+import { InlineEntitySelect } from '@/components/crm/InlineEntitySelect';
 // Stint 63.L — hover preview on matter reference.
 import { MatterHoverPreview } from '@/components/crm/MatterHoverPreview';
 import { crmLoadList } from '@/lib/useCrmFetch';
@@ -53,6 +55,12 @@ interface Matter {
   conflict_check_done: boolean;
   client_name: string | null;
   client_id: string | null;
+  // Stint 93 — surfaced by the list API so the table can show "who is
+  // the contact for this matter?" at a glance, same pattern as
+  // Opportunities. The schema column existed (mig 032) but the list
+  // never JOIN'd it until now.
+  primary_contact_name: string | null;
+  primary_contact_id: string | null;
   total_billed: number | string;
   total_hours: number | string;
 }
@@ -161,9 +169,17 @@ function MattersPageContent() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err?.error?.message ?? `Save failed (${res.status})`);
       }
-      setRows(prev => prev?.map(r =>
-        r.id === id ? { ...r, [field]: value as never } : r
-      ) ?? null);
+      // Stint 93 — entity FKs (client_company_id, primary_contact_id)
+      // change a JOIN-derived display name (client_name /
+      // primary_contact_name) that the optimistic patch can't infer
+      // from the id alone — reload to pick it up.
+      if (field === 'client_company_id' || field === 'primary_contact_id') {
+        await load();
+      } else {
+        setRows(prev => prev?.map(r =>
+          r.id === id ? { ...r, [field]: value as never } : r
+        ) ?? null);
+      }
     } catch (e) {
       toast.error(`Save failed: ${String(e instanceof Error ? e.message : e)}`);
       await load();
@@ -261,6 +277,7 @@ function MattersPageContent() {
                 </th>
                 <th className="text-left px-3 py-2 font-medium">Reference</th>
                 <th className="text-left px-3 py-2 font-medium">Client</th>
+                <th className="text-left px-3 py-2 font-medium">Primary contact</th>
                 <th className="text-left px-3 py-2 font-medium">Status</th>
                 <th className="text-left px-3 py-2 font-medium">Practice</th>
                 <th className="text-left px-3 py-2 font-medium">Fee</th>
@@ -300,9 +317,30 @@ function MattersPageContent() {
                       <span className="ml-2 text-2xs uppercase tracking-wide text-danger-700 bg-danger-50 border border-danger-200 rounded px-1 py-0.5" title="Conflict check pending">No conflict check</span>
                     )}
                   </td>
-                  {/* Client → link, not editable inline (heavy action). */}
+                  {/* Client → inline-editable picker (stint 93,
+                      mirroring the Opportunities Company column fix).
+                      Plain-click on the company name still navigates;
+                      click around the link opens the picker. */}
                   <td className="px-3 py-2">
-                    {r.client_id ? <Link href={`/crm/companies/${r.client_id}`} className="text-ink-muted hover:underline">{r.client_name}</Link> : <span className="text-ink-muted">—</span>}
+                    <InlineEntitySelect
+                      source="company"
+                      value={r.client_id}
+                      displayLabel={r.client_name}
+                      href={r.client_id ? `/crm/companies/${r.client_id}` : null}
+                      onSave={async next => { await patchMatter(r.id, 'client_company_id', next); }}
+                    />
+                  </td>
+                  {/* Stint 93 — Primary contact column (parity with
+                      Opportunities). Matter schema had primary_contact_id
+                      since mig 032 but the list never showed it. */}
+                  <td className="px-3 py-2">
+                    <InlineEntitySelect
+                      source="contact"
+                      value={r.primary_contact_id}
+                      displayLabel={r.primary_contact_name}
+                      href={r.primary_contact_id ? `/crm/contacts/${r.primary_contact_id}` : null}
+                      onSave={async next => { await patchMatter(r.id, 'primary_contact_id', next); }}
+                    />
                   </td>
                   {/* Status — ChipSelect with active/on_hold/closed/archived tones. */}
                   <td className="px-3 py-2">
