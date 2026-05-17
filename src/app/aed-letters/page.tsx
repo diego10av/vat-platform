@@ -36,6 +36,13 @@ interface AEDComm {
   summary: string | null;
   status: string;
   uploaded_at: string;
+  // Stint 94 — Haiku extracts a suggested next_action at upload time;
+  // pre-94 it was stored but invisible to the UI. Now displayed read-
+  // only on the card so Diego sees the suggestion at a glance.
+  next_action: string | null;
+  // Stint 94 — free-text notes (mig 092). Inline-editable below the
+  // summary, owned by Diego (chase history, response drafts, etc.).
+  notes: string | null;
 }
 interface Entity { id: string; name: string; }
 
@@ -98,6 +105,23 @@ export default function AEDLettersPage() {
     }
     toast.success(`Letter marked ${status}`);
     load();
+  }
+
+  // Stint 94 — inline-save helper for free-text fields on a letter.
+  async function patchField(id: string, field: 'notes' | 'next_action', value: string | null) {
+    const res = await fetch(`/api/aed/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: value }),
+    });
+    if (!res.ok) {
+      toast.error(`Could not save ${field.replace('_', ' ')}`);
+      return;
+    }
+    // Optimistic local update — no full reload needed, fields are
+    // free text and have no JOIN-derived siblings.
+    setLetters(prev => prev?.map(l =>
+      l.id === id ? { ...l, [field]: value } : l,
+    ) ?? null);
   }
   async function openLetter(id: string) {
     const res = await fetch(`/api/aed/${id}?action=url`);
@@ -270,6 +294,7 @@ export default function AEDLettersPage() {
               letter={l}
               onOpen={() => openLetter(l.id)}
               onSetStatus={(s) => setStatus(l.id, s)}
+              onSaveNotes={(v) => patchField(l.id, 'notes', v)}
             />
           ))}
         </ul>
@@ -279,11 +304,12 @@ export default function AEDLettersPage() {
 }
 
 function LetterCard({
-  letter, onOpen, onSetStatus,
+  letter, onOpen, onSetStatus, onSaveNotes,
 }: {
   letter: AEDComm;
   onOpen: () => void;
   onSetStatus: (status: string) => void;
+  onSaveNotes: (next: string | null) => Promise<void>;
 }) {
   const isUrgent = letter.urgency === 'high' && letter.status !== 'archived' && letter.status !== 'actioned';
   const isArchived = letter.status === 'archived';
@@ -338,6 +364,15 @@ function LetterCard({
                   No summary yet — <button onClick={onOpen} className="text-brand-600 hover:underline">open to review</button>.
                 </p>
               )}
+              {/* Stint 94 — Haiku's extracted next-action suggestion. Read-
+                  only by design (it's an AI proposal, kept stable as evidence).
+                  Diego's own running thoughts live in the Notes field below. */}
+              {letter.next_action && (
+                <p className="text-xs text-ink-muted mt-1.5 inline-flex items-center gap-1.5">
+                  <span className="text-2xs uppercase tracking-wide font-semibold text-ink-faint">Suggested</span>
+                  <span className="text-ink-soft">{letter.next_action}</span>
+                </p>
+              )}
             </div>
 
             {/* Right rail — amount + deadline */}
@@ -357,6 +392,16 @@ function LetterCard({
           </div>
 
           {/* Actions */}
+          {/* Stint 94 — inline-editable Notes field. The big real-world
+              gap: when Diego chased the client / drafted a response /
+              waited for AED, he had nowhere to capture it inside cifra.
+              Now it lives on the card itself. Click → textarea →
+              click-outside or blur to save. */}
+          <NotesField
+            value={letter.notes}
+            onSave={onSaveNotes}
+          />
+
           <div className="flex items-center gap-2 mt-3 pt-3 border-t border-divider flex-wrap">
             <button
               onClick={onOpen}
@@ -463,6 +508,79 @@ function StatusPill({ status, className = '' }: { status: string; className?: st
     <span className={className}>
       <Badge tone={entry.tone}>{entry.label}</Badge>
     </span>
+  );
+}
+
+// Stint 94 — inline-editable notes. Diego owns this field (Haiku
+// never touches notes; only Diego writes). Click-outside / blur saves;
+// ESC reverts. Empty value is allowed (saved as null).
+function NotesField({
+  value, onSave,
+}: {
+  value: string | null;
+  onSave: (next: string | null) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? '');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { setDraft(value ?? ''); }, [value]);
+
+  async function commit() {
+    setEditing(false);
+    const trimmed = draft.trim();
+    const next = trimmed === '' ? null : trimmed;
+    if (next === value) return;
+    setBusy(true);
+    try { await onSave(next); } finally { setBusy(false); }
+  }
+
+  function cancel() {
+    setDraft(value ?? '');
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="mt-3 px-3 py-2 rounded-md border border-brand-200 bg-brand-50/30">
+        <div className="text-2xs uppercase tracking-wide font-semibold text-brand-700 mb-1">
+          Notes
+        </div>
+        <textarea
+          autoFocus
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+          }}
+          onBlur={() => void commit()}
+          rows={3}
+          placeholder="Chase the client / draft reply / status of the response…"
+          className="w-full px-2 py-1.5 text-sm border border-border rounded bg-surface resize-y"
+          disabled={busy}
+        />
+        <div className="text-2xs text-ink-faint mt-1">
+          Click away or press ESC to {busy ? 'save…' : 'finish'}.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="mt-3 w-full text-left px-3 py-2 rounded-md border border-dashed border-border bg-surface-alt/30 hover:bg-surface-alt/50 transition-colors"
+    >
+      <div className="text-2xs uppercase tracking-wide font-semibold text-ink-muted mb-1">
+        Notes
+      </div>
+      {value ? (
+        <p className="text-sm text-ink-soft whitespace-pre-wrap leading-relaxed">{value}</p>
+      ) : (
+        <p className="text-sm text-ink-faint italic">+ Add notes (chase, response draft, status…)</p>
+      )}
+    </button>
   );
 }
 

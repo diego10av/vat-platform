@@ -43,7 +43,12 @@ export async function PATCH(
   const sets: string[] = [];
   const vals: unknown[] = [];
   let i = 1;
-  for (const f of ['status', 'type', 'urgency', 'summary', 'reference', 'amount', 'deadline_date']) {
+  // Stint 94 — added next_action + notes so Diego can override Haiku's
+  // extracted suggestion and capture chase / response progress without
+  // leaving cifra. entity_id added so reassignment from the list is
+  // possible (Haiku sometimes guesses the wrong entity on upload).
+  for (const f of ['status', 'type', 'urgency', 'summary', 'reference', 'amount',
+                   'deadline_date', 'next_action', 'notes', 'entity_id']) {
     if (f in body) {
       sets.push(`${f} = $${i}`);
       vals.push(body[f]);
