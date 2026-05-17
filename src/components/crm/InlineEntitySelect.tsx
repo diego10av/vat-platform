@@ -27,6 +27,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { ExternalLinkIcon } from 'lucide-react';
 import { InlineCellEditor } from '@/components/tax-ops/InlineCellEditor';
 import { SearchableSelect, type SearchableOption } from '@/components/ui/SearchableSelect';
 
@@ -108,55 +109,67 @@ interface Props {
 export function InlineEntitySelect({
   value, displayLabel, source, onSave, href, placeholder = '—', disabled,
 }: Props) {
+  // Stint 94 — REDESIGN. The original (stints 91 + 93) wrapped a <Link>
+  // INSIDE the editor's trigger <button> with stopPropagation. That broke
+  // editing for every populated row: clicking the company name fired the
+  // link's navigation instead of entering edit mode (because the link
+  // text occupied the entire visible area of the cell). It was also
+  // invalid HTML (nested interactive elements).
+  //
+  // New design:
+  //   - The InlineCellEditor's display is plain text. Clicking ANYWHERE
+  //     on it enters edit mode, like every other inline cell in cifra.
+  //   - A small ↗ icon renders as a SIBLING (not nested), only when the
+  //     value is set + an href is provided. Clicking ↗ navigates to the
+  //     detail page. Cmd-click / middle-click on the ↗ open in a new tab.
+  //   - Stopping propagation on the icon is no longer needed because it
+  //     sits outside the editor's click target.
+  //
+  // Result: click cell → edit. Click ↗ → navigate. No ambiguity, valid
+  // markup, and accessibility-conformant (single interactive element per
+  // role).
   return (
-    <InlineCellEditor<string | null>
-      value={value}
-      onSave={async next => { await onSave(next); }}
-      disabled={disabled}
-      inline
-      ariaLabel={`Edit ${source}`}
-      renderDisplay={(v) => {
-        if (!v || !displayLabel) {
-          return <span className="text-ink-faint italic">{placeholder}</span>;
-        }
-        if (href) {
-          // Display as link so cmd-click / middle-click still navigates,
-          // matching the previous read-only experience. Inline editor
-          // wraps the whole node in a click target; we stop propagation
-          // on the link so plain clicks navigate instead of entering edit
-          // mode. To edit, click anywhere outside the link text (the
-          // wrapping cell remains clickable around the link).
-          return (
-            <Link
-              href={href}
-              className="text-brand-700 hover:underline"
-              onClick={(e) => { e.stopPropagation(); }}
-            >
-              {displayLabel}
-            </Link>
-          );
-        }
-        return <span className="text-ink">{displayLabel}</span>;
-      }}
-      renderEditor={({ value: editorValue, setValue, commit }) => (
-        <InlineEditorPicker
-          source={source}
-          value={editorValue}
-          onPick={(next) => {
-            setValue(next);
-            // Stint 93 — pass `next` explicitly to commit so we don't
-            // race React's async batching of setValue. The setTimeout
-            // is intentional: it lets the inner SearchableSelect close
-            // its own popup before the editor unmounts (better UX,
-            // and avoids React unmount-during-handler warnings).
-            // Click-outside on the portal popup is now guarded by
-            // InlineCellEditor's data-popover-portal check, so this
-            // path is no longer racing with a premature outer commit.
-            setTimeout(() => commit(next), 0);
-          }}
-        />
+    <span className="inline-flex items-center gap-1 align-middle">
+      <InlineCellEditor<string | null>
+        value={value}
+        onSave={async next => { await onSave(next); }}
+        disabled={disabled}
+        inline
+        ariaLabel={`Edit ${source}`}
+        renderDisplay={(v) => {
+          if (!v || !displayLabel) {
+            return <span className="text-ink-faint italic">{placeholder}</span>;
+          }
+          return <span className="text-ink">{displayLabel}</span>;
+        }}
+        renderEditor={({ value: editorValue, setValue, commit }) => (
+          <InlineEditorPicker
+            source={source}
+            value={editorValue}
+            onPick={(next) => {
+              setValue(next);
+              // Pass `next` explicitly to commit so we don't race React's
+              // async batching of setValue. The setTimeout lets the inner
+              // SearchableSelect close its own popup before the editor
+              // unmounts. Click-outside on the portal popup is guarded by
+              // InlineCellEditor's data-popover-portal check (stint 93),
+              // so this is no longer racing with a premature outer commit.
+              setTimeout(() => commit(next), 0);
+            }}
+          />
+        )}
+      />
+      {href && value && (
+        <Link
+          href={href}
+          className="shrink-0 text-ink-muted hover:text-brand-700"
+          title="Open detail page"
+          aria-label={`Open ${source} detail`}
+        >
+          <ExternalLinkIcon size={11} />
+        </Link>
       )}
-    />
+    </span>
   );
 }
 
