@@ -7,7 +7,6 @@
 //   - GET /api/metrics/classifier — exposes the report as JSON to the
 //                                   /settings/classifier dashboard
 //   - (future) a CI step that fails the build if accuracy drops
-//   - (future) a nightly scheduled task that emails Diego if it drops
 //
 // Why a runtime endpoint (not "run at build, bake the number"):
 //

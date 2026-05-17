@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   params.push(limit);
 
   const rows = await query(
-    `SELECT id, title, description, status, priority, due_date, reminder_at,
+    `SELECT id, title, description, status, priority, due_date,
             assignee, related_type, related_id, auto_generated,
             completed_at, created_at
        FROM crm_tasks
@@ -63,15 +63,14 @@ export async function POST(request: NextRequest) {
   const id = generateId();
   await execute(
     `INSERT INTO crm_tasks
-       (id, title, description, status, priority, due_date, reminder_at,
+       (id, title, description, status, priority, due_date,
         assignee, related_type, related_id, auto_generated, created_by, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,$11,NOW())`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,false,$10,NOW())`,
     [
       id, body.title, body.description ?? null,
       body.status ?? 'open',
       body.priority ?? 'medium',
       body.due_date ?? null,
-      body.reminder_at ?? null,
       body.assignee ?? null,
       body.related_type ?? null,
       body.related_id ?? null,

@@ -4,7 +4,7 @@ import { apiError } from '@/lib/api-errors';
 
 const UPDATABLE_FIELDS = [
   'title', 'description', 'status', 'priority', 'due_date',
-  'reminder_at', 'assignee', 'related_type', 'related_id',
+  'assignee', 'related_type', 'related_id',
 ] as const;
 type UpdatableField = typeof UPDATABLE_FIELDS[number];
 

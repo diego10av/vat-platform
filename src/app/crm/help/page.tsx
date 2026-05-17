@@ -72,7 +72,7 @@ export default function HelpPage() {
         <EntityRow icon={TargetIcon} title="Opportunity" blurb="A potential engagement in the pipeline. 7 stages, drag-drop kanban, weighted value = estimated × probability. Won → open a matter." />
         <EntityRow icon={BriefcaseIcon} title="Matter" blurb="An active legal engagement. MP-YYYY-NNNN reference, parties, scope, team, fee structure, budget + cap, time entries, disbursements, closing checklist." />
         <EntityRow icon={CalendarIcon} title="Activity" blurb="A call / meeting / email logged against a company / opportunity / matter / contact. Can auto-create a time entry (check the box)." />
-        <EntityRow icon={CheckSquareIcon} title="Task" blurb="A to-do with due date + priority. Can be attached to any record. Many are auto-generated (payment reminders, budget alerts, template apply, anniversaries)." />
+        <EntityRow icon={CheckSquareIcon} title="Task" blurb="A to-do with due date + priority. Can be attached to any record. Some are auto-generated: applying a task template seeds several at once; matter budget thresholds (75/90/100%) fire a task on time-entry write." />
         <EntityRow icon={EuroIcon} title="Invoice" blurb="A billable document linked to a company + optional matter. PDF generation, VAT snapshot, retainer drawdown, approval threshold, credit notes. Payments create status transitions." />
       </Section>
 
@@ -100,7 +100,7 @@ export default function HelpPage() {
           <li>Open <Link href="/crm/opportunities" className="text-brand-700 hover:underline">the opportunities kanban</Link> — anything stuck {'>'}14 days in stage already shows as an NBA action, but eyeball everything for hygiene.</li>
           <li>Scan <Link href="/crm/matters" className="text-brand-700 hover:underline">matters</Link> — filter by active, check closing-date column for anything approaching, trigger closing checklist where relevant.</li>
           <li>Review the <Link href="/crm/calendar" className="text-brand-700 hover:underline">calendar</Link> for the coming two weeks. Birthdays, anniversaries, matter closes, deal closes all cross-cut.</li>
-          <li>Glance at any new auto-tasks created during the week (payment reminders, budget crossings, anniversaries, template-applied, rule-fired).</li>
+          <li>Glance at any auto-generated tasks on <Link href="/crm/tasks" className="text-brand-700 hover:underline">/crm/tasks</Link> (budget crossings + template-applied are the two live sources).</li>
         </ul>
       </Section>
 
@@ -119,7 +119,7 @@ export default function HelpPage() {
         <Practice title="Use task templates at the right moments."
           body='New client onboarding → apply on the company. Matter opening → wizard handles it. M&A deal kickoff → apply on the matter day 1. Closing a matter → mirrors the 7-step checklist.' />
         <Practice title="Fill birthday + client_anniversary for Key Accounts."
-          body="Weekly cron surfaces them 7 days ahead so you can send something human. Low-effort, high-retention." />
+          body="They surface on the /crm home Upcoming widget + /crm/calendar within 7 days, prompting a human nudge from your side. Low-effort, high-retention." />
       </Section>
 
       {/* ─── 6. Power features ─── */}
@@ -143,7 +143,7 @@ export default function HelpPage() {
         <FAQ q="I deleted a company by mistake."
           a={<>Stint 96 removed the trash bin — deletes are permanent after the confirmation modal. The audit log on the company detail page keeps a row for every delete, so the historical record survives. Restore needs a fresh import + relinking activities/invoices, which is rarely worth it.</>} />
         <FAQ q="A contact shows engagement = lapsed but I called them yesterday."
-          a="Log the call as an activity with activity_date = yesterday. The daily cron recomputes engagement from max(activity_date). If you want to override manually, the contact form has an engagement_override field." />
+          a="Log the call as an activity with activity_date = yesterday. A Postgres trigger recomputes engagement live from max(activity_date) — there's no cron, the new tier shows up as soon as the activity row commits. If you want to override manually, the contact form has an engagement_override field." />
         <FAQ q="My invoice won't move from draft to sent."
           a="Settings → Firm identity → if you set an approval threshold, any invoice above that amount needs an explicit Approve click first. Look for the green 'Approved by' banner on the invoice." />
         <FAQ q="Time entries aren't showing up on the WIP widget."

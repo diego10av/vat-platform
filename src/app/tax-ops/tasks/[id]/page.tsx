@@ -24,9 +24,6 @@ import { PageContainer } from '@/components/ui/PageContainer';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { DateBadge } from '@/components/crm/DateBadge';
 import { useToast } from '@/components/Toaster';
-import {
-  RecurrenceEditor, describeRecurrence, type RecurrenceRule,
-} from '@/components/tax-ops/RecurrenceEditor';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { TaskTimeline } from '@/components/tax-ops/TaskTimeline';
 import { TaskAttachmentsPanel } from '@/components/tax-ops/TaskAttachmentsPanel';
@@ -46,7 +43,6 @@ interface Task {
   due_date: string | null;
   assignee: string | null;
   tags: string[];
-  recurrence_rule: RecurrenceRule | null;
   related_filing_id: string | null;
   related_entity_id: string | null;
   auto_generated: boolean;
@@ -623,29 +619,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             onChanged={load}
           />
 
-          {/* Recurrence — Stint 58.T3.3: collapsed by default. Most
-              tasks aren't recurring; surfacing the editor unconditionally
-              wasted vertical space. Now a tiny <details> that expands
-              if the user has set a rule (or wants to). */}
-          <details className="rounded-md border border-border bg-surface px-4 py-2 group" open={!!t.recurrence_rule}>
-            <summary className="cursor-pointer list-none flex items-center justify-between text-sm font-semibold text-ink">
-              <span>Recurrence{t.recurrence_rule ? ' · active' : ''}</span>
-              <span className="text-2xs text-ink-muted">
-                {t.recurrence_rule ? describeRecurrence(t.recurrence_rule) : 'Make this task recurring'}
-              </span>
-            </summary>
-            <div className="mt-2">
-              <RecurrenceEditor
-                value={t.recurrence_rule}
-                onChange={rule => patch({ recurrence_rule: rule }, 'Recurrence saved')}
-              />
-              {t.recurrence_rule && (
-                <p className="mt-2 text-xs text-ink-muted italic">
-                  When marked done, a new instance will be created on the next occurrence.
-                </p>
-              )}
-            </div>
-          </details>
+          {/* Stint 97 — recurrence_rule UI removed. The editor promised
+              that completing a task would spawn the next instance, but
+              the recurrence-expand scheduled job never existed in this
+              codebase (the cron infrastructure was deleted in the
+              2026-05-05 reset). mig 094 drops the column. */}
 
           {/* Related */}
           {(data.related_entity_name || data.related_filing_label) && (

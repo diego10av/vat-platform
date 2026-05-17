@@ -452,7 +452,7 @@ export async function GET(request: NextRequest) {
     }
     case 'tasks': {
       rows = await query(
-        `SELECT title, status, priority, due_date, reminder_at,
+        `SELECT title, status, priority, due_date,
                 related_type, assignee, auto_generated, description,
                 completed_at, created_at
            FROM crm_tasks
@@ -465,7 +465,6 @@ export async function GET(request: NextRequest) {
         { header: 'Status',         key: 'status',          width: 14, format: 'status' },
         { header: 'Priority',       key: 'priority',        width: 12, format: 'status' },
         { header: 'Due date',       key: 'due_date',        width: 14, format: 'date' },
-        { header: 'Reminder',       key: 'reminder_at',     width: 18, format: 'datetime' },
         { header: 'Related to',     key: 'related_type',    width: 14, format: 'text' },
         { header: 'Assignee',       key: 'assignee',        width: 16, format: 'text' },
         { header: 'Auto-generated', key: 'auto_generated',  width: 14, format: 'yesno' },

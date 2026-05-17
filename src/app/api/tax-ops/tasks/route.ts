@@ -29,7 +29,6 @@ interface TaskListRow {
   remind_at: string | null;
   parent_task_id: string | null;
   depends_on_task_id: string | null;
-  recurrence_rule: Record<string, unknown> | null;
   tags: string[];
   related_filing_id: string | null;
   related_entity_id: string | null;
@@ -163,7 +162,7 @@ export async function GET(request: NextRequest) {
   const rows = await query<TaskListRow>(
     `SELECT t.id, t.title, t.description, t.status, t.priority,
             t.due_date::text, t.remind_at::text,
-            t.parent_task_id, t.depends_on_task_id, t.recurrence_rule, t.tags,
+            t.parent_task_id, t.depends_on_task_id, t.tags,
             t.related_filing_id, t.related_entity_id,
             t.assignee, t.auto_generated,
             t.entity_id, t.task_kind, t.waiting_on_kind,
@@ -319,7 +318,6 @@ export async function POST(request: NextRequest) {
     remind_at?: string | null;
     parent_task_id?: string | null;
     depends_on_task_id?: string | null;
-    recurrence_rule?: Record<string, unknown> | null;
     tags?: string[];
     related_filing_id?: string | null;
     related_entity_id?: string | null;
@@ -344,16 +342,15 @@ export async function POST(request: NextRequest) {
   await execute(
     `INSERT INTO tax_ops_tasks
        (id, title, description, status, priority, due_date, remind_at,
-        parent_task_id, depends_on_task_id, recurrence_rule, tags,
+        parent_task_id, depends_on_task_id, tags,
         related_filing_id, related_entity_id, assignee, auto_generated, created_by,
         entity_id, task_kind, waiting_on_kind, waiting_on_note, follow_up_date)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,'founder',
-             $16,$17,$18,$19,$20)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'founder',
+             $15,$16,$17,$18,$19)`,
     [
       id, title, body.description ?? null, status, priority,
       body.due_date ?? null, body.remind_at ?? null,
       body.parent_task_id ?? null, body.depends_on_task_id ?? null,
-      body.recurrence_rule ? JSON.stringify(body.recurrence_rule) : null,
       body.tags ?? [],
       body.related_filing_id ?? null, body.related_entity_id ?? null,
       body.assignee ?? null, body.auto_generated ?? false,

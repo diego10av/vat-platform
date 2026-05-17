@@ -42,7 +42,6 @@ interface Task {
   status: string;
   priority: string;
   due_date: string | null;
-  reminder_at: string | null;
   related_type: string | null;
   related_id: string | null;
   auto_generated: boolean;
@@ -216,7 +215,7 @@ export default function TasksPage() {
               title={filtersActive ? 'No tasks match these filters' : 'No tasks yet'}
               description={filtersActive
                 ? 'Loosen your filters or clear them to see all tasks.'
-                : 'Create a task to track a follow-up. cifra also auto-generates tasks when a Key Account has a stale declaration. Press N anywhere in /crm for quick-capture.'}
+                : 'Create a task to track a follow-up. Press N anywhere in /crm for quick-capture.'}
               action={filtersActive ? undefined : (
                 <Button onClick={() => setNewOpen(true)} variant="primary" size="sm" icon={<PlusIcon size={13} />}>
                   New task

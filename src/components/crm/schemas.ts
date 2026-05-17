@@ -336,7 +336,7 @@ export const CONTACT_FIELDS: FieldSchema[] = [
     name: 'birthday',
     label: 'Birthday',
     type: 'date',
-    help: 'Weekly cron surfaces a reminder 7 days before. Year is a placeholder — only month/day match.',
+    help: 'Surfaced on /crm home + /crm/calendar when within 7 days. Year is a placeholder — only month/day match.',
   },
   {
     name: 'client_anniversary',
@@ -683,12 +683,6 @@ export const TASK_FIELDS: FieldSchema[] = [
     name: 'due_date',
     label: 'Due date',
     type: 'date',
-  },
-  {
-    name: 'reminder_at',
-    label: 'Reminder (optional)',
-    type: 'date',
-    help: 'When cifra should nudge you about this task.',
   },
   {
     name: 'description',

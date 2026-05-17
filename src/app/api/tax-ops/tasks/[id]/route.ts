@@ -20,7 +20,6 @@ interface TaskDetail {
   remind_at: string | null;
   parent_task_id: string | null;
   depends_on_task_id: string | null;
-  recurrence_rule: Record<string, unknown> | null;
   tags: string[];
   related_filing_id: string | null;
   related_entity_id: string | null;
@@ -94,7 +93,7 @@ interface TaskCounterparty {
 
 const ALLOWED = [
   'title', 'description', 'status', 'priority', 'due_date', 'remind_at',
-  'parent_task_id', 'depends_on_task_id', 'recurrence_rule', 'tags',
+  'parent_task_id', 'depends_on_task_id', 'tags',
   'related_filing_id', 'related_entity_id', 'assignee',
   'completed_at', 'completed_by',
   // Stint 37.G
@@ -119,7 +118,7 @@ export async function GET(
       // entity_id so the detail page can edit them inline (Hito 1).
       `SELECT id, title, description, status, priority,
               due_date::text, remind_at::text,
-              parent_task_id, depends_on_task_id, recurrence_rule, tags,
+              parent_task_id, depends_on_task_id, tags,
               related_filing_id, related_entity_id,
               assignee, auto_generated,
               completed_at::text, completed_by,
@@ -327,11 +326,6 @@ export async function PATCH(
     // Clear completed_at if moving back out of done
     body.completed_at = null;
     body.completed_by = null;
-  }
-
-  // Serialize JSON fields
-  if (body.recurrence_rule !== undefined && body.recurrence_rule !== null) {
-    body.recurrence_rule = JSON.stringify(body.recurrence_rule);
   }
 
   const { sql, values, changes } = buildUpdate(

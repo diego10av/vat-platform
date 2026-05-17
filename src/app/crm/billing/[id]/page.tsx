@@ -294,15 +294,12 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
         </div>
       )}
 
-      {!!(i as Record<string, string | null>).last_reminder_kind && (
-        <div className="mb-4 p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900">
-          ⏰ Last reminder: <strong>{String((i as Record<string, string>).last_reminder_kind)}</strong>
-          {(i as Record<string, string | null>).last_reminder_sent_at && (
-            <> on {formatDate(String((i as Record<string, string>).last_reminder_sent_at))}</>
-          )}
-          . An open task exists in the Tasks tab.
-        </div>
-      )}
+      {/* Stint 97 — "Last reminder" banner removed. The columns
+          last_reminder_kind / last_reminder_sent_at were written by a
+          daily payment-reminder cron deleted in the 2026-05-05 reset.
+          The banner was rendering nothing (no writer) but the dead
+          surface implied cifra was sending dunning emails. mig 094
+          drops the columns. */}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <Kpi label="Amount (incl. VAT)" value={formatEur(i.amount_incl_vat)} />
