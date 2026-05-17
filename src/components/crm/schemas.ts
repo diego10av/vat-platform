@@ -65,7 +65,10 @@ const FEE_TYPES = [
   { value: 'hourly',      label: 'Hourly' },
 ];
 
-const LOSS_REASONS = [
+// Stint 94 — these were file-local; now exported so the Opportunities
+// list table can render the inline Reason column without duplicating
+// the taxonomy.
+export const LOSS_REASONS = [
   { value: 'no_response',          label: 'No response' },
   { value: 'competitor',           label: 'Competitor won' },
   { value: 'conflict_of_interest', label: 'Conflict of interest' },
@@ -76,7 +79,7 @@ const LOSS_REASONS = [
 // Stint 91 — won_reason taxonomy. Symmetric to LOSS_REASONS so closed-won
 // opportunities can capture "what actually won this deal" for the playbook
 // reporting widget that Workstream B will surface later.
-const WON_REASONS = [
+export const WON_REASONS = [
   { value: 'referral',          label: 'Referral' },
   { value: 'existing_client',   label: 'Existing client relationship' },
   { value: 'pricing',           label: 'Pricing' },

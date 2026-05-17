@@ -22,7 +22,7 @@ import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDra
 // Stint 63.L — hover preview on opportunity name.
 import { OpportunityHoverPreview } from '@/components/crm/OpportunityHoverPreview';
 import { crmLoadList } from '@/lib/useCrmFetch';
-import { OPPORTUNITY_FIELDS } from '@/components/crm/schemas';
+import { OPPORTUNITY_FIELDS, LOSS_REASONS, WON_REASONS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
 import { useConfirm } from '@/lib/use-confirm';
 // Stint 63.A.2 — port Tax-Ops inline editors to opportunities table.
@@ -70,6 +70,11 @@ interface Opportunity {
   // contact picker on the detail page (the list still keeps the
   // column count compact).
   primary_contact_id: string | null;
+  // Stint 94 — closed-deal post-mortem fields surfaced inline so
+  // Diego can capture the why right after closing, not from the
+  // edit modal. Only render the cell when stage ∈ {won, lost}.
+  won_reason: string | null;
+  loss_reason: string | null;
 }
 
 // Stint 67.C: Suspense wrapper removed (see /clients/page.tsx).
@@ -395,6 +400,7 @@ function OpportunitiesPageContent() {
                 <th className="text-left px-3 py-2 font-medium">Company</th>
                 <th className="text-left px-3 py-2 font-medium">Primary contact</th>
                 <th className="text-left px-3 py-2 font-medium">Stage</th>
+                <th className="text-left px-3 py-2 font-medium">Reason</th>
                 <th className="text-right px-3 py-2 font-medium">Value</th>
                 <th className="text-right px-3 py-2 font-medium">Prob.</th>
                 <th className="text-right px-3 py-2 font-medium">Weighted</th>
@@ -467,6 +473,38 @@ function OpportunitiesPageContent() {
                       onChange={next => { void patchOpportunity(r.id, 'stage', next); }}
                       ariaLabel="Stage"
                     />
+                  </td>
+                  {/* Stint 94 — Reason column (won_reason / loss_reason).
+                      Only meaningful when stage is won or lost; rendered
+                      as a muted dash otherwise so the column visual stays
+                      consistent without imposing edit affordance where
+                      it wouldn't apply. Inline ChipSelect lets Diego
+                      capture the why right after closing a deal without
+                      opening the modal. */}
+                  <td className="px-3 py-2">
+                    {r.stage === 'won' ? (
+                      <ChipSelect
+                        value={r.won_reason ?? ''}
+                        options={[
+                          { value: '', label: '— pick —', tone: 'bg-surface-alt text-ink-faint' },
+                          ...WON_REASONS.map(o => ({ value: o.value, label: o.label, tone: 'bg-success-50 text-success-700' })),
+                        ]}
+                        onChange={next => { void patchOpportunity(r.id, 'won_reason', next || null); }}
+                        ariaLabel="Won reason"
+                      />
+                    ) : r.stage === 'lost' ? (
+                      <ChipSelect
+                        value={r.loss_reason ?? ''}
+                        options={[
+                          { value: '', label: '— pick —', tone: 'bg-surface-alt text-ink-faint' },
+                          ...LOSS_REASONS.map(o => ({ value: o.value, label: o.label, tone: 'bg-danger-50 text-danger-700' })),
+                        ]}
+                        onChange={next => { void patchOpportunity(r.id, 'loss_reason', next || null); }}
+                        ariaLabel="Loss reason"
+                      />
+                    ) : (
+                      <span className="text-ink-faint">—</span>
+                    )}
                   </td>
                   {/* Estimated value — InlineTextCell with numeric coerce. */}
                   <td className="px-3 py-2 text-right tabular-nums">
