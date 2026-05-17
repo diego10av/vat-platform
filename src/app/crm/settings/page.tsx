@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { BuildingIcon, ChevronRightIcon, ZapIcon, ListChecksIcon } from 'lucide-react';
+import { BuildingIcon, ChevronRightIcon, ListChecksIcon } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 
 // CRM settings landing — lists sub-areas.
@@ -10,12 +10,6 @@ export default function CrmSettingsIndex() {
       icon: BuildingIcon,
       title: 'Firm identity',
       blurb: 'Name, address, VAT, bank details, default payment terms. Used on invoice PDFs.',
-    },
-    {
-      href: '/crm/settings/automations',
-      icon: ZapIcon,
-      title: 'Automations',
-      blurb: 'Rules that auto-create follow-up tasks on stage changes, invoice events, etc.',
     },
     {
       href: '/crm/settings/taxonomies',

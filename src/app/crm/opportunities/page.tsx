@@ -17,7 +17,6 @@ import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 // Stint 63.G/H/I — port the patterns to opportunities.
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
-import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
 // Stint 63.L — hover preview on opportunity name.
 import { OpportunityHoverPreview } from '@/components/crm/OpportunityHoverPreview';
@@ -146,16 +145,6 @@ function OpportunitiesPageContent() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [rows]);
 
-  // currentQuery for CrmSavedViews — excludes the view toggle (saved
-  // views capture filters, not which layout you happen to be in).
-  const currentQuery = useMemo(() => {
-    const qs = new URLSearchParams();
-    if (q) qs.set('q', q);
-    if (stage) qs.set('stage', stage);
-    if (bdLawyerFilter) qs.set('bd_lawyer', bdLawyerFilter);
-    return qs.toString();
-  }, [q, stage, bdLawyerFilter]);
-
   // Stint 64.C — apply bd_lawyer filter client-side (API returns the
   // full set scoped to q + stage; bd_lawyer is cheap to filter locally).
   const filteredRows = useMemo(() => {
@@ -185,21 +174,21 @@ function OpportunitiesPageContent() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Stint 63.I — soft-delete invoked from context menu.
-  async function archiveOpportunity(id: string, name: string) {
+  // Hard-delete from the context menu (stint 96 — trash bin removed).
+  async function deleteOpportunity(id: string, name: string) {
     if (!await confirm({
-      title: `Archive ${name}?`,
-      description: 'It moves to trash for 30 days. You can restore it from /crm/trash.',
+      title: `Delete ${name}?`,
+      description: 'This is permanent and cannot be undone.',
       tone: 'danger',
-      confirmLabel: 'Archive',
+      confirmLabel: 'Delete',
     })) return;
     try {
       const res = await fetch(`/api/crm/opportunities/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success('Opportunity archived');
+      toast.success('Opportunity deleted');
       await load();
     } catch (e) {
-      toast.error(`Archive failed: ${String(e instanceof Error ? e.message : e)}`);
+      toast.error(`Delete failed: ${String(e instanceof Error ? e.message : e)}`);
     }
   }
 
@@ -348,11 +337,6 @@ function OpportunitiesPageContent() {
             {bdLawyersInData.map(name => <option key={name} value={name}>{name}</option>)}
           </select>
         )}
-        <CrmSavedViews
-          currentQuery={currentQuery}
-          storageKey="cifra.crm.opportunities.savedViews.v1"
-          defaultLabel="All opportunities"
-        />
         <div className="ml-auto flex items-center gap-2">
           <ExportButton entity="opportunities" />
           <span className="text-xs text-ink-muted">
@@ -609,11 +593,11 @@ function OpportunitiesPageContent() {
             onClick: () => { void handleStageChange(o.id, 'lost'); },
           },
           {
-            label: 'Archive',
+            label: 'Delete',
             icon: Trash2Icon,
             danger: true,
             separatorBefore: true,
-            onClick: () => archiveOpportunity(o.id, o.name),
+            onClick: () => deleteOpportunity(o.id, o.name),
           },
         ];
         return (

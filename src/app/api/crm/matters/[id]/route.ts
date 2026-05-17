@@ -25,7 +25,7 @@ export async function GET(
        FROM crm_matters m
        LEFT JOIN crm_companies c ON c.id = m.client_company_id
        LEFT JOIN crm_contacts ct ON ct.id = m.primary_contact_id
-      WHERE m.id = $1 AND m.deleted_at IS NULL`,
+      WHERE m.id = $1`,
     [id],
   );
   if (!matter) return apiError('not_found', 'Matter not found.', { status: 404 });
@@ -53,7 +53,7 @@ export async function PUT(
   const body = await request.json().catch(() => ({}));
 
   const existing = await queryOne<Record<string, unknown>>(
-    `SELECT * FROM crm_matters WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT * FROM crm_matters WHERE id = $1`,
     [id],
   );
   if (!existing) return apiError('not_found', 'Matter not found.', { status: 404 });
@@ -144,21 +144,19 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const existing = await queryOne<{ id: string; matter_reference: string; title: string }>(
-    `SELECT id, matter_reference, title FROM crm_matters WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT id, matter_reference, title FROM crm_matters WHERE id = $1`,
     [id],
   );
-  if (!existing) return apiError('not_found', 'Matter not found or already deleted.', { status: 404 });
+  if (!existing) return apiError('not_found', 'Matter not found.', { status: 404 });
 
-  await execute(
-    `UPDATE crm_matters SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1`,
-    [id],
-  );
+  // Stint 96 — hard delete (see opportunities/[id] for rationale).
+  await execute(`DELETE FROM crm_matters WHERE id = $1`, [id]);
   await logAudit({
-    action: 'soft_delete',
+    action: 'delete',
     targetType: 'crm_matter',
     targetId: id,
     oldValue: `${existing.matter_reference} — ${existing.title}`,
-    reason: 'Moved to trash',
+    reason: 'Deleted',
   });
-  return NextResponse.json({ id, soft_deleted: true });
+  return NextResponse.json({ id, deleted: true });
 }

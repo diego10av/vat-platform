@@ -41,7 +41,6 @@ export async function GET() {
         `SELECT stage, COUNT(*)::int AS n
            FROM crm_opportunities
           WHERE stage IN ('won','lost')
-            AND deleted_at IS NULL
             AND (actual_close_date >= $1 AND actual_close_date < $2
               OR (actual_close_date IS NULL AND stage_entered_at >= $1::timestamptz
                                           AND stage_entered_at < $2::timestamptz))
@@ -52,7 +51,6 @@ export async function GET() {
         `SELECT AVG(estimated_value_eur)::numeric AS avg
            FROM crm_opportunities
           WHERE stage = 'won'
-            AND deleted_at IS NULL
             AND (actual_close_date >= $1 AND actual_close_date < $2
               OR (actual_close_date IS NULL AND stage_entered_at >= $1::timestamptz
                                           AND stage_entered_at < $2::timestamptz))`,
@@ -63,7 +61,6 @@ export async function GET() {
            FROM crm_opportunities
           WHERE stage = 'won'
             AND won_reason IS NOT NULL
-            AND deleted_at IS NULL
             AND (actual_close_date >= $1 AND actual_close_date < $2
               OR (actual_close_date IS NULL AND stage_entered_at >= $1::timestamptz
                                           AND stage_entered_at < $2::timestamptz))
@@ -75,7 +72,6 @@ export async function GET() {
            FROM crm_opportunities
           WHERE stage = 'lost'
             AND loss_reason IS NOT NULL
-            AND deleted_at IS NULL
             AND (actual_close_date >= $1 AND actual_close_date < $2
               OR (actual_close_date IS NULL AND stage_entered_at >= $1::timestamptz
                                           AND stage_entered_at < $2::timestamptz))
@@ -87,7 +83,6 @@ export async function GET() {
            FROM crm_opportunities
           WHERE stage = 'won'
             AND source IS NOT NULL
-            AND deleted_at IS NULL
             AND (actual_close_date >= $1 AND actual_close_date < $2
               OR (actual_close_date IS NULL AND stage_entered_at >= $1::timestamptz
                                           AND stage_entered_at < $2::timestamptz))

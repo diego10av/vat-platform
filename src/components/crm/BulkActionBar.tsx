@@ -2,7 +2,10 @@
 
 // ════════════════════════════════════════════════════════════════════════
 // BulkActionBar — floating bar shown when N>0 rows are selected in a
-// CRM list view. Offers bulk delete (soft) and bulk tag add/remove.
+// CRM list view. Offers bulk delete (hard) and bulk tag add/remove.
+//
+// Stint 96 — soft-delete + trash bin removed; delete is now permanent
+// after the confirm modal.
 //
 // The hosting list page is responsible for:
 //  - Rendering checkboxes in each row and tracking a `selected` Set
@@ -36,7 +39,7 @@ export function BulkActionBar({
 
   if (selectedIds.length === 0) return null;
 
-  async function run(op: 'soft_delete' | 'add_tag' | 'remove_tag', extra?: { tag?: string }) {
+  async function run(op: 'hard_delete' | 'add_tag' | 'remove_tag', extra?: { tag?: string }) {
     setBusy(true);
     try {
       const res = await fetch('/api/crm/bulk', {
@@ -59,10 +62,10 @@ export function BulkActionBar({
 
   async function handleDelete() {
     if (!confirm(
-      `Move ${selectedIds.length} record${selectedIds.length === 1 ? '' : 's'} to trash?\n\n` +
-      `You can restore from /crm/trash within 30 days.`,
+      `Permanently delete ${selectedIds.length} record${selectedIds.length === 1 ? '' : 's'}?\n\n` +
+      `This cannot be undone.`,
     )) return;
-    await run('soft_delete');
+    await run('hard_delete');
   }
 
   async function handleTagSubmit() {

@@ -109,7 +109,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
 
   async function handleDelete() {
     const name = String((data?.contact as { full_name?: string })?.full_name ?? '?');
-    if (!confirm(`Delete "${name}"?\n\nIt goes to the trash for 30 days — you can restore it from /crm/trash.`)) return;
+    if (!confirm(`Delete "${name}"?\n\nThis is permanent and cannot be undone.`)) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/crm/contacts/${id}`, { method: 'DELETE' });
@@ -118,18 +118,7 @@ export default function ContactDetailPage({ params }: { params: Promise<{ id: st
         toast.error(err?.error?.message ?? `Delete failed (${res.status})`);
         return;
       }
-      toast.withAction('success', 'Contact moved to trash', 'Will auto-purge after 30 days.', {
-        label: 'Undo',
-        onClick: async () => {
-          const restore = await fetch(`/api/crm/trash/contact/${id}`, { method: 'POST' });
-          if (restore.ok) {
-            toast.success('Contact restored');
-            router.push(`/crm/contacts/${id}`);
-          } else {
-            toast.error('Undo failed — restore manually from /crm/trash');
-          }
-        },
-      });
+      toast.success('Contact deleted');
       router.push('/crm/contacts');
     } finally {
       setDeleting(false);

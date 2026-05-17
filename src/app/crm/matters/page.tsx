@@ -16,7 +16,6 @@ import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 // Stint 63.G/H/I — port the patterns to matters.
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
-import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
 // Stint 93 — inline reassign of client + primary contact on matter rows.
 import { InlineEntitySelect } from '@/components/crm/InlineEntitySelect';
@@ -99,13 +98,6 @@ function MattersPageContent() {
     router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
   }, [q, status, router, pathname]);
 
-  const currentQuery = useMemo(() => {
-    const qs = new URLSearchParams();
-    if (q) qs.set('q', q);
-    if (status) qs.set('status', status);
-    return qs.toString();
-  }, [q, status]);
-
   const toggleOne = (id: string) => setSelected(prev => {
     const n = new Set(prev);
     if (n.has(id)) n.delete(id); else n.add(id);
@@ -139,21 +131,21 @@ function MattersPageContent() {
     await load();
   }
 
-  // Stint 63.I — soft-delete (archive) helper for context menu.
-  async function archiveMatter(id: string, ref: string) {
+  // Hard-delete from the context menu (stint 96 — trash bin removed).
+  async function deleteMatter(id: string, ref: string) {
     if (!await confirm({
-      title: `Archive matter ${ref}?`,
-      description: 'It moves to trash for 30 days. You can restore it from /crm/trash.',
+      title: `Delete matter ${ref}?`,
+      description: 'This is permanent and cannot be undone.',
       tone: 'danger',
-      confirmLabel: 'Archive',
+      confirmLabel: 'Delete',
     })) return;
     try {
       const res = await fetch(`/api/crm/matters/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success('Matter archived');
+      toast.success('Matter deleted');
       await load();
     } catch (e) {
-      toast.error(`Archive failed: ${String(e instanceof Error ? e.message : e)}`);
+      toast.error(`Delete failed: ${String(e instanceof Error ? e.message : e)}`);
     }
   }
 
@@ -232,11 +224,6 @@ function MattersPageContent() {
           <option value="">All statuses</option>
           {MATTER_STATUSES.map(s => <option key={s} value={s}>{LABELS_MATTER_STATUS[s]}</option>)}
         </select>
-        <CrmSavedViews
-          currentQuery={currentQuery}
-          storageKey="cifra.crm.matters.savedViews.v1"
-          defaultLabel="All matters"
-        />
         <div className="ml-auto flex items-center gap-2">
           <ExportButton entity="matters" />
           <span className="text-xs text-ink-muted">{rows.length} matters</span>
@@ -454,11 +441,11 @@ function MattersPageContent() {
             onClick: () => { void patchMatter(m.id, 'status', 'closed'); },
           },
           {
-            label: 'Archive',
+            label: 'Delete',
             icon: Trash2Icon,
             danger: true,
             separatorBefore: true,
-            onClick: () => archiveMatter(m.id, m.matter_reference),
+            onClick: () => deleteMatter(m.id, m.matter_reference),
           },
         ];
         return (

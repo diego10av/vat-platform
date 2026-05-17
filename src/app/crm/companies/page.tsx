@@ -16,7 +16,6 @@ import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CompanyHoverPreview } from '@/components/crm/CompanyHoverPreview';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
 import { useConfirm } from '@/lib/use-confirm';
-import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
 import { COMPANY_FIELDS } from '@/components/crm/schemas';
 import { useToast } from '@/components/Toaster';
@@ -110,19 +109,6 @@ function CompaniesPageContent() {
     router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
   }, [q, classFilter, countryFilter, industryFilter, sizeFilter, router, pathname]);
 
-  // currentQuery is what CrmSavedViews captures when Diego clicks
-  // "Save current as…". Captures all filter dimensions so a saved
-  // view restores Diego back to the exact same slice.
-  const currentQuery = useMemo(() => {
-    const qs = new URLSearchParams();
-    if (q) qs.set('q', q);
-    if (classFilter) qs.set('classification', classFilter);
-    if (countryFilter) qs.set('country', countryFilter);
-    if (industryFilter) qs.set('industry', industryFilter);
-    if (sizeFilter) qs.set('size', sizeFilter);
-    return qs.toString();
-  }, [q, classFilter, countryFilter, industryFilter, sizeFilter]);
-
   // Stint 64.B — list of unique non-null countries from the loaded
   // rows, sorted. Lets the country dropdown only show values that
   // actually exist in the data — Diego shouldn't have to remember
@@ -196,21 +182,21 @@ function CompaniesPageContent() {
     await load();
   }
 
-  // Stint 63.C — soft-delete helper invoked by the context menu.
-  async function archiveCompany(id: string, name: string) {
+  // Hard-delete from the context menu (stint 96 — trash bin removed).
+  async function deleteCompany(id: string, name: string) {
     if (!await confirm({
-      title: `Archive ${name}?`,
-      description: 'It moves to trash for 30 days. You can restore it from /crm/trash.',
+      title: `Delete ${name}?`,
+      description: 'This is permanent and cannot be undone.',
       tone: 'danger',
-      confirmLabel: 'Archive',
+      confirmLabel: 'Delete',
     })) return;
     try {
       const res = await fetch(`/api/crm/companies/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success('Company archived');
+      toast.success('Company deleted');
       await load();
     } catch (e) {
-      toast.error(`Archive failed: ${String(e instanceof Error ? e.message : e)}`);
+      toast.error(`Delete failed: ${String(e instanceof Error ? e.message : e)}`);
     }
   }
 
@@ -343,11 +329,6 @@ function CompaniesPageContent() {
             Clear filters
           </button>
         )}
-        <CrmSavedViews
-          currentQuery={currentQuery}
-          storageKey="cifra.crm.companies.savedViews.v1"
-          defaultLabel="All companies"
-        />
         <div className="ml-auto flex items-center gap-2">
           <ExportButton entity="companies" />
           <span className="text-xs text-ink-muted">
@@ -566,11 +547,11 @@ function CompaniesPageContent() {
             onClick: () => router.push(`/crm/opportunities?company_id=${c.id}`),
           },
           {
-            label: 'Archive',
+            label: 'Delete',
             icon: Trash2Icon,
             danger: true,
             separatorBefore: true,
-            onClick: () => archiveCompany(c.id, c.company_name),
+            onClick: () => deleteCompany(c.id, c.company_name),
           },
         ];
         return (

@@ -30,8 +30,10 @@ interface AuditEntry {
 const ACTION_LABELS: Record<string, string> = {
   create:           'Created',
   update:           'Updated',
-  soft_delete:      'Moved to trash',
-  restore:          'Restored from trash',
+  // Pre-stint-96 audit rows may still carry soft_delete / restore /
+  // permanent_delete actions; keep the labels so history reads cleanly.
+  soft_delete:      'Deleted (legacy)',
+  restore:          'Restored',
   permanent_delete: 'Permanently deleted',
   delete:           'Deleted',
   payment_recorded: 'Payment recorded',

@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
   const q = url.searchParams.get('q')?.trim() ?? '';
   const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') ?? 200) || 200));
 
-  const conditions: string[] = ['m.deleted_at IS NULL'];
+  const conditions: string[] = ['1=1'];
   const params: unknown[] = [];
   if (q) {
     params.push(`%${q}%`);

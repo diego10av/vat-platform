@@ -53,7 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const beforeRows = await query<Record<string, unknown> & { id: string }>(
     `SELECT id, lifecycle_stage, country, source, engagement_override, preferred_language
        FROM crm_contacts
-      WHERE id = ANY($1::text[]) AND deleted_at IS NULL`,
+      WHERE id = ANY($1::text[])`,
     [ids],
   );
   const beforeById = new Map<string, Record<string, unknown>>();
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   await execute(
     `UPDATE crm_contacts
         SET ${setClauses.join(', ')}
-      WHERE id = ANY($1::text[]) AND deleted_at IS NULL`,
+      WHERE id = ANY($1::text[])`,
     values,
   );
 

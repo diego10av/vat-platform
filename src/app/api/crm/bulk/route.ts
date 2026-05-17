@@ -3,7 +3,7 @@ import { execute, logAudit } from '@/lib/db';
 import { apiError } from '@/lib/api-errors';
 
 // Map target types → table name. Keeps the handler generic without
-// dynamic SQL magic. Supports soft-delete-enabled tables only.
+// dynamic SQL magic.
 const TABLES: Record<string, { table: string; audit: string }> = {
   crm_company:     { table: 'crm_companies',     audit: 'crm_company' },
   crm_contact:     { table: 'crm_contacts',      audit: 'crm_contact' },
@@ -15,9 +15,12 @@ const TABLES: Record<string, { table: string; audit: string }> = {
 // Body: {
 //   target_type: 'crm_company' | ...,
 //   ids: string[],
-//   op: 'soft_delete' | 'add_tag' | 'remove_tag',
+//   op: 'hard_delete' | 'add_tag' | 'remove_tag',
 //   tag?: string   // required when op is add_tag / remove_tag
 // }
+//
+// Stint 96 — soft-delete replaced by hard-delete. The UI gates the
+// destructive call behind a confirmation modal; trash bin removed.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
   const targetType = body.target_type;
@@ -38,22 +41,20 @@ export async function POST(request: NextRequest) {
 
   const cfg = TABLES[targetType];
 
-  if (op === 'soft_delete') {
+  if (op === 'hard_delete') {
     await execute(
-      `UPDATE ${cfg.table}
-          SET deleted_at = NOW(), updated_at = NOW()
-        WHERE id = ANY($1::text[]) AND deleted_at IS NULL`,
+      `DELETE FROM ${cfg.table} WHERE id = ANY($1::text[])`,
       [ids],
     );
     for (const id of ids) {
       await logAudit({
-        action: 'soft_delete',
+        action: 'delete',
         targetType: cfg.audit,
         targetId: id,
         reason: 'Bulk delete',
       });
     }
-    return NextResponse.json({ op: 'soft_delete', affected: ids.length });
+    return NextResponse.json({ op: 'hard_delete', affected: ids.length });
   }
 
   if (op === 'add_tag' || op === 'remove_tag') {
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
                          ELSE array_append(COALESCE(tags, '{}'::text[]), $1)
                        END,
                 updated_at = NOW()
-          WHERE id = ANY($2::text[]) AND deleted_at IS NULL`,
+          WHERE id = ANY($2::text[])`,
         [tag, ids],
       );
     } else {
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
         `UPDATE ${cfg.table}
             SET tags = array_remove(COALESCE(tags, '{}'::text[]), $1),
                 updated_at = NOW()
-          WHERE id = ANY($2::text[]) AND deleted_at IS NULL`,
+          WHERE id = ANY($2::text[])`,
         [tag, ids],
       );
     }
@@ -94,5 +95,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ op, affected: ids.length, tag });
   }
 
-  return apiError('invalid_op', `op must be one of: soft_delete, add_tag, remove_tag`, { status: 400 });
+  return apiError('invalid_op', `op must be one of: hard_delete, add_tag, remove_tag`, { status: 400 });
 }

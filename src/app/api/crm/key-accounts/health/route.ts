@@ -30,7 +30,7 @@ export async function GET() {
     `WITH ka AS (
        SELECT id, company_name
          FROM crm_companies
-        WHERE deleted_at IS NULL AND classification = 'key_account'
+        WHERE classification = 'key_account'
      ),
      last_act AS (
        SELECT co.id AS company_id,
@@ -50,13 +50,13 @@ export async function GET() {
               COUNT(*) AS open_opps_count,
               COALESCE(SUM(estimated_value_eur), 0) AS pipeline_value
          FROM crm_opportunities
-        WHERE deleted_at IS NULL AND stage NOT IN ('won','lost')
+        WHERE stage NOT IN ('won','lost')
         GROUP BY company_id
      ),
      matters AS (
        SELECT client_company_id AS company_id, COUNT(*) AS open_matters_count
          FROM crm_matters
-        WHERE deleted_at IS NULL AND status IN ('active', 'on_hold')
+        WHERE status IN ('active', 'on_hold')
         GROUP BY client_company_id
      ),
      outstanding AS (

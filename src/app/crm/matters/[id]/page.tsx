@@ -81,7 +81,7 @@ export default function MatterDetailPage({ params }: { params: Promise<{ id: str
 
   async function handleDelete() {
     const ref = String((data?.matter as { matter_reference?: string })?.matter_reference ?? '?');
-    if (!confirm(`Delete matter "${ref}"?\n\nGoes to trash for 30 days.`)) return;
+    if (!confirm(`Delete matter "${ref}"?\n\nThis is permanent and cannot be undone.`)) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/crm/matters/${id}`, { method: 'DELETE' });
@@ -90,18 +90,7 @@ export default function MatterDetailPage({ params }: { params: Promise<{ id: str
         toast.error(err?.error?.message ?? `Delete failed (${res.status})`);
         return;
       }
-      toast.withAction('success', 'Matter moved to trash', 'Will auto-purge after 30 days.', {
-        label: 'Undo',
-        onClick: async () => {
-          const restore = await fetch(`/api/crm/trash/matter/${id}`, { method: 'POST' });
-          if (restore.ok) {
-            toast.success('Matter restored');
-            router.push(`/crm/matters/${id}`);
-          } else {
-            toast.error('Undo failed — restore manually from /crm/trash');
-          }
-        },
-      });
+      toast.success('Matter deleted');
       router.push('/crm/matters');
     } finally {
       setDeleting(false);

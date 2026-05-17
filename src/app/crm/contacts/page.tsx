@@ -15,7 +15,6 @@ import { BulkActionBar } from '@/components/crm/BulkActionBar';
 import { ExportButton } from '@/components/crm/ExportButton';
 import { CrmErrorBox } from '@/components/crm/CrmErrorBox';
 import { CrmContextMenu, type CrmContextAction } from '@/components/crm/CrmContextMenu';
-import { CrmSavedViews } from '@/components/crm/CrmSavedViews';
 import { BulkEditDrawer, type BulkEditField } from '@/components/crm/BulkEditDrawer';
 // Stint 63.L — hover preview on contact name.
 import { ContactHoverPreview } from '@/components/crm/ContactHoverPreview';
@@ -103,13 +102,6 @@ function ContactsPageContent() {
     router.replace(s ? `${pathname}?${s}` : pathname, { scroll: false });
   }, [q, lifecycle, router, pathname]);
 
-  const currentQuery = useMemo(() => {
-    const qs = new URLSearchParams();
-    if (q) qs.set('q', q);
-    if (lifecycle) qs.set('lifecycle', lifecycle);
-    return qs.toString();
-  }, [q, lifecycle]);
-
   const toggleOne = (id: string) => setSelected(prev => {
     const n = new Set(prev);
     if (n.has(id)) n.delete(id); else n.add(id);
@@ -143,21 +135,21 @@ function ContactsPageContent() {
     await load();
   }
 
-  // Stint 63.C — soft-delete invoked from the context menu.
-  async function archiveContact(id: string, name: string) {
+  // Hard-delete from the context menu (stint 96 — trash bin removed).
+  async function deleteContact(id: string, name: string) {
     if (!await confirm({
-      title: `Archive ${name}?`,
-      description: 'It moves to trash for 30 days. You can restore it from /crm/trash.',
+      title: `Delete ${name}?`,
+      description: 'This is permanent and cannot be undone.',
       tone: 'danger',
-      confirmLabel: 'Archive',
+      confirmLabel: 'Delete',
     })) return;
     try {
       const res = await fetch(`/api/crm/contacts/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      toast.success('Contact archived');
+      toast.success('Contact deleted');
       await load();
     } catch (e) {
-      toast.error(`Archive failed: ${String(e instanceof Error ? e.message : e)}`);
+      toast.error(`Delete failed: ${String(e instanceof Error ? e.message : e)}`);
     }
   }
 
@@ -226,11 +218,6 @@ function ContactsPageContent() {
           <option value="">All lifecycle stages</option>
           {CONTACT_LIFECYCLES.map(s => <option key={s} value={s}>{LABELS_LIFECYCLE[s]}</option>)}
         </select>
-        <CrmSavedViews
-          currentQuery={currentQuery}
-          storageKey="cifra.crm.contacts.savedViews.v1"
-          defaultLabel="All contacts"
-        />
         <div className="ml-auto flex items-center gap-2">
           <ExportButton entity="contacts" />
           <span className="text-xs text-ink-muted">{rows.length} contacts</span>
@@ -458,11 +445,11 @@ function ContactsPageContent() {
             },
           },
           {
-            label: 'Archive',
+            label: 'Delete',
             icon: Trash2Icon,
             danger: true,
             separatorBefore: true,
-            onClick: () => archiveContact(c.id, c.full_name),
+            onClick: () => deleteContact(c.id, c.full_name),
           },
         ];
         return (

@@ -98,8 +98,7 @@ export async function GET() {
     safeCount(
       `SELECT COUNT(*)::int AS count
          FROM crm_matters
-        WHERE status = 'active'
-          AND deleted_at IS NULL`,
+        WHERE status = 'active'`,
     ),
   ]);
 

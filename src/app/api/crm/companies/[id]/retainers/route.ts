@@ -73,9 +73,9 @@ export async function POST(
     return apiError('topup_date_required', 'topup_date is required (YYYY-MM-DD).', { status: 400 });
   }
 
-  // Verify company exists (and isn't soft-deleted).
+  // Verify company exists.
   const existingCompany = await queryOne<{ id: string; company_name: string }>(
-    `SELECT id, company_name FROM crm_companies WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT id, company_name FROM crm_companies WHERE id = $1`,
     [companyId],
   );
   if (!existingCompany) return apiError('not_found', 'Company not found.', { status: 404 });

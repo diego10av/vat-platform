@@ -18,7 +18,7 @@ export async function GET(
 ) {
   const { id } = await params;
   const contact = await queryOne(
-    `SELECT * FROM crm_contacts WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT * FROM crm_contacts WHERE id = $1`,
     [id],
   );
   if (!contact) return apiError('not_found', 'Contact not found.', { status: 404 });
@@ -35,7 +35,7 @@ export async function GET(
             cc.notes            AS junction_notes
        FROM crm_contact_companies cc
        JOIN crm_companies c ON c.id = cc.company_id
-      WHERE cc.contact_id = $1 AND c.deleted_at IS NULL
+      WHERE cc.contact_id = $1
       ORDER BY
         CASE WHEN cc.ended_at IS NULL THEN 0 ELSE 1 END,
         cc.is_primary DESC,
@@ -66,8 +66,7 @@ export async function GET(
             c.company_name AS client_name
        FROM crm_opportunities o
        LEFT JOIN crm_companies c ON c.id = o.company_id
-      WHERE o.deleted_at IS NULL
-        AND (
+      WHERE (
           o.primary_contact_id = $1
           OR o.company_id IN (
             SELECT company_id FROM crm_contact_companies
@@ -95,8 +94,7 @@ export async function GET(
             c.company_name AS client_name
        FROM crm_matters m
        LEFT JOIN crm_companies c ON c.id = m.client_company_id
-      WHERE m.deleted_at IS NULL
-        AND (
+      WHERE (
           m.primary_contact_id = $1
           OR m.client_company_id IN (
             SELECT company_id FROM crm_contact_companies
@@ -125,7 +123,7 @@ export async function PUT(
   const body = await request.json().catch(() => ({}));
 
   const existing = await queryOne<Record<string, unknown>>(
-    `SELECT * FROM crm_contacts WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT * FROM crm_contacts WHERE id = $1`,
     [id],
   );
   if (!existing) return apiError('not_found', 'Contact not found.', { status: 404 });
@@ -184,21 +182,19 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const existing = await queryOne<{ id: string; full_name: string }>(
-    `SELECT id, full_name FROM crm_contacts WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT id, full_name FROM crm_contacts WHERE id = $1`,
     [id],
   );
-  if (!existing) return apiError('not_found', 'Contact not found or already deleted.', { status: 404 });
+  if (!existing) return apiError('not_found', 'Contact not found.', { status: 404 });
 
-  await execute(
-    `UPDATE crm_contacts SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1`,
-    [id],
-  );
+  // Stint 96 — hard delete (see opportunities/[id] for rationale).
+  await execute(`DELETE FROM crm_contacts WHERE id = $1`, [id]);
   await logAudit({
-    action: 'soft_delete',
+    action: 'delete',
     targetType: 'crm_contact',
     targetId: id,
     oldValue: existing.full_name,
-    reason: 'Moved to trash',
+    reason: 'Deleted',
   });
-  return NextResponse.json({ id, soft_deleted: true });
+  return NextResponse.json({ id, deleted: true });
 }

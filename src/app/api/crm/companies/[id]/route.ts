@@ -22,7 +22,7 @@ export async function GET(
 ) {
   const { id } = await params;
   const company = await queryOne(
-    `SELECT * FROM crm_companies WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT * FROM crm_companies WHERE id = $1`,
     [id],
   );
   if (!company) return apiError('not_found', 'Company not found.', { status: 404 });
@@ -41,7 +41,6 @@ export async function GET(
        JOIN crm_contacts c ON c.id = cc.contact_id
       WHERE cc.company_id = $1
         AND cc.ended_at IS NULL
-        AND c.deleted_at IS NULL
       ORDER BY cc.is_primary DESC, c.full_name ASC`,
     [id],
   );
@@ -50,7 +49,7 @@ export async function GET(
     `SELECT id, name, stage, estimated_value_eur, probability_pct, weighted_value_eur,
             estimated_close_date
        FROM crm_opportunities
-      WHERE company_id = $1 AND deleted_at IS NULL
+      WHERE company_id = $1
       ORDER BY
         CASE stage
           WHEN 'in_negotiation'  THEN 0
@@ -70,7 +69,7 @@ export async function GET(
   const matters = await query(
     `SELECT id, matter_reference, title, status, practice_areas, opening_date, closing_date
        FROM crm_matters
-      WHERE client_company_id = $1 AND deleted_at IS NULL
+      WHERE client_company_id = $1
       ORDER BY status ASC, opening_date DESC NULLS LAST`,
     [id],
   );
@@ -98,7 +97,7 @@ export async function PUT(
   const body = await request.json().catch(() => ({}));
 
   const existing = await queryOne<Record<string, unknown>>(
-    `SELECT * FROM crm_companies WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT * FROM crm_companies WHERE id = $1`,
     [id],
   );
   if (!existing) return apiError('not_found', 'Company not found.', { status: 404 });
@@ -154,30 +153,26 @@ export async function PUT(
   return NextResponse.json({ id, changed: changed.map(c => c.field) });
 }
 
-// DELETE /api/crm/companies/[id] — soft delete (sets deleted_at = NOW()).
-// Hard delete is only done from /crm/trash (permanent purge route) or
-// by the scheduled 30-day purge task.
+// DELETE /api/crm/companies/[id] — hard delete (stint 96, trash bin removed).
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const existing = await queryOne<{ id: string; company_name: string }>(
-    `SELECT id, company_name FROM crm_companies WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT id, company_name FROM crm_companies WHERE id = $1`,
     [id],
   );
-  if (!existing) return apiError('not_found', 'Company not found or already deleted.', { status: 404 });
+  if (!existing) return apiError('not_found', 'Company not found.', { status: 404 });
 
-  await execute(
-    `UPDATE crm_companies SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1`,
-    [id],
-  );
+  // Stint 96 — hard delete (see opportunities/[id] for rationale).
+  await execute(`DELETE FROM crm_companies WHERE id = $1`, [id]);
   await logAudit({
-    action: 'soft_delete',
+    action: 'delete',
     targetType: 'crm_company',
     targetId: id,
     oldValue: existing.company_name,
-    reason: 'Moved to trash',
+    reason: 'Deleted',
   });
-  return NextResponse.json({ id, soft_deleted: true });
+  return NextResponse.json({ id, deleted: true });
 }

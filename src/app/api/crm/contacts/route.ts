@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
   // Stint 64.P — column refs are prefixed with c. because the SELECT
   // joins crm_contacts with crm_contact_companies via a LATERAL.
-  const conditions: string[] = ['c.deleted_at IS NULL'];
+  const conditions: string[] = ['1=1'];
   const params: unknown[] = [];
   if (q) {
     params.push(`%${q}%`);
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
        LEFT JOIN LATERAL (
          SELECT co.id, co.company_name
            FROM crm_contact_companies cc
-           JOIN crm_companies co ON co.id = cc.company_id AND co.deleted_at IS NULL
+           JOIN crm_companies co ON co.id = cc.company_id
           WHERE cc.contact_id = c.id
             AND cc.ended_at IS NULL                  -- stint 64.Q.5: current employer only
           ORDER BY cc.is_primary DESC, cc.started_at DESC

@@ -95,7 +95,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete "${String(data?.company?.company_name ?? '?')}"?\n\nIt goes to the trash for 30 days — you can restore it from /crm/trash.`)) return;
+    if (!confirm(`Delete "${String(data?.company?.company_name ?? '?')}"?\n\nThis is permanent and cannot be undone.`)) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/crm/companies/${id}`, { method: 'DELETE' });
@@ -104,18 +104,7 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
         toast.error(err?.error?.message ?? `Delete failed (${res.status})`);
         return;
       }
-      toast.withAction('success', 'Company moved to trash', 'Will auto-purge after 30 days.', {
-        label: 'Undo',
-        onClick: async () => {
-          const restore = await fetch(`/api/crm/trash/company/${id}`, { method: 'POST' });
-          if (restore.ok) {
-            toast.success('Company restored');
-            router.push(`/crm/companies/${id}`);
-          } else {
-            toast.error('Undo failed — restore manually from /crm/trash');
-          }
-        },
-      });
+      toast.success('Company deleted');
       router.push('/crm/companies');
     } finally {
       setDeleting(false);

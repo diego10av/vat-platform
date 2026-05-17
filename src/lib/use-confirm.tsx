@@ -14,10 +14,10 @@
 //
 //   async function handleDelete() {
 //     if (!await confirm({
-//       title: 'Archive Acme Capital SARL?',
-//       description: 'It moves to trash for 30 days. You can restore it from /crm/trash.',
+//       title: 'Delete Acme Capital SARL?',
+//       description: 'This is permanent and cannot be undone.',
 //       tone: 'danger',
-//       confirmLabel: 'Archive',
+//       confirmLabel: 'Delete',
 //     })) return;
 //     await fetch(...);
 //   }

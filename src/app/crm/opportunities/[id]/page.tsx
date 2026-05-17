@@ -87,7 +87,7 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
 
   async function handleDelete() {
     const name = String((data?.opportunity as { name?: string })?.name ?? '?');
-    if (!confirm(`Delete opportunity "${name}"?\n\nGoes to trash for 30 days.`)) return;
+    if (!confirm(`Delete opportunity "${name}"?\n\nThis is permanent and cannot be undone.`)) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/crm/opportunities/${id}`, { method: 'DELETE' });
@@ -96,18 +96,7 @@ export default function OpportunityDetailPage({ params }: { params: Promise<{ id
         toast.error(err?.error?.message ?? `Delete failed (${res.status})`);
         return;
       }
-      toast.withAction('success', 'Opportunity moved to trash', 'Will auto-purge after 30 days.', {
-        label: 'Undo',
-        onClick: async () => {
-          const restore = await fetch(`/api/crm/trash/opportunity/${id}`, { method: 'POST' });
-          if (restore.ok) {
-            toast.success('Opportunity restored');
-            router.push(`/crm/opportunities/${id}`);
-          } else {
-            toast.error('Undo failed — restore manually from /crm/trash');
-          }
-        },
-      });
+      toast.success('Opportunity deleted');
       router.push('/crm/opportunities');
     } finally {
       setDeleting(false);

@@ -25,8 +25,7 @@ export async function GET() {
             date_trunc('quarter', CURRENT_DATE)::text AS q_start,
             (date_trunc('quarter', CURRENT_DATE) + INTERVAL '3 months')::text AS q_end
        FROM crm_opportunities
-      WHERE deleted_at IS NULL
-        AND stage NOT IN ('won', 'lost')
+      WHERE stage NOT IN ('won', 'lost')
         AND estimated_close_date >= date_trunc('quarter', CURRENT_DATE)
         AND estimated_close_date <  date_trunc('quarter', CURRENT_DATE) + INTERVAL '3 months'`,
   );

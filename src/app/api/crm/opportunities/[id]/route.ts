@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, query, execute, logAudit } from '@/lib/db';
 import { apiError } from '@/lib/api-errors';
-import { runAutomations } from '@/lib/crm-automation';
 
 const UPDATABLE_FIELDS = [
   'name', 'company_id', 'primary_contact_id', 'stage', 'practice_areas',
@@ -22,7 +21,7 @@ export async function GET(
        FROM crm_opportunities o
        LEFT JOIN crm_companies c ON c.id = o.company_id
        LEFT JOIN crm_contacts ct ON ct.id = o.primary_contact_id
-      WHERE o.id = $1 AND o.deleted_at IS NULL`,
+      WHERE o.id = $1`,
     [id],
   );
   if (!opp) return apiError('not_found', 'Opportunity not found.', { status: 404 });
@@ -46,7 +45,7 @@ export async function PUT(
   const body = await request.json().catch(() => ({}));
 
   const existing = await queryOne<Record<string, unknown>>(
-    `SELECT * FROM crm_opportunities WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT * FROM crm_opportunities WHERE id = $1`,
     [id],
   );
   if (!existing) return apiError('not_found', 'Opportunity not found.', { status: 404 });
@@ -106,21 +105,11 @@ export async function PUT(
     });
   }
 
-  // Fire automation rules on stage change. Fails open — never blocks
-  // the PUT response.
-  if (stageChanged) {
-    const stageChange = changed.find(c => c.field === 'stage');
-    if (stageChange) {
-      await runAutomations('opportunity_stage_changed', {
-        target_type: 'crm_opportunity',
-        target_id: id,
-        from_stage: String(stageChange.before ?? ''),
-        to_stage: String(stageChange.after ?? ''),
-        opp_name: String((existing.name as string | null) ?? id),
-      });
-    }
-  }
-
+  // Stint 96 — runAutomations() removed. Stage transitions used to
+  // fire 3 hard-coded rules (proposal_sent → follow-up task, won →
+  // open matter task, etc). For dogfood single-user this surfaced
+  // tasks Diego didn't want; the simpler signal is the stage chip
+  // on /crm/opportunities itself.
   return NextResponse.json({ id, changed: changed.map(c => c.field) });
 }
 
@@ -130,21 +119,21 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const existing = await queryOne<{ id: string; name: string }>(
-    `SELECT id, name FROM crm_opportunities WHERE id = $1 AND deleted_at IS NULL`,
+    `SELECT id, name FROM crm_opportunities WHERE id = $1`,
     [id],
   );
-  if (!existing) return apiError('not_found', 'Opportunity not found or already deleted.', { status: 404 });
+  if (!existing) return apiError('not_found', 'Opportunity not found.', { status: 404 });
 
-  await execute(
-    `UPDATE crm_opportunities SET deleted_at = NOW(), updated_at = NOW() WHERE id = $1`,
-    [id],
-  );
+  // Stint 96 — hard delete. Single-user dogfood + UI confirmation
+  // modal makes the soft-delete + trash bin ceremony unnecessary.
+  // The audit log row remains as the historical record.
+  await execute(`DELETE FROM crm_opportunities WHERE id = $1`, [id]);
   await logAudit({
-    action: 'soft_delete',
+    action: 'delete',
     targetType: 'crm_opportunity',
     targetId: id,
     oldValue: existing.name,
-    reason: 'Moved to trash',
+    reason: 'Deleted',
   });
-  return NextResponse.json({ id, soft_deleted: true });
+  return NextResponse.json({ id, deleted: true });
 }

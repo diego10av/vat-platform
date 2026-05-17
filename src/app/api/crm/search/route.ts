@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     query(
       `SELECT id, company_name AS label, classification, country
          FROM crm_companies
-        WHERE deleted_at IS NULL AND company_name ILIKE $1
+        WHERE company_name ILIKE $1
         ORDER BY company_name ASC
         LIMIT $2`,
       [pattern, limitPerType],
@@ -29,8 +29,7 @@ export async function GET(request: NextRequest) {
     query(
       `SELECT id, full_name AS label, email, job_title
          FROM crm_contacts
-        WHERE deleted_at IS NULL
-          AND (full_name ILIKE $1 OR email ILIKE $1)
+        WHERE (full_name ILIKE $1 OR email ILIKE $1)
         ORDER BY full_name ASC
         LIMIT $2`,
       [pattern, limitPerType],
@@ -39,7 +38,7 @@ export async function GET(request: NextRequest) {
       `SELECT o.id, o.name AS label, o.stage, c.company_name AS company_name
          FROM crm_opportunities o
          LEFT JOIN crm_companies c ON c.id = o.company_id
-        WHERE o.deleted_at IS NULL AND o.name ILIKE $1
+        WHERE o.name ILIKE $1
         ORDER BY o.name ASC
         LIMIT $2`,
       [pattern, limitPerType],
@@ -49,8 +48,7 @@ export async function GET(request: NextRequest) {
               c.company_name AS client_name
          FROM crm_matters m
          LEFT JOIN crm_companies c ON c.id = m.client_company_id
-        WHERE m.deleted_at IS NULL
-          AND (m.matter_reference ILIKE $1 OR m.title ILIKE $1)
+        WHERE (m.matter_reference ILIKE $1 OR m.title ILIKE $1)
         ORDER BY m.opening_date DESC NULLS LAST
         LIMIT $2`,
       [pattern, limitPerType],

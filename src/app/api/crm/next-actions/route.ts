@@ -109,8 +109,7 @@ export async function GET(_request: NextRequest) {
             o.weighted_value_eur::text
        FROM crm_opportunities o
        LEFT JOIN crm_companies c ON c.id = o.company_id
-      WHERE o.deleted_at IS NULL
-        AND o.stage NOT IN ('won', 'lost')
+      WHERE o.stage NOT IN ('won', 'lost')
         AND o.stage_entered_at IS NOT NULL
         AND (CURRENT_DATE - o.stage_entered_at::date) > 14
       ORDER BY o.stage_entered_at ASC
@@ -142,8 +141,7 @@ export async function GET(_request: NextRequest) {
             o.estimated_value_eur::text
        FROM crm_opportunities o
        LEFT JOIN crm_companies c ON c.id = o.company_id
-      WHERE o.deleted_at IS NULL
-        AND o.stage NOT IN ('won', 'lost')
+      WHERE o.stage NOT IN ('won', 'lost')
         AND o.estimated_close_date IS NOT NULL
         AND o.estimated_close_date < CURRENT_DATE
       ORDER BY o.estimated_close_date ASC
@@ -180,12 +178,11 @@ export async function GET(_request: NextRequest) {
               9999
             ) AS days_since
        FROM crm_contacts c
-      WHERE c.deleted_at IS NULL
-        AND c.engagement_level = 'dormant'
+      WHERE c.engagement_level = 'dormant'
         AND EXISTS (
           SELECT 1 FROM crm_contact_companies cc
           JOIN crm_companies co ON co.id = cc.company_id
-          WHERE cc.contact_id = c.id AND co.classification = 'key_account' AND co.deleted_at IS NULL
+          WHERE cc.contact_id = c.id AND co.classification = 'key_account'
         )
       ORDER BY c.last_activity_at ASC NULLS FIRST
       LIMIT 5`,
@@ -210,8 +207,7 @@ export async function GET(_request: NextRequest) {
             c.company_name AS client_name
        FROM crm_opportunities o
        LEFT JOIN crm_companies c ON c.id = o.company_id
-      WHERE o.deleted_at IS NULL
-        AND o.stage NOT IN ('won', 'lost')
+      WHERE o.stage NOT IN ('won', 'lost')
         AND o.next_action IS NOT NULL
         AND o.next_action_due IS NOT NULL
         AND o.next_action_due <= CURRENT_DATE + INTERVAL '1 day'
@@ -236,8 +232,7 @@ export async function GET(_request: NextRequest) {
             next_follow_up::text,
             (next_follow_up - CURRENT_DATE)::int AS days_delta
        FROM crm_contacts
-      WHERE deleted_at IS NULL
-        AND next_follow_up IS NOT NULL
+      WHERE next_follow_up IS NOT NULL
         AND next_follow_up <= CURRENT_DATE
       ORDER BY next_follow_up ASC
       LIMIT 10`,
@@ -264,8 +259,7 @@ export async function GET(_request: NextRequest) {
     `SELECT id, matter_reference, title, closing_date::text,
             (closing_date - CURRENT_DATE)::int AS days_until
        FROM crm_matters
-      WHERE deleted_at IS NULL
-        AND status = 'active'
+      WHERE status = 'active'
         AND closing_date IS NOT NULL
         AND closing_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '14 days'
       ORDER BY closing_date ASC

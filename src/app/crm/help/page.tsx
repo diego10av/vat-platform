@@ -17,7 +17,7 @@ import Link from 'next/link';
 import {
   BookOpenIcon, UsersIcon, TargetIcon, BriefcaseIcon,
   CheckSquareIcon, EuroIcon, CalendarIcon, BuildingIcon,
-  CalendarDaysIcon, SparklesIcon, KeyboardIcon, ZapIcon,
+  CalendarDaysIcon, SparklesIcon, KeyboardIcon,
   HelpCircleIcon, ArrowRightIcon,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -128,8 +128,6 @@ export default function HelpPage() {
           body="Cmd+K (Ctrl+K on Windows) from anywhere in /crm opens a fuzzy search across companies + contacts + matters + opportunities + invoices. Arrow keys to navigate. Fastest way to jump." />
         <Power icon={KeyboardIcon} title="Keyboard shortcuts g+letter"
           body="g c → Companies, g o → Opportunities, g m → Matters, g a → Activities, g t → Tasks, g b → Billing. Learn once, use forever." />
-        <Power icon={ZapIcon} title="Automations"
-          body={<>Rules in <Link href="/crm/settings/automations" className="text-brand-700 hover:underline">/crm/settings/automations</Link>. Three pre-seeded: proposal_sent → follow-up in 5 days, opp won → open matter task, invoice sent → confirm-receipt task. Toggle them off if they don&apos;t fit your flow.</>} />
         <Power icon={CheckSquareIcon} title="Task templates"
           body={<>&quot;Apply template&quot; button on matter + company detail pages. 3 pre-seeded: client onboarding (7 tasks), matter closing (7 steps), M&amp;A deal kickoff (7 tasks). Each task gets a due date offset from today. One click to seed 7 to-dos.</>} />
         <Power icon={CalendarDaysIcon} title="Full calendar view"
@@ -143,15 +141,13 @@ export default function HelpPage() {
         <FAQ q="The billing dashboard says 'Loading dashboard...' forever."
           a="If you see this again, look for the red error banner above — it now tells you the actual error with a Retry button. If the error mentions SQL, it's a migration out of sync; ping the engineer." />
         <FAQ q="I deleted a company by mistake."
-          a={<>Click <strong>Undo</strong> on the success toast within 5 seconds. After that: <Link href="/crm/trash" className="text-brand-700 hover:underline">/crm/trash</Link> holds soft-deleted records for 30 days with a Restore button. After 30 days the weekly trash-purge cron hard-deletes.</>} />
+          a={<>Stint 96 removed the trash bin — deletes are permanent after the confirmation modal. The audit log on the company detail page keeps a row for every delete, so the historical record survives. Restore needs a fresh import + relinking activities/invoices, which is rarely worth it.</>} />
         <FAQ q="A contact shows engagement = lapsed but I called them yesterday."
           a="Log the call as an activity with activity_date = yesterday. The daily cron recomputes engagement from max(activity_date). If you want to override manually, the contact form has an engagement_override field." />
         <FAQ q="My invoice won't move from draft to sent."
           a="Settings → Firm identity → if you set an approval threshold, any invoice above that amount needs an explicit Approve click first. Look for the green 'Approved by' banner on the invoice." />
         <FAQ q="Time entries aren't showing up on the WIP widget."
           a="The WIP widget shows billable unbilled hours. Check (a) the entry's billable=true, (b) billed_on_invoice_id is null, (c) the matter isn't deleted. You can eyeball all time entries on the matter detail page." />
-        <FAQ q="How do I disable an automation rule?"
-          a={<>Go to <Link href="/crm/settings/automations" className="text-brand-700 hover:underline">/crm/settings/automations</Link>, click the circle next to the rule name to toggle off. The rule stops firing but past auto-created tasks remain.</>} />
         <FAQ q="Can I export data to Excel?"
           a="Every list page has an Excel button in the top right. Export respects your active filters + search. Relations expand to human-readable names (not UUIDs)." />
         <FAQ q="How do I open a matter from a won deal?"

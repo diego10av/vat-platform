@@ -73,8 +73,7 @@ export async function POST(request: NextRequest) {
       `SELECT m.id, m.matter_reference, m.status, c.company_name
          FROM crm_matters m
          LEFT JOIN crm_companies c ON c.id = m.client_company_id
-        WHERE m.deleted_at IS NULL
-          AND m.status IN ('active', 'on_hold')
+        WHERE m.status IN ('active', 'on_hold')
           AND ($2::text IS NULL OR m.id != $2)
           AND c.company_name ILIKE $1`,
       [pattern, excludeId],
@@ -99,8 +98,7 @@ export async function POST(request: NextRequest) {
       `SELECT m.id, m.matter_reference, m.status, m.counterparty_name, c.company_name
          FROM crm_matters m
          LEFT JOIN crm_companies c ON c.id = m.client_company_id
-        WHERE m.deleted_at IS NULL
-          AND m.status IN ('active', 'on_hold')
+        WHERE m.status IN ('active', 'on_hold')
           AND ($2::text IS NULL OR m.id != $2)
           AND m.counterparty_name ILIKE $1`,
       [pattern, excludeId],
@@ -126,8 +124,7 @@ export async function POST(request: NextRequest) {
          FROM crm_matters m
          LEFT JOIN crm_companies c ON c.id = m.client_company_id
          CROSS JOIN LATERAL unnest(COALESCE(m.related_parties, '{}'::text[])) AS unn(elem)
-        WHERE m.deleted_at IS NULL
-          AND m.status IN ('active', 'on_hold')
+        WHERE m.status IN ('active', 'on_hold')
           AND ($2::text IS NULL OR m.id != $2)
           AND unn.elem ILIKE $1`,
       [pattern, excludeId],

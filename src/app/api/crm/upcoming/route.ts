@@ -67,8 +67,7 @@ export async function GET(request: NextRequest) {
   const followUps = await query<{ id: string; full_name: string; next_follow_up: string }>(
     `SELECT id, full_name, next_follow_up::text
        FROM crm_contacts
-      WHERE deleted_at IS NULL
-        AND next_follow_up IS NOT NULL
+      WHERE next_follow_up IS NOT NULL
         AND next_follow_up BETWEEN CURRENT_DATE AND CURRENT_DATE + ($1 || ' days')::interval`,
     [days],
   );
@@ -98,7 +97,7 @@ export async function GET(request: NextRequest) {
                       (EXTRACT(DOY FROM birthday) - 1 || ' days')::interval)::date
               END AS upcoming_date
          FROM crm_contacts
-        WHERE deleted_at IS NULL AND birthday IS NOT NULL
+        WHERE birthday IS NOT NULL
      )
      SELECT id, full_name, upcoming_date::text
        FROM candidates
@@ -127,7 +126,7 @@ export async function GET(request: NextRequest) {
                       (EXTRACT(DOY FROM client_anniversary) - 1 || ' days')::interval)::date
               END AS upcoming_date
          FROM crm_contacts
-        WHERE deleted_at IS NULL AND client_anniversary IS NOT NULL
+        WHERE client_anniversary IS NOT NULL
      )
      SELECT id, full_name, upcoming_date::text
        FROM candidates
@@ -148,8 +147,7 @@ export async function GET(request: NextRequest) {
     `SELECT o.id, o.name, o.estimated_close_date::text, c.company_name AS client_name
        FROM crm_opportunities o
        LEFT JOIN crm_companies c ON c.id = o.company_id
-      WHERE o.deleted_at IS NULL
-        AND o.stage NOT IN ('won', 'lost')
+      WHERE o.stage NOT IN ('won', 'lost')
         AND o.estimated_close_date IS NOT NULL
         AND o.estimated_close_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ($1 || ' days')::interval`,
     [days],
@@ -167,8 +165,7 @@ export async function GET(request: NextRequest) {
   const oppNext = await query<{ id: string; name: string; next_action: string; next_action_due: string }>(
     `SELECT id, name, next_action, next_action_due::text
        FROM crm_opportunities
-      WHERE deleted_at IS NULL
-        AND stage NOT IN ('won', 'lost')
+      WHERE stage NOT IN ('won', 'lost')
         AND next_action IS NOT NULL AND next_action_due IS NOT NULL
         AND next_action_due BETWEEN CURRENT_DATE AND CURRENT_DATE + ($1 || ' days')::interval`,
     [days],
@@ -187,8 +184,7 @@ export async function GET(request: NextRequest) {
   const matterCloses = await query<{ id: string; matter_reference: string; title: string; closing_date: string }>(
     `SELECT id, matter_reference, title, closing_date::text
        FROM crm_matters
-      WHERE deleted_at IS NULL
-        AND status = 'active'
+      WHERE status = 'active'
         AND closing_date IS NOT NULL
         AND closing_date BETWEEN CURRENT_DATE AND CURRENT_DATE + ($1 || ' days')::interval`,
     [days],

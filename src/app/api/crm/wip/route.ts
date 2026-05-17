@@ -23,7 +23,7 @@ export async function GET() {
           WHERE te.matter_id = m.id AND te.billable = true AND te.billed_on_invoice_id IS NULL) AS unbilled_amount
        FROM crm_matters m
        LEFT JOIN crm_companies c ON c.id = m.client_company_id
-      WHERE m.deleted_at IS NULL AND m.status IN ('active', 'on_hold')
+      WHERE m.status IN ('active', 'on_hold')
       ORDER BY unbilled_amount DESC NULLS LAST, m.opening_date DESC NULLS LAST`,
   );
 

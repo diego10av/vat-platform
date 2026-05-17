@@ -309,7 +309,7 @@ export async function GET(request: NextRequest) {
         `SELECT company_name, country, industry, size, classification,
                 website, linkedin_url, array_to_string(tags, ', ') AS tags,
                 notes, created_at
-           FROM crm_companies WHERE deleted_at IS NULL
+           FROM crm_companies
           ORDER BY company_name ASC`,
       );
       columns = [
@@ -333,7 +333,7 @@ export async function GET(request: NextRequest) {
                 array_to_string(areas_of_interest, ', ') AS areas_of_interest,
                 COALESCE(engagement_override, engagement_level) AS engagement_level,
                 source, next_follow_up, last_activity_at
-           FROM crm_contacts WHERE deleted_at IS NULL
+           FROM crm_contacts
           ORDER BY full_name ASC`,
       );
       columns = [
@@ -365,7 +365,6 @@ export async function GET(request: NextRequest) {
            FROM crm_opportunities o
            LEFT JOIN crm_companies c ON c.id = o.company_id
            LEFT JOIN crm_contacts ct ON ct.id = o.primary_contact_id
-          WHERE o.deleted_at IS NULL
           ORDER BY o.estimated_close_date ASC NULLS LAST`,
       );
       columns = [
@@ -401,7 +400,6 @@ export async function GET(request: NextRequest) {
            FROM crm_matters m
            LEFT JOIN crm_companies c ON c.id = m.client_company_id
            LEFT JOIN crm_contacts ct ON ct.id = m.primary_contact_id
-          WHERE m.deleted_at IS NULL
           ORDER BY m.opening_date DESC NULLS LAST`,
       );
       columns = [

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { queryOne, query, execute, logAudit } from '@/lib/db';
 import { apiError } from '@/lib/api-errors';
 import { getFirmSettings } from '@/lib/crm-firm-settings';
-import { runAutomations } from '@/lib/crm-automation';
 
 const UPDATABLE_FIELDS = [
   'invoice_number', 'company_id', 'matter_id', 'primary_contact_id',
@@ -128,17 +127,9 @@ export async function PUT(
     });
   }
 
-  // Fire automation rules on status change.
-  if (statusChange) {
-    await runAutomations('invoice_status_changed', {
-      target_type: 'crm_invoice',
-      target_id: id,
-      from_status: String(statusChange.before ?? ''),
-      to_status: String(statusChange.after ?? ''),
-      invoice_number: String((existing.invoice_number as string | null) ?? id),
-    });
-  }
-
+  // Stint 96 — runAutomations() removed. Invoice status transitions
+  // used to spawn a "confirm receipt" task on send; Diego tracks
+  // that off the /crm/billing list directly.
   return NextResponse.json({ id, changed: changed.map(c => c.field) });
 }
 
