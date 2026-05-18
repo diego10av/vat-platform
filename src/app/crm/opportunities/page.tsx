@@ -25,7 +25,7 @@ import { OPPORTUNITY_FIELDS, LOSS_REASONS, WON_REASONS } from '@/components/crm/
 import { useToast } from '@/components/Toaster';
 import { useConfirm } from '@/lib/use-confirm';
 // Stint 63.A.2 — port Tax-Ops inline editors to opportunities table.
-import { InlineTextCell, InlineDateCell } from '@/components/tax-ops/inline-editors';
+import { InlineTextCell } from '@/components/tax-ops/inline-editors';
 import { ChipSelect } from '@/components/tax-ops/ChipSelect';
 // Stint 91 — inline reassign of company on opportunity rows.
 import { InlineEntitySelect } from '@/components/crm/InlineEntitySelect';
@@ -389,11 +389,10 @@ function OpportunitiesPageContent() {
                 <th className="text-left px-3 py-2 font-medium">Company</th>
                 <th className="text-left px-3 py-2 font-medium">Primary contact</th>
                 <th className="text-left px-3 py-2 font-medium">Stage</th>
-                <th className="text-left px-3 py-2 font-medium">Reason</th>
+                <th className="text-left px-3 py-2 font-medium">Win/Loss reason</th>
                 <th className="text-right px-3 py-2 font-medium">Value</th>
                 <th className="text-right px-3 py-2 font-medium">Prob.</th>
                 <th className="text-right px-3 py-2 font-medium">Weighted</th>
-                <th className="text-left px-3 py-2 font-medium">Est. close</th>
                 <th className="text-left px-3 py-2 font-medium">Next action</th>
                 <th className="text-left px-3 py-2 font-medium">Notes</th>
               </tr>
@@ -464,37 +463,58 @@ function OpportunitiesPageContent() {
                       ariaLabel="Stage"
                     />
                   </td>
-                  {/* Stint 94 — Reason column (won_reason / loss_reason).
-                      Only meaningful when stage is won or lost; rendered
-                      as a muted dash otherwise so the column visual stays
-                      consistent without imposing edit affordance where
-                      it wouldn't apply. Inline ChipSelect lets Diego
-                      capture the why right after closing a deal without
-                      opening the modal. */}
+                  {/* Stint 99 — Win/Loss reason. Always editable (was
+                      read-only for open stages in stint 94, but Diego
+                      asked to be able to hypothesize during the
+                      pipeline + refine on close). Grouped ChipSelect:
+                      one picker, two sections ("Win reasons" + "Loss
+                      reasons"). Selecting a Win option writes
+                      won_reason and clears loss; selecting a Loss
+                      option does the opposite. Prefix `won:` / `loss:`
+                      on option values disambiguates collisions like
+                      `other` that exist in both taxonomies — prefix
+                      is stripped before writing to DB. */}
                   <td className="px-3 py-2">
-                    {r.stage === 'won' ? (
-                      <ChipSelect
-                        value={r.won_reason ?? ''}
-                        options={[
-                          { value: '', label: '— pick —', tone: 'bg-surface-alt text-ink-faint' },
-                          ...WON_REASONS.map(o => ({ value: o.value, label: o.label, tone: 'bg-success-50 text-success-700' })),
-                        ]}
-                        onChange={next => { void patchOpportunity(r.id, 'won_reason', next || null); }}
-                        ariaLabel="Won reason"
-                      />
-                    ) : r.stage === 'lost' ? (
-                      <ChipSelect
-                        value={r.loss_reason ?? ''}
-                        options={[
-                          { value: '', label: '— pick —', tone: 'bg-surface-alt text-ink-faint' },
-                          ...LOSS_REASONS.map(o => ({ value: o.value, label: o.label, tone: 'bg-danger-50 text-danger-700' })),
-                        ]}
-                        onChange={next => { void patchOpportunity(r.id, 'loss_reason', next || null); }}
-                        ariaLabel="Loss reason"
-                      />
-                    ) : (
-                      <span className="text-ink-faint">—</span>
-                    )}
+                    <ChipSelect
+                      value={
+                        r.won_reason ? `won:${r.won_reason}`
+                        : r.loss_reason ? `loss:${r.loss_reason}`
+                        : ''
+                      }
+                      options={[
+                        { value: '', label: '— pick —', tone: 'bg-surface-alt text-ink-faint' },
+                        ...WON_REASONS.map(o => ({
+                          value: `won:${o.value}`,
+                          label: o.label,
+                          tone: 'bg-success-50 text-success-700',
+                          group: 'Win reasons',
+                        })),
+                        ...LOSS_REASONS.map(o => ({
+                          value: `loss:${o.value}`,
+                          label: o.label,
+                          tone: 'bg-danger-50 text-danger-700',
+                          group: 'Loss reasons',
+                        })),
+                      ]}
+                      onChange={async (next) => {
+                        if (!next) {
+                          await patchOpportunity(r.id, 'won_reason', null);
+                          await patchOpportunity(r.id, 'loss_reason', null);
+                          return;
+                        }
+                        const sep = next.indexOf(':');
+                        const groupKey = next.slice(0, sep);
+                        const rawValue = next.slice(sep + 1);
+                        if (groupKey === 'won') {
+                          await patchOpportunity(r.id, 'won_reason', rawValue);
+                          await patchOpportunity(r.id, 'loss_reason', null);
+                        } else {
+                          await patchOpportunity(r.id, 'loss_reason', rawValue);
+                          await patchOpportunity(r.id, 'won_reason', null);
+                        }
+                      }}
+                      ariaLabel="Win/Loss reason"
+                    />
                   </td>
                   {/* Estimated value — InlineTextCell with numeric coerce. */}
                   <td className="px-3 py-2 text-right tabular-nums">
@@ -516,13 +536,14 @@ function OpportunitiesPageContent() {
                   <td className="px-3 py-2 text-right tabular-nums font-medium text-ink-soft">
                     {formatEur(r.weighted_value_eur)}
                   </td>
-                  {/* Estimated close — InlineDateCell, urgency mode. */}
-                  <td className="px-3 py-2">
-                    <InlineDateCell
-                      value={r.estimated_close_date}
-                      onSave={async v => { await patchOpportunity(r.id, 'estimated_close_date', v); }}
-                    />
-                  </td>
+                  {/* Stint 99 — Estimated close column removed from
+                      the list. Field stays in DB + detail page +
+                      Excel export + the two widgets it feeds
+                      (ForecastWidget + DealsAtRiskWidget close-date-
+                      missed alert on /crm/home). Editing happens on
+                      the detail page where it's an inline urgency-
+                      mode date card. */}
+
                   {/* Next action — InlineTextCell. The due date stays
                       read-only here (edit from detail page if needed). */}
                   <td className="px-3 py-2 max-w-[200px]">

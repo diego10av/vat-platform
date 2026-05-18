@@ -17,7 +17,7 @@
 // Position is computed from the trigger's rect each open + on
 // scroll/resize, mirroring the SearchableSelect pattern.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDownIcon, CheckIcon } from 'lucide-react';
 
@@ -27,6 +27,12 @@ export interface ChipOption {
   /** Optional Tailwind classes applied to the chip when this option is
    *  selected (e.g. "bg-amber-100 text-amber-800"). */
   tone?: string;
+  /** Stint 99 — optional grouping. When set, a section header is
+   *  rendered above the first option in each group (e.g. "Win reasons"
+   *  / "Loss reasons"). Consecutive options sharing the same group
+   *  collapse under one header. Flat lists (no group field) behave
+   *  identically to before. */
+  group?: string;
 }
 
 interface Props {
@@ -124,24 +130,36 @@ export function ChipSelect({
           }}
           className="z-popover bg-surface border border-border rounded-md shadow-lg py-1 max-h-[280px] overflow-y-auto"
         >
-          {options.map((o) => {
+          {options.map((o, i) => {
             const isSelected = o.value === value;
+            const prevGroup = i > 0 ? options[i - 1].group : undefined;
+            const showHeader = o.group && o.group !== prevGroup;
             return (
-              <li key={o.value}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  onClick={() => { onChange(o.value); setOpen(false); }}
-                  className={[
-                    'w-full text-left px-2 py-1 text-sm flex items-center gap-2',
-                    isSelected ? 'bg-brand-50 text-brand-800' : 'hover:bg-surface-alt',
-                  ].join(' ')}
-                >
-                  <span className="flex-1 truncate">{o.label}</span>
-                  {isSelected && <CheckIcon size={11} className="shrink-0 text-brand-700" />}
-                </button>
-              </li>
+              <Fragment key={o.value}>
+                {showHeader && (
+                  <li
+                    role="presentation"
+                    className="px-2 pt-1.5 pb-0.5 text-2xs font-semibold text-ink-faint uppercase tracking-wider"
+                  >
+                    {o.group}
+                  </li>
+                )}
+                <li>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isSelected}
+                    onClick={() => { onChange(o.value); setOpen(false); }}
+                    className={[
+                      'w-full text-left px-2 py-1 text-sm flex items-center gap-2',
+                      isSelected ? 'bg-brand-50 text-brand-800' : 'hover:bg-surface-alt',
+                    ].join(' ')}
+                  >
+                    <span className="flex-1 truncate">{o.label}</span>
+                    {isSelected && <CheckIcon size={11} className="shrink-0 text-brand-700" />}
+                  </button>
+                </li>
+              </Fragment>
             );
           })}
         </ul>,
