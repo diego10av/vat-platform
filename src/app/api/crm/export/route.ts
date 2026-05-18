@@ -361,7 +361,7 @@ export async function GET(request: NextRequest) {
                 array_to_string(o.practice_areas, ', ') AS practice_areas,
                 o.source, o.first_contact_date, o.estimated_close_date,
                 o.actual_close_date, o.next_action, o.next_action_due,
-                o.loss_reason, o.won_reason
+                o.loss_reason, o.won_reason, o.notes
            FROM crm_opportunities o
            LEFT JOIN crm_companies c ON c.id = o.company_id
            LEFT JOIN crm_contacts ct ON ct.id = o.primary_contact_id
@@ -384,6 +384,7 @@ export async function GET(request: NextRequest) {
         { header: 'Next action due',  key: 'next_action_due',       width: 14, format: 'date' },
         { header: 'Loss reason',      key: 'loss_reason',           width: 16, format: 'text' },
         { header: 'Won reason',       key: 'won_reason',            width: 16, format: 'text' },
+        { header: 'Notes',            key: 'notes',                 width: 50, format: 'longtext' },
       ];
       withTotals = true;
       break;

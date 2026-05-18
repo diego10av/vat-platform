@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LABELS_STAGE, formatEur, type OpportunityStage } from '@/lib/crm-types';
+import { getTriggerRect } from '@/lib/dom-trigger-rect';
 
 const HOVER_OPEN_MS = 400;
 const HOVER_CLOSE_MS = 150;
@@ -88,7 +89,10 @@ export function OpportunityHoverPreview({ opportunityId, children }: Props) {
   useEffect(() => { setMounted(true); }, []);
 
   function recompute() {
-    const r = triggerRef.current?.getBoundingClientRect();
+    // Wrapper below uses `display: contents` (no layout box), so
+    // getBoundingClientRect on it returns zeros. Walk children to
+    // find a real rect. See src/lib/dom-trigger-rect.ts.
+    const r = getTriggerRect(triggerRef.current);
     if (!r) return;
     const left = Math.min(r.left, window.innerWidth - 320);
     setPos({ top: r.bottom + 6, left: Math.max(8, left) });

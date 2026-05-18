@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     `SELECT o.id, o.name, o.stage, o.stage_entered_at, o.practice_areas,
             o.estimated_value_eur, o.probability_pct, o.weighted_value_eur,
             o.first_contact_date, o.estimated_close_date, o.next_action, o.next_action_due,
-            o.won_reason, o.loss_reason,
+            o.won_reason, o.loss_reason, o.notes,
             c.company_name AS company_name, c.id AS company_id,
             ct.full_name AS primary_contact_name, ct.id AS primary_contact_id
        FROM crm_opportunities o

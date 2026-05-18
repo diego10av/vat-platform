@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { LABELS_MATTER_STATUS, type MatterStatus } from '@/lib/crm-types';
+import { getTriggerRect } from '@/lib/dom-trigger-rect';
 
 const HOVER_OPEN_MS = 400;
 const HOVER_CLOSE_MS = 150;
@@ -87,7 +88,9 @@ export function MatterHoverPreview({ matterId, children }: Props) {
   useEffect(() => { setMounted(true); }, []);
 
   function recompute() {
-    const r = triggerRef.current?.getBoundingClientRect();
+    // Wrapper below uses `display: contents` (no layout box). See
+    // src/lib/dom-trigger-rect.ts for why we walk children.
+    const r = getTriggerRect(triggerRef.current);
     if (!r) return;
     const left = Math.min(r.left, window.innerWidth - 320);
     setPos({ top: r.bottom + 6, left: Math.max(8, left) });

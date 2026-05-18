@@ -74,6 +74,11 @@ interface Opportunity {
   // edit modal. Only render the cell when stage ∈ {won, lost}.
   won_reason: string | null;
   loss_reason: string | null;
+  // Stint 98 — free-text notes column surfaced inline so Diego can
+  // read the last email / latest context without opening the detail
+  // page. Column already existed on crm_opportunities; only the list
+  // surface was missing.
+  notes: string | null;
 }
 
 // Stint 67.C: Suspense wrapper removed (see /clients/page.tsx).
@@ -390,6 +395,7 @@ function OpportunitiesPageContent() {
                 <th className="text-right px-3 py-2 font-medium">Weighted</th>
                 <th className="text-left px-3 py-2 font-medium">Est. close</th>
                 <th className="text-left px-3 py-2 font-medium">Next action</th>
+                <th className="text-left px-3 py-2 font-medium">Notes</th>
               </tr>
             </thead>
             <tbody>
@@ -530,6 +536,17 @@ function OpportunitiesPageContent() {
                         due {formatDate(r.next_action_due)}
                       </div>
                     )}
+                  </td>
+                  {/* Notes — Stint 98. Free-text blob, multiline editor
+                      (textarea on open). Display clamps to 2 lines with
+                      a browser-native tooltip carrying the full text. */}
+                  <td className="px-3 py-2 max-w-[240px]">
+                    <InlineTextCell
+                      value={r.notes}
+                      multiline
+                      onSave={async v => { await patchOpportunity(r.id, 'notes', v); }}
+                      placeholder="—"
+                    />
                   </td>
                 </tr>
               ))}
