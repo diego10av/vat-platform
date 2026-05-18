@@ -97,6 +97,11 @@ export async function GET(request: NextRequest) {
   // Stint 84.E — "Stale only" filter for the home dashboard "Chase today"
   // section. waiting_on_* + no comment in last 5d.
   const onlyStale = url.searchParams.get('stale') === '1';
+  // Stint 100 — hide done/cancelled by default; UI toggle "Show
+  // completed" passes show_completed=1 to surface them. Mirrors the
+  // /crm/tasks pattern. An explicit ?status= filter overrides this so
+  // Diego can pick "done" from the dropdown and see only those.
+  const showCompleted = url.searchParams.get('show_completed') === '1';
 
   const where: string[] = [];
   const params: unknown[] = [];
@@ -105,6 +110,19 @@ export async function GET(request: NextRequest) {
   if (statusVals.length > 0) {
     where.push(`t.status = ANY($${pi}::text[])`);
     params.push(statusVals); pi += 1;
+  } else if (!showCompleted) {
+    // Hide done/cancelled by default, BUT keep done parents whose
+    // descendants still have open work — otherwise marking a parent
+    // done would orphan its open subtasks visually. The EXISTS clause
+    // covers a single level of subtasks (cifra trees don't go deeper).
+    where.push(`(
+      t.status NOT IN ('done', 'cancelled')
+      OR EXISTS (
+        SELECT 1 FROM tax_ops_tasks c
+         WHERE c.parent_task_id = t.id
+           AND c.status NOT IN ('done', 'cancelled')
+      )
+    )`);
   }
   if (priority) { where.push(`t.priority = $${pi}`); params.push(priority); pi += 1; }
   if (assignee) { where.push(`t.assignee = $${pi}`); params.push(assignee); pi += 1; }

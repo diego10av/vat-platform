@@ -25,7 +25,7 @@ import { OPPORTUNITY_FIELDS, LOSS_REASONS, WON_REASONS } from '@/components/crm/
 import { useToast } from '@/components/Toaster';
 import { useConfirm } from '@/lib/use-confirm';
 // Stint 63.A.2 — port Tax-Ops inline editors to opportunities table.
-import { InlineTextCell } from '@/components/tax-ops/inline-editors';
+import { InlineTextCell, InlineDateCell } from '@/components/tax-ops/inline-editors';
 import { ChipSelect } from '@/components/tax-ops/ChipSelect';
 // Stint 91 — inline reassign of company on opportunity rows.
 import { InlineEntitySelect } from '@/components/crm/InlineEntitySelect';
@@ -391,8 +391,6 @@ function OpportunitiesPageContent() {
                 <th className="text-left px-3 py-2 font-medium">Stage</th>
                 <th className="text-left px-3 py-2 font-medium">Win/Loss reason</th>
                 <th className="text-right px-3 py-2 font-medium">Value</th>
-                <th className="text-right px-3 py-2 font-medium">Prob.</th>
-                <th className="text-right px-3 py-2 font-medium">Weighted</th>
                 <th className="text-left px-3 py-2 font-medium">Next action</th>
                 <th className="text-left px-3 py-2 font-medium">Notes</th>
               </tr>
@@ -524,18 +522,14 @@ function OpportunitiesPageContent() {
                       placeholder="—"
                     />
                   </td>
-                  {/* Probability — InlineTextCell, just the % integer. */}
-                  <td className="px-3 py-2 text-right tabular-nums">
-                    <InlineTextCell
-                      value={r.probability_pct !== null ? `${r.probability_pct}` : null}
-                      onSave={async v => { await patchOpportunity(r.id, 'probability_pct', v); }}
-                      placeholder="—"
-                    />
-                  </td>
-                  {/* Weighted — read-only (server-computed generated column). */}
-                  <td className="px-3 py-2 text-right tabular-nums font-medium text-ink-soft">
-                    {formatEur(r.weighted_value_eur)}
-                  </td>
+                  {/* Stint 100 — Probability + Weighted columns removed
+                      from the list. probability_pct stays inline-editable
+                      on the detail page; weighted_value_eur is a DB-
+                      generated column that keeps feeding the Forecast
+                      widget, the page header "X € weighted across N
+                      open" subtotal, deals-at-risk widget, and Excel
+                      export. The list goes from 12 columns to 10. */}
+
                   {/* Stint 99 — Estimated close column removed from
                       the list. Field stays in DB + detail page +
                       Excel export + the two widgets it feeds
@@ -544,19 +538,26 @@ function OpportunitiesPageContent() {
                       the detail page where it's an inline urgency-
                       mode date card. */}
 
-                  {/* Next action — InlineTextCell. The due date stays
-                      read-only here (edit from detail page if needed). */}
+                  {/* Next action — Stint 100. Text + due date are BOTH
+                      inline-editable now. The due date used to be a
+                      read-only display below the text; Diego asked to
+                      be able to edit it without opening the detail page.
+                      InlineDateCell with mode="urgency" turns the badge
+                      red when the date is overdue. */}
                   <td className="px-3 py-2 max-w-[200px]">
                     <InlineTextCell
                       value={r.next_action}
                       onSave={async v => { await patchOpportunity(r.id, 'next_action', v); }}
                       placeholder="—"
                     />
-                    {r.next_action_due && (
-                      <div className="text-2xs text-ink-faint mt-0.5">
-                        due {formatDate(r.next_action_due)}
-                      </div>
-                    )}
+                    <div className="text-2xs text-ink-faint mt-0.5 flex items-center gap-1">
+                      <span>due</span>
+                      <InlineDateCell
+                        value={r.next_action_due}
+                        onSave={async v => { await patchOpportunity(r.id, 'next_action_due', v); }}
+                        mode="urgency"
+                      />
+                    </div>
                   </td>
                   {/* Notes — Stint 98. Free-text blob, multiline editor
                       (textarea on open). Display clamps to 2 lines with

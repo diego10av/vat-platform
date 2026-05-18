@@ -207,6 +207,9 @@ function TasksListContent() {
   // Stint 51.A — family filter.
   const [familyId, setFamilyId] = useState<string>(searchParams.get('family_id') ?? '');
   const [families, setFamilies] = useState<FamilyOption[]>([]);
+  // Stint 100 — "Show completed" toggle. Off by default; flips the
+  // API into showing done/cancelled tasks. Mirrors /crm/tasks.
+  const [showCompleted, setShowCompleted] = useState(false);
   // Stint 55.A — sub-tasks tree expansion (not URL-persisted; ephemeral).
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [childrenByParent, setChildrenByParent] = useState<Record<string, TaskFull[]>>({});
@@ -291,6 +294,7 @@ function TasksListContent() {
     if (status) qs.set('status', status);
     if (assignee) qs.set('assignee', assignee);
     if (familyId) qs.set('family_id', familyId);
+    if (showCompleted) qs.set('show_completed', '1');
     if (preset) {
       const p = QUICK_FILTERS.find(f => f.key === preset);
       p?.apply(qs);
@@ -299,7 +303,7 @@ function TasksListContent() {
     crmLoadShape<TaskFull[]>(`/api/tax-ops/tasks?${qs}`, b => (b as { tasks: TaskFull[] }).tasks)
       .then(rows => { setRows(rows); setError(null); })
       .catch(e => { setError(String(e instanceof Error ? e.message : e)); setRows([]); });
-  }, [q, status, assignee, familyId, preset]);
+  }, [q, status, assignee, familyId, preset, showCompleted]);
 
   // Load families once for the filter dropdown — reuse the same list
   // the matrices use (groups returned by /api/tax-ops/entities).
@@ -539,6 +543,17 @@ function TasksListContent() {
           <option value="">All statuses</option>
           {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
+        {/* Stint 100 — Show completed toggle. Off by default; surface
+            done/cancelled tasks on demand. */}
+        <label className="inline-flex items-center gap-1.5 text-xs text-ink-soft cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showCompleted}
+            onChange={e => setShowCompleted(e.target.checked)}
+            className="h-3.5 w-3.5 accent-brand-500 cursor-pointer"
+          />
+          Show completed
+        </label>
         <select
           value={familyId}
           onChange={e => setFamilyId(e.target.value)}
@@ -813,6 +828,9 @@ function TasksListContent() {
                   className={[
                     'border-t border-border/70 align-top',
                     selected.has(t.id) ? 'bg-brand-50/40' : 'hover:bg-surface-alt/50',
+                    // Stint 100 — gray-out done / cancelled rows when
+                    // showCompleted is on (they're hidden by default).
+                    t.status === 'done' || t.status === 'cancelled' ? 'opacity-60' : '',
                   ].join(' ')}
                 >
                   <td className="px-2 py-1.5">
