@@ -85,6 +85,31 @@ export async function PUT(
     setClauses.push(`stage_entered_at = NOW()`);
   }
 
+  // Stint 105 — closing a deal auto-clears next_action + next_action_due.
+  // Diego: "cuando una oportunidad se pierde o si ya no hay mas next
+  // action deberia poder eliminar la fecha y que no me saltaran luego
+  // alertas que no vienen a cuento". Without this, a deal marked
+  // won/lost keeps its dangling follow-up date in the row (visually
+  // confusing, even though the alert SQL already filters closed
+  // stages). HubSpot/Pipedrive/Salesforce all cancel pending follow-
+  // ups on close — same pattern. Body-supplied next_action / due
+  // values win (Diego can explicitly set a post-close action in the
+  // same PATCH if he wants).
+  if (stageChanged) {
+    const newStage = changed.find(c => c.field === 'stage')?.after;
+    const closing = newStage === 'won' || newStage === 'lost';
+    if (closing) {
+      if (!('next_action' in body) && existing.next_action) {
+        setClauses.push(`next_action = NULL`);
+        changed.push({ field: 'next_action', before: existing.next_action, after: null });
+      }
+      if (!('next_action_due' in body) && existing.next_action_due) {
+        setClauses.push(`next_action_due = NULL`);
+        changed.push({ field: 'next_action_due', before: existing.next_action_due, after: null });
+      }
+    }
+  }
+
   if (changed.length === 0) return NextResponse.json({ id, changed: [] });
 
   setClauses.push(`updated_at = NOW()`);
