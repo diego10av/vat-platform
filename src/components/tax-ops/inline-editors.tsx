@@ -14,6 +14,7 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { useEffect, useRef } from 'react';
+import { XIcon } from 'lucide-react';
 import { InlineCellEditor } from './InlineCellEditor';
 import { FilingStatusBadge, FILING_STATUSES, filingStatusLabel } from './FilingStatusBadge';
 import { DateBadge } from '@/components/crm/DateBadge';
@@ -184,18 +185,39 @@ export function InlineDateCell({
       ariaLabel="Edit date"
       renderDisplay={(v) => <DateBadge value={v || null} mode={mode} />}
       renderEditor={({ value, setValue, commit, cancel }) => (
-        <input
-          type="date"
-          autoFocus
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') { e.preventDefault(); commit(); }
-            else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
-          }}
-          onBlur={() => commit()}
-          className="px-1.5 py-0.5 text-xs border border-border rounded bg-surface tabular-nums"
-        />
+        <div className="inline-flex items-center gap-1">
+          <input
+            type="date"
+            autoFocus
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commit(); }
+              else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+            }}
+            onBlur={() => commit()}
+            className="px-1.5 py-0.5 text-xs border border-border rounded bg-surface tabular-nums"
+          />
+          {value && (
+            <button
+              type="button"
+              // Stint 106 — explicit clear (✕). Native <input type="date">
+              // hides its clear affordance behind browser quirks (Chrome
+              // Mac shows a tiny ✕, Safari refuses value=""), so the
+              // discoverable path was non-existent. preventDefault on
+              // mousedown stops the input from blurring first — without
+              // it, onBlur fires commit() with the OLD draft and races
+              // the explicit clear.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => commit('')}
+              title="Clear date"
+              aria-label="Clear date"
+              className="p-0.5 text-ink-muted hover:text-danger-600 rounded"
+            >
+              <XIcon size={11} />
+            </button>
+          )}
+        </div>
       )}
     />
   );
