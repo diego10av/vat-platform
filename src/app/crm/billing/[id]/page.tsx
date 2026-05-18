@@ -254,6 +254,13 @@ export default function InvoiceDetailPage({ params }: { params: Promise<{ id: st
           payment_method: i.payment_method,
           payment_reference: i.payment_reference,
           notes: i.notes,
+          // Stint 101 — missing here pre-fix caused silent data loss:
+          // open Edit, change ANY field, save → these two got NULL-ed
+          // because the form state for absent fields defaulted to ''
+          // → trimmed to null → PUT wrote NULL. Add the current values
+          // so they round-trip cleanly.
+          company_id: (i as { company_id?: string | null }).company_id ?? null,
+          matter_id: (i as { matter_id?: string | null }).matter_id ?? null,
         }}
         onSave={handleUpdate}
       />

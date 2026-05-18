@@ -146,6 +146,17 @@ export default function MatterDetailPage({ params }: { params: Promise<{ id: str
           documents_link: m.documents_link,
           tags: m.tags ?? [],
           notes: m.notes,
+          // Stint 101 — missing here pre-fix caused silent data loss:
+          // open Edit, change ANY field, save → these six got NULL-ed
+          // because the form state for absent fields defaulted to ''
+          // → trimmed to null → PUT wrote NULL. Add the current values
+          // so they round-trip cleanly.
+          client_company_id: (m as { client_company_id?: string | null }).client_company_id ?? null,
+          primary_contact_id: (m as { primary_contact_id?: string | null }).primary_contact_id ?? null,
+          counterparty_name: (m as { counterparty_name?: string | null }).counterparty_name ?? null,
+          related_parties: (m as { related_parties?: string | null }).related_parties ?? null,
+          estimated_budget_eur: (m as { estimated_budget_eur?: number | null }).estimated_budget_eur ?? null,
+          cap_eur: (m as { cap_eur?: number | null }).cap_eur ?? null,
         }}
         onSave={handleUpdate}
       />

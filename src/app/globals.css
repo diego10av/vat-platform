@@ -345,19 +345,23 @@
 
   /* Stint 48.B4 — z-index canonical tiers. Stops the popover/modal/sticky
    *  z-stacking chaos Diego saw ("things showing through behind").
-   *  Use Tailwind utilities `z-sticky`, `z-popover`, `z-drawer`,
-   *  `z-modal`, `z-toast` instead of bare `z-{n}` literals.
+   *  Use Tailwind utilities `z-sticky`, `z-drawer`, `z-modal`,
+   *  `z-popover`, `z-toast` instead of bare `z-{n}` literals.
    *
    *    sticky:  10  — table sticky cells (header + first cols)
-   *    popover: 30  — inline popovers, dropdowns, action menus
    *    drawer:  40  — right-side slide-in panels
    *    modal:   50  — centred dialogs (above drawers)
+   *    popover: 55  — inline popovers, dropdowns, action menus
+   *                   (Stint 101: bumped from 30 to 55 so dropdowns
+   *                   triggered from inside a modal/drawer render
+   *                   ABOVE the backdrop. Was the root cause of "el
+   *                   picker no se abre dentro del modal").
    *    toast:   60  — toast rack (above everything)
    */
   --z-index-sticky:  10;
-  --z-index-popover: 30;
   --z-index-drawer:  40;
   --z-index-modal:   50;
+  --z-index-popover: 55;
   --z-index-toast:   60;
 }
 

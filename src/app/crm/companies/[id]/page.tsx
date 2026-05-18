@@ -159,6 +159,15 @@ export default function CompanyDetailPage({ params }: { params: Promise<{ id: st
           linkedin_url: c.linkedin_url,
           tags: c.tags ?? [],
           notes: c.notes,
+          // Stint 101 — missing here pre-fix caused silent data loss:
+          // open Edit, change ANY field, save → these four got NULL-ed
+          // because the form state for absent fields defaulted to ''
+          // → trimmed to null → PUT wrote NULL. Add the current
+          // values so they round-trip cleanly.
+          billing_address: (c as { billing_address?: string | null }).billing_address ?? null,
+          registered_address: (c as { registered_address?: string | null }).registered_address ?? null,
+          vat_number: (c as { vat_number?: string | null }).vat_number ?? null,
+          matricule: (c as { matricule?: string | null }).matricule ?? null,
         }}
         onSave={handleUpdate}
       />
