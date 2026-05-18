@@ -17,7 +17,15 @@ export function TopBar({ badges }: TopBarProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-popover h-14 bg-surface/85 backdrop-blur-xl border-b border-divider">
+      {/* Stint 104 — z-sticky (was z-popover). Stint 101 bumped
+          --z-index-popover from 30 → 55 so SearchableSelect dropdowns
+          inside modals render above the backdrop. Collateral: this
+          header was also z-popover (now 55), which made the global
+          search bar float ABOVE any open modal. z-sticky:10 lets the
+          modal backdrop (z-modal:50) cleanly cover the header when
+          one is open, and still keeps the header above page content
+          (z-auto = 0) when scrolling. */}
+      <header className="sticky top-0 z-sticky h-14 bg-surface/85 backdrop-blur-xl border-b border-divider">
         <div className="h-full px-4 md:px-6 flex items-center gap-3 md:gap-4">
           <button
             className="md:hidden w-8 h-8 inline-flex items-center justify-center rounded-md hover:bg-surface-alt text-ink-soft"
