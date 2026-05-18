@@ -28,11 +28,7 @@ interface PreviewPayload {
   last_comment: string | null;
   blocker_title: string | null;
   blocker_status: string | null;
-  // Stint 58.T2.4 — sign-off names surfaced in the preview now that the
-  // list cell shows only a compact lock/ready icon (no more 1/3 chip).
-  preparer: string | null;
-  reviewer: string | null;
-  partner_sign_off: string | null;
+  // Stint 103 — sign-off snapshot removed (columns dropped in mig 095).
 }
 
 const cache = new Map<string, PreviewPayload>();
@@ -49,9 +45,6 @@ async function fetchPreview(taskId: string): Promise<PreviewPayload | null> {
     const detail = await detailRes.json() as {
       task: {
         description: string | null;
-        preparer: string | null;
-        reviewer: string | null;
-        partner_sign_off: string | null;
       };
       subtasks: Array<{ status: string }>;
       blocker: { title: string; status: string } | null;
@@ -71,9 +64,6 @@ async function fetchPreview(taskId: string): Promise<PreviewPayload | null> {
       last_comment: comments[comments.length - 1]?.body ?? null,
       blocker_title: detail.blocker?.title ?? null,
       blocker_status: detail.blocker?.status ?? null,
-      preparer: detail.task.preparer,
-      reviewer: detail.task.reviewer,
-      partner_sign_off: detail.task.partner_sign_off,
     };
     cache.set(taskId, payload);
     return payload;
@@ -190,32 +180,9 @@ export function TaskHoverPreview({ taskId, children }: Props) {
             </div>
           )}
 
-          {(() => {
-            // Stint 58.T2.4 — sign-off rollup. Shown only when at least
-            // one role is signed (otherwise the panel stays clean).
-            const signed = [
-              data.preparer && { role: 'Preparer', name: data.preparer },
-              data.reviewer && { role: 'Reviewer', name: data.reviewer },
-              data.partner_sign_off && { role: 'Partner', name: data.partner_sign_off },
-            ].filter((x): x is { role: string; name: string } => !!x);
-            if (signed.length === 0) return null;
-            return (
-              <div className="mt-2 pt-2 border-t border-border text-2xs">
-                <div className="text-ink-muted mb-0.5">
-                  Sign-off ({signed.length}/3)
-                </div>
-                <div className="space-y-0.5">
-                  {signed.map(s => (
-                    <div key={s.role} className="flex items-center gap-1">
-                      <span className="text-success-700">✓</span>
-                      <span className="text-ink-muted">{s.role}:</span>
-                      <span className="text-ink">{s.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
+          {/* Stint 103 — sign-off rollup removed (cascade columns
+              dropped in mig 095; the 3-person workflow was ceremony
+              for solo dogfood per stint 96 plan). */}
           {data.last_comment && (
             <div className="mt-2 pt-2 border-t border-border text-2xs text-ink-muted">
               <span className="font-medium text-ink">Last comment:</span>{' '}

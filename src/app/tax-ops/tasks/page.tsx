@@ -8,14 +8,14 @@ export const dynamic = 'force-dynamic';
 // Filtros: Mine · Overdue · Waiting · This week + search.
 // Inline edit en status, priority, assignee, due_date, follow_up_date.
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import {
   SearchIcon, LayoutListIcon, LayoutGridIcon, PlusIcon, FilterXIcon,
   CalendarIcon, MessagesSquareIcon, ListIcon, Trash2Icon,
   ChevronRightIcon, ChevronDownIcon, LockIcon, UnlockIcon,
-  StarIcon, XIcon, SlidersHorizontalIcon,
+  XIcon, SlidersHorizontalIcon,
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageSkeleton } from '@/components/ui/Skeleton';
@@ -46,19 +46,14 @@ interface TaskFull extends TaskRow {
   entity_name: string | null;
   family_name: string | null;
   family_id: string | null;
-  task_kind: string;
   waiting_on_kind: string | null;
   waiting_on_note: string | null;
   follow_up_date: string | null;
   // Stint 55.B — blocker info for the 🔒/🔓 badge.
   blocker_title: string | null;
   blocker_status: string | null;
-  // Stint 56.A — sign-off snapshot for the N/3 chip.
-  preparer: string | null;
-  reviewer: string | null;
-  partner_sign_off: string | null;
-  // Stint 56.D — favourite.
-  is_starred: boolean;
+  // Stint 103 — task_kind / preparer / reviewer / partner_sign_off /
+  // is_starred columns dropped in mig 095.
   // Stint 84.B — list view shows effective_status (rolled up from open
   // sub-tasks when the parent is closed but workstreams remain open).
   effective_status?: string;
@@ -88,14 +83,7 @@ const STATUSES = [
   { value: 'cancelled',           label: 'Cancelled' },
 ];
 
-const TASK_KIND_LABELS: Record<string, string> = {
-  action:           'Action',
-  follow_up:        'Follow-up',
-  clarification:    'Clarification',
-  approval_request: 'Approval request',
-  review:           'Review',
-  other:            'Other',
-};
+// Stint 103 — TASK_KIND_LABELS removed (column dropped in mig 095).
 
 const WAITING_ON_LABELS: Record<string, string> = {
   csp_contact:   'CSP contact',
@@ -159,12 +147,6 @@ const QUICK_FILTERS: Array<{
     label: 'Ready to work',
     tooltip: 'Tasks not blocked by an unfinished dependency. Stint 55.B.',
     apply: (p) => p.set('ready', '1'),
-  },
-  {
-    key: 'starred',
-    label: 'Starred',
-    tooltip: 'Tasks you marked with a star.',
-    apply: (p) => p.set('starred', '1'),
   },
   {
     key: 'thisweek',
@@ -240,7 +222,7 @@ function TasksListContent() {
       return next;
     });
   }
-  const showKind     = extraColsVisible.has('kind');
+  // Stint 103 — "kind" optional column removed (task_kind dropped in mig 095).
   const showWaiting  = extraColsVisible.has('waiting');
   // Stint 58.fix — Follow-up promoted out of the gear menu and made
   // always-visible. Diego: "no crees que puede ser util que aparezca
@@ -612,7 +594,6 @@ function TasksListContent() {
               </label>
               <div className="mt-3 text-2xs text-ink-muted mb-1.5">Optional columns</div>
               {[
-                { key: 'kind', label: 'Kind' },
                 { key: 'waiting', label: 'Waiting on' },
               ].map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 px-1 py-0.5 cursor-pointer hover:bg-surface-alt rounded">
@@ -626,7 +607,7 @@ function TasksListContent() {
               ))}
               <div className="mt-2 text-2xs text-ink-faint italic leading-snug">
                 Default columns (Client, Title, Status, Assignee,
-                Follow-up, Due, Priority) are always shown.
+                Next action, Priority) are always shown.
               </div>
             </div>
           )}
@@ -691,13 +672,7 @@ function TasksListContent() {
                 <option value="medium">Medium</option>
                 <option value="low">Low</option>
               </select>
-              <button
-                type="button"
-                onClick={() => void bulkPatch({ is_starred: true })}
-                className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded border border-border bg-surface hover:bg-surface-alt"
-              >
-                <StarIcon size={11} /> Star
-              </button>
+              {/* Stint 103 — bulk-star button removed (is_starred dropped). */}
               <button
                 type="button"
                 onClick={clearSelection}
@@ -726,35 +701,56 @@ function TasksListContent() {
                     }}
                   />
                 </th>
-                <th className="px-2 py-1.5 font-medium w-[28px]" aria-label="Star"></th>
+                {/* Stint 103 — Star column removed (is_starred dropped). */}
                 {/* Stint 58.T2.1 — Family + Entity merged into one
                     "Client" column with a Family › Entity breadcrumb. */}
                 <th className="px-2 py-1.5 font-medium w-[200px]">Client</th>
                 <th className="px-2 py-1.5 font-medium">Title</th>
-                {showKind     && <th className="px-2 py-1.5 font-medium w-[120px]">Kind</th>}
+                {/* Stint 103 — Kind optional column removed. */}
                 <th className="px-2 py-1.5 font-medium w-[120px]">Status</th>
                 {showWaiting  && <th className="px-2 py-1.5 font-medium w-[150px]">Waiting on</th>}
                 <th className="px-2 py-1.5 font-medium w-[100px]">Assignee</th>
-                {/* Stint 58.fix — Follow-up always visible, sits right
-                    before Due so the two action-triggering dates read
-                    side-by-side. */}
-                <th className="px-2 py-1.5 font-medium w-[110px]">Follow-up</th>
-                <th className="px-2 py-1.5 font-medium w-[110px]">Due</th>
+                {/* Stint 103 — Follow-up + Due fused into "Next action"
+                    with 📨/📅 icon. Detail page keeps both editable. */}
+                <th className="px-2 py-1.5 font-medium w-[130px]">Next action</th>
                 <th className="px-2 py-1.5 font-medium w-[90px]">Priority</th>
                 <th className="px-2 py-1.5 w-[30px]"></th>
               </tr>
             </thead>
             <tbody>
-              {flattenTree(rows).map(row => {
+              {(() => {
+                const flatAll = flattenTree(rows);
+                // Stint 103 — when showCompleted is on, split the array
+                // into active + completed sections at the first top-level
+                // done/cancelled row. SQL already sorts done roots last,
+                // so the boundary is the first depth=0 done task.
+                const boundary = flatAll.findIndex(r =>
+                  r.kind === 'task' && r.depth === 0 &&
+                  (r.task.effective_status === 'done' || r.task.effective_status === 'cancelled')
+                );
+                const activeRows = boundary < 0 ? flatAll : flatAll.slice(0, boundary);
+                const completedRows = boundary < 0 ? [] : flatAll.slice(boundary);
+                const completedTaskCount = completedRows.filter(r => r.kind === 'task').length;
+                const allRows = [...activeRows, ...completedRows];
+                return allRows.map((row, allIndex) => {
+                  // Inject the "Completed (N)" divider just before the first row of the completed section.
+                  const showCompletedDivider = boundary >= 0 && allIndex === activeRows.length;
                 if (row.kind === 'add') {
                   const isOpen = subtaskDraftFor === row.parentId;
-                  // Total visible columns: checkbox + star + client + title +
-                  // (kind?) + status + (waiting?) + assignee + follow-up +
-                  // due + priority + delete = 10 base + 0..2 conditional.
-                  const totalCols = 10 + (showKind ? 1 : 0) + (showWaiting ? 1 : 0);
+                  // Total visible columns: checkbox + client + title +
+                  // status + (waiting?) + assignee + next-action +
+                  // priority + delete = 8 base + 0..1 conditional.
+                  const totalCols = 8 + (showWaiting ? 1 : 0);
                   return (
+                    <Fragment key={`add-${row.parentId}`}>
+                      {showCompletedDivider && (
+                        <tr className="bg-surface-alt/40">
+                          <td colSpan={totalCols} className="px-3 py-2 text-2xs text-ink-muted font-semibold uppercase tracking-wider">
+                            Completed ({completedTaskCount})
+                          </td>
+                        </tr>
+                      )}
                     <tr
-                      key={`add-${row.parentId}`}
                       className="border-t border-border/40 bg-surface-alt/20"
                     >
                       <td colSpan={totalCols} className="px-2 py-1" style={{ paddingLeft: `${4.5 + row.depth * 1.25}rem` }}>
@@ -804,12 +800,21 @@ function TasksListContent() {
                         )}
                       </td>
                     </tr>
+                    </Fragment>
                   );
                 }
                 const { task: t, depth } = row;
+                const totalCols = 8 + (showWaiting ? 1 : 0);
                 return (
+                  <Fragment key={t.id}>
+                    {showCompletedDivider && (
+                      <tr className="bg-surface-alt/40">
+                        <td colSpan={totalCols} className="px-3 py-2 text-2xs text-ink-muted font-semibold uppercase tracking-wider">
+                          Completed ({completedTaskCount})
+                        </td>
+                      </tr>
+                    )}
                 <tr
-                  key={t.id}
                   onContextMenu={(e) => {
                     // Stint 58.T1.4 — let the browser handle right-click
                     // when the target is an editable field so paste /
@@ -821,7 +826,7 @@ function TasksListContent() {
                     }
                     e.preventDefault();
                     setContextMenu({
-                      task: { id: t.id, title: t.title, status: t.status, is_starred: t.is_starred },
+                      task: { id: t.id, title: t.title, status: t.status },
                       x: e.clientX,
                       y: e.clientY,
                     });
@@ -845,17 +850,7 @@ function TasksListContent() {
                       aria-label={`Select task ${t.title}`}
                     />
                   </td>
-                  <td className="px-2 py-1.5">
-                    <button
-                      type="button"
-                      onClick={() => void patchTask(t.id, { is_starred: !t.is_starred })}
-                      aria-label={t.is_starred ? 'Unstar' : 'Star'}
-                      title={t.is_starred ? 'Unstar' : 'Star this task'}
-                      className={t.is_starred ? 'text-amber-500 hover:text-amber-600' : 'text-ink-faint hover:text-amber-500'}
-                    >
-                      <StarIcon size={14} fill={t.is_starred ? 'currentColor' : 'none'} />
-                    </button>
-                  </td>
+                  {/* Stint 103 — Star <td> removed (is_starred dropped). */}
                   {/* Stint 58.T2.1 — Client column = Family › Entity
                       breadcrumb. Both segments are independent links
                       (family chip → /families/[id], entity → entity detail). */}
@@ -990,24 +985,14 @@ function TasksListContent() {
                     </div>
                     {t.tags.length > 0 && (
                       <div className="mt-0.5 flex flex-wrap gap-1">
-                        {t.tags.filter(tg => !tg.startsWith('recurring_from:')).slice(0, 3).map((tg, i) => (
+                        {/* Stint 103 — recurring_from: tag filter removed (recurrence feature long gone). */}
+                        {t.tags.slice(0, 3).map((tg, i) => (
                           <span key={i} className="text-2xs px-1 py-0 rounded bg-surface-alt text-ink-muted">{tg}</span>
                         ))}
                       </div>
                     )}
                   </td>
-                  {/* Kind — Stint 58.T2.3: ChipSelect for design parity.
-                      Hidden by default (gear menu), shows when toggled. */}
-                  {showKind && (
-                    <td className="px-2 py-1.5">
-                      <ChipSelect
-                        value={t.task_kind}
-                        options={Object.entries(TASK_KIND_LABELS).map(([v, l]) => ({ value: v, label: l }))}
-                        onChange={(next) => patchTask(t.id, { task_kind: next }).catch(err => toast.error(String(err)))}
-                        ariaLabel="Task kind"
-                      />
-                    </td>
-                  )}
+                  {/* Stint 103 — Kind column removed (task_kind dropped in mig 095). */}
                   {/* Status — ChipSelect with status-toned chips.
                       Stint 84.B: when a closed parent has open sub-tasks
                       we show the rolled-up effective status as a
@@ -1079,26 +1064,33 @@ function TasksListContent() {
                       placeholder="—"
                     />
                   </td>
-                  {/* Follow-up — Stint 58.fix: always visible, immediately
-                      before Due. Same overdue/today highlighting that
-                      InlineDateCell already provides.
-                      Stint 64.X.3 — neutral mode for done/cancelled
-                      tasks so the dates don't read as "overdue" once
-                      the work is closed. */}
+                  {/* Next action — Stint 103: Follow-up + Due fused
+                      into one column with 📨/📅 icon. Detail page
+                      keeps both fields editable separately. If both
+                      are set, list shows follow_up (chase intent);
+                      the other date is reachable from detail. Neutral
+                      mode for done/cancelled tasks so the dates don't
+                      read as "overdue" once the work is closed. */}
                   <td className="px-2 py-1.5">
-                    <InlineDateCell
-                      value={t.follow_up_date}
-                      onSave={async v => { await patchTask(t.id, { follow_up_date: v }); }}
-                      mode={t.effective_status === 'done' || t.effective_status === 'cancelled' ? 'neutral' : 'urgency'}
-                    />
-                  </td>
-                  {/* Due — inline editable date. */}
-                  <td className="px-2 py-1.5">
-                    <InlineDateCell
-                      value={t.due_date}
-                      onSave={async v => { await patchTask(t.id, { due_date: v }); }}
-                      mode={t.effective_status === 'done' || t.effective_status === 'cancelled' ? 'neutral' : 'urgency'}
-                    />
+                    {(() => {
+                      const whichField: 'follow_up_date' | 'due_date' =
+                        t.follow_up_date ? 'follow_up_date' : 'due_date';
+                      const icon = whichField === 'follow_up_date' ? '📨' : '📅';
+                      const value = t[whichField];
+                      const titleParts: string[] = [];
+                      if (t.follow_up_date) titleParts.push(`Chase: ${t.follow_up_date}`);
+                      if (t.due_date) titleParts.push(`Due: ${t.due_date}`);
+                      return (
+                        <div className="flex items-center gap-1" title={titleParts.join(' · ') || 'Next action'}>
+                          <span className="text-xs leading-none select-none" aria-hidden>{icon}</span>
+                          <InlineDateCell
+                            value={value}
+                            onSave={async v => { await patchTask(t.id, { [whichField]: v }); }}
+                            mode={t.effective_status === 'done' || t.effective_status === 'cancelled' ? 'neutral' : 'urgency'}
+                          />
+                        </div>
+                      );
+                    })()}
                   </td>
                   {/* Priority — Stint 58.T2.3: ChipSelect with priority tone. */}
                   <td className="px-2 py-1.5">
@@ -1124,8 +1116,10 @@ function TasksListContent() {
                     </button>
                   </td>
                 </tr>
+                </Fragment>
                 );
-              })}
+                });
+              })()}
             </tbody>
           </table>
         </div>
@@ -1139,7 +1133,6 @@ function TasksListContent() {
             due_date: t.due_date,
             status: t.status,
             priority: t.priority,
-            is_starred: t.is_starred,
           }))}
         />
       )}
@@ -1151,7 +1144,6 @@ function TasksListContent() {
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
           onMarkDone={(id) => patchTask(id, { status: 'done' }).catch(e => toast.error(String(e)))}
-          onToggleStar={(id, next) => patchTask(id, { is_starred: next }).catch(e => toast.error(String(e)))}
           onSetPriority={(id, priority) => patchTask(id, { priority }).catch(e => toast.error(String(e)))}
           onReassign={(id) => {
             const v = window.prompt('New assignee (blank to clear):');

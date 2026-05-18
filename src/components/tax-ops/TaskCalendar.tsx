@@ -21,7 +21,6 @@ interface CalendarTask {
   due_date: string | null;
   status: string;
   priority: string;
-  is_starred: boolean;
 }
 
 const PRIORITY_TONE: Record<string, string> = {
@@ -162,7 +161,7 @@ export function TaskCalendar({ tasks }: Props) {
                         className={`text-2xs leading-tight border rounded px-1 py-0.5 truncate ${PRIORITY_TONE[t.priority] ?? PRIORITY_TONE.medium} ${t.status === 'done' ? 'opacity-50 line-through' : ''}`}
                         title={t.title}
                       >
-                        {t.is_starred ? '⭐ ' : ''}{t.title}
+                        {t.title}
                       </div>
                     ))}
                     {dayTasks.length > 3 && (
@@ -193,7 +192,6 @@ export function TaskCalendar({ tasks }: Props) {
                       className={`border rounded-md p-2 text-sm ${PRIORITY_TONE[t.priority] ?? PRIORITY_TONE.medium}`}
                     >
                       <div className="font-medium">
-                        {t.is_starred && <span className="mr-1">⭐</span>}
                         {t.title}
                       </div>
                       <div className="text-xs opacity-80 mt-0.5">

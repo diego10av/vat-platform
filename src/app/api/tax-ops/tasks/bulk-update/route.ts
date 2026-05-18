@@ -2,15 +2,17 @@
 // pattern (stint 42). Single transaction, audit-log per row.
 //
 // Body shape:
-//   { task_ids: string[], patch: { status?, priority?, assignee?, is_starred? } }
+//   { task_ids: string[], patch: { status?, priority?, assignee? } }
 //
-// ALLOWED_FIELDS whitelist enforced server-side. Only these four can be
+// ALLOWED_FIELDS whitelist enforced server-side. Only these three can be
 // bulk-set today; full-fat editing still goes through PATCH /tasks/[id].
+//
+// Stint 103 — is_starred removed (column dropped in mig 095).
 
 import { NextRequest, NextResponse } from 'next/server';
 import { tx, execTx, logAuditTx } from '@/lib/db';
 
-const ALLOWED = ['status', 'priority', 'assignee', 'is_starred'] as const;
+const ALLOWED = ['status', 'priority', 'assignee'] as const;
 type AllowedField = typeof ALLOWED[number];
 
 const VALID_STATUSES = new Set([
@@ -52,8 +54,6 @@ export async function POST(request: NextRequest) {
       if (typeof v !== 'string' || !VALID_PRIORITIES.has(v)) {
         return NextResponse.json({ error: 'invalid_priority' }, { status: 400 });
       }
-    } else if (f === 'is_starred') {
-      v = !!v;
     } else if (f === 'assignee') {
       if (v !== null && typeof v !== 'string') {
         return NextResponse.json({ error: 'invalid_assignee' }, { status: 400 });

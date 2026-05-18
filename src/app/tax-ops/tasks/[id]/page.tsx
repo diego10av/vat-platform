@@ -50,18 +50,11 @@ interface Task {
   created_at: string;
   updated_at: string;
   // Stint 53 — Hito 1 surfaces these fields in the detail editor.
-  task_kind: string | null;
   waiting_on_kind: string | null;
   waiting_on_note: string | null;
   follow_up_date: string | null;
   entity_id: string | null;
-  // Stint 56.A — sign-off cascade.
-  preparer: string | null;
-  preparer_at: string | null;
-  reviewer: string | null;
-  reviewer_at: string | null;
-  partner_sign_off: string | null;
-  partner_sign_off_at: string | null;
+  // Stint 103 — task_kind + sign-off cascade columns dropped in mig 095.
   // Stint 84.C — deliverables JSONB list.
   deliverables: Deliverable[];
 }
@@ -305,30 +298,13 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               />
             </label>
           )}
-          {t.auto_generated && (
-            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-2xs bg-brand-100 text-brand-800">
-              Auto-generated
-            </span>
-          )}
+          {/* Stint 103 — auto_generated chip removed. Ningún job lo
+              escribe desde el reset 2026-05-05 (cron purge). DB column
+              se queda por si reaparece; chip muere. */}
         </div>
-        {/* Stint 53 — Hito 1: surface task_kind / waiting_on / follow_up
-            so the detail page covers every column the list now exposes. */}
+        {/* Stint 103 — Kind selector removed (task_kind column dropped
+            in mig 095). Waiting-on + follow-up siguen abajo. */}
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-          <label className="inline-flex items-center gap-1">
-            <span className="text-ink-muted">Kind:</span>
-            <select
-              value={t.task_kind ?? 'action'}
-              onChange={e => patch({ task_kind: e.target.value })}
-              className="px-2 py-1 border border-border rounded-md bg-surface"
-            >
-              <option value="action">Action</option>
-              <option value="follow_up">Follow-up</option>
-              <option value="clarification">Clarification</option>
-              <option value="approval_request">Approval request</option>
-              <option value="review">Review</option>
-              <option value="other">Other</option>
-            </select>
-          </label>
           <label className="inline-flex items-center gap-1">
             <span className="text-ink-muted">Waiting on:</span>
             <select

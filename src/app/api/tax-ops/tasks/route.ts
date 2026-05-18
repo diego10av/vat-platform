@@ -26,7 +26,6 @@ interface TaskListRow {
   is_status_rolled_up: boolean;
   priority: string;
   due_date: string | null;
-  remind_at: string | null;
   parent_task_id: string | null;
   depends_on_task_id: string | null;
   tags: string[];
@@ -47,12 +46,6 @@ interface TaskListRow {
   // Stint 55.B — blocker fields
   blocker_title: string | null;
   blocker_status: string | null;
-  // Stint 56.A — sign-off snapshot for the chip in title cell.
-  preparer: string | null;
-  reviewer: string | null;
-  partner_sign_off: string | null;
-  // Stint 56.D — favourite.
-  is_starred: boolean;
   // Stint 84.C — deliverables list (used for the "X/Y drafted" roll-up
   // chip on collapsed rows). Always returned; empty array when none.
   deliverables: Array<{
@@ -75,6 +68,7 @@ interface TaskListRow {
 const VALID_STATUSES = ['queued', 'in_progress', 'waiting_on_external',
                         'waiting_on_internal', 'done', 'cancelled'];
 const VALID_PRIORITIES = ['urgent', 'high', 'medium', 'low'];
+// Stint 103 — VALID_KINDS removed (task_kind column dropped in mig 095).
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
@@ -92,8 +86,7 @@ export async function GET(request: NextRequest) {
   // Stint 55.B — "Ready to work on" filter: exclude tasks blocked by
   // a dependency that hasn't been completed.
   const onlyReady = url.searchParams.get('ready') === '1';
-  // Stint 56.D — "Starred only" filter.
-  const onlyStarred = url.searchParams.get('starred') === '1';
+  // Stint 103 — `onlyStarred` removed (is_starred column dropped in mig 095).
   // Stint 84.E — "Stale only" filter for the home dashboard "Chase today"
   // section. waiting_on_* + no comment in last 5d.
   const onlyStale = url.searchParams.get('stale') === '1';
@@ -162,9 +155,6 @@ export async function GET(request: NextRequest) {
         OR (SELECT b.status FROM tax_ops_tasks b WHERE b.id = t.depends_on_task_id) = 'done')`,
     );
   }
-  if (onlyStarred) {
-    where.push(`t.is_starred = TRUE`);
-  }
   if (onlyStale) {
     where.push(
       `t.status IN ('waiting_on_external','waiting_on_internal')
@@ -179,11 +169,11 @@ export async function GET(request: NextRequest) {
 
   const rows = await query<TaskListRow>(
     `SELECT t.id, t.title, t.description, t.status, t.priority,
-            t.due_date::text, t.remind_at::text,
+            t.due_date::text,
             t.parent_task_id, t.depends_on_task_id, t.tags,
             t.related_filing_id, t.related_entity_id,
             t.assignee, t.auto_generated,
-            t.entity_id, t.task_kind, t.waiting_on_kind,
+            t.entity_id, t.waiting_on_kind,
             t.waiting_on_note, t.follow_up_date::text,
             t.completed_at::text, t.created_at::text, t.updated_at::text,
             (SELECT COUNT(*)::int FROM tax_ops_tasks s WHERE s.parent_task_id = t.id) AS subtask_total,
@@ -239,10 +229,7 @@ export async function GET(request: NextRequest) {
             -- "🔒 blocked by X" / "🔓 ready" indicators.
             (SELECT b.title FROM tax_ops_tasks b WHERE b.id = t.depends_on_task_id) AS blocker_title,
             (SELECT b.status FROM tax_ops_tasks b WHERE b.id = t.depends_on_task_id) AS blocker_status,
-            -- Stint 56.A — sign-off snapshot for the chip in title cell.
-            t.preparer, t.reviewer, t.partner_sign_off,
-            -- Stint 56.D — favourite.
-            t.is_starred,
+            -- Stint 103 — sign-off snapshot + is_starred removed (mig 095 dropped columns).
             -- Stint 84.E — stale follow-up signal. The "anchor" date for
             -- staleness is the most recent of:
             --   (a) last comment on this task, OR
@@ -281,8 +268,7 @@ export async function GET(request: NextRequest) {
       -- regardless of their dates.
       ORDER BY
         CASE WHEN t.status IN ('done','cancelled') THEN 1 ELSE 0 END,
-        -- Stint 56.D — starred bubbles to the top within each status bucket.
-        CASE WHEN t.is_starred THEN 0 ELSE 1 END,
+        -- Stint 103 — is_starred tiebreaker removed (mig 095).
         COALESCE(t.follow_up_date, t.due_date) ASC NULLS LAST,
         CASE t.priority
           WHEN 'urgent' THEN 0 WHEN 'high' THEN 1
@@ -333,7 +319,6 @@ export async function POST(request: NextRequest) {
     status?: string;
     priority?: string;
     due_date?: string | null;
-    remind_at?: string | null;
     parent_task_id?: string | null;
     depends_on_task_id?: string | null;
     tags?: string[];
@@ -343,7 +328,6 @@ export async function POST(request: NextRequest) {
     auto_generated?: boolean;
     // Stint 37.G
     entity_id?: string | null;
-    task_kind?: string;
     waiting_on_kind?: string | null;
     waiting_on_note?: string | null;
     follow_up_date?: string | null;
@@ -353,26 +337,25 @@ export async function POST(request: NextRequest) {
 
   const status = VALID_STATUSES.includes(body.status ?? '') ? body.status! : 'queued';
   const priority = VALID_PRIORITIES.includes(body.priority ?? '') ? body.priority! : 'medium';
-  const VALID_KINDS = ['action', 'follow_up', 'clarification', 'approval_request', 'review', 'other'];
-  const task_kind = VALID_KINDS.includes(body.task_kind ?? '') ? body.task_kind! : 'action';
+  // Stint 103 — task_kind + remind_at columns dropped in mig 095.
 
   const id = generateId();
   await execute(
     `INSERT INTO tax_ops_tasks
-       (id, title, description, status, priority, due_date, remind_at,
+       (id, title, description, status, priority, due_date,
         parent_task_id, depends_on_task_id, tags,
         related_filing_id, related_entity_id, assignee, auto_generated, created_by,
-        entity_id, task_kind, waiting_on_kind, waiting_on_note, follow_up_date)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'founder',
-             $15,$16,$17,$18,$19)`,
+        entity_id, waiting_on_kind, waiting_on_note, follow_up_date)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'founder',
+             $14,$15,$16,$17)`,
     [
       id, title, body.description ?? null, status, priority,
-      body.due_date ?? null, body.remind_at ?? null,
+      body.due_date ?? null,
       body.parent_task_id ?? null, body.depends_on_task_id ?? null,
       body.tags ?? [],
       body.related_filing_id ?? null, body.related_entity_id ?? null,
       body.assignee ?? null, body.auto_generated ?? false,
-      body.entity_id ?? null, task_kind,
+      body.entity_id ?? null,
       body.waiting_on_kind ?? null, body.waiting_on_note ?? null,
       body.follow_up_date ?? null,
     ],

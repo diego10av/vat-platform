@@ -23,7 +23,6 @@ interface Task {
   due_date: string | null;
   follow_up_date: string | null;
   assignee: string | null;
-  task_kind: string | null;
   completed_at: string | null;
 }
 

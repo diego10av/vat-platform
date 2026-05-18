@@ -3,20 +3,21 @@
 // Stint 57.D.7 — right-click context menu for the tasks list.
 //
 // Renders a small floating menu at the cursor coordinates with quick
-// actions: Mark done · Star/Unstar · Set priority · Reassign · Delete.
+// actions: Mark done · Set priority · Reassign · Delete.
 // Single instance lifted to the page level (not per-row); the row's
 // onContextMenu hands us the task + the mouse coords. Click outside
 // closes; Escape closes; clicking an action closes after dispatching.
+//
+// Stint 103 — Star/Unstar action removed (is_starred column dropped).
 
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { CheckIcon, StarIcon, Trash2Icon, UserIcon } from 'lucide-react';
+import { CheckIcon, Trash2Icon, UserIcon } from 'lucide-react';
 
 export interface ContextTask {
   id: string;
   title: string;
   status: string;
-  is_starred: boolean;
 }
 
 interface Props {
@@ -25,7 +26,6 @@ interface Props {
   y: number;
   onClose: () => void;
   onMarkDone: (id: string) => void | Promise<void>;
-  onToggleStar: (id: string, next: boolean) => void | Promise<void>;
   onSetPriority: (id: string, priority: string) => void | Promise<void>;
   onReassign: (id: string) => void | Promise<void>;
   onDelete: (id: string) => void | Promise<void>;
@@ -68,14 +68,6 @@ export function TaskContextMenu(props: Props) {
         className="w-full text-left px-3 py-1 hover:bg-surface-alt disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-2"
       >
         <CheckIcon size={11} /> Mark done
-      </button>
-      <button
-        type="button"
-        onClick={() => { void props.onToggleStar(task.id, !task.is_starred); onClose(); }}
-        className="w-full text-left px-3 py-1 hover:bg-surface-alt inline-flex items-center gap-2"
-      >
-        <StarIcon size={11} fill={task.is_starred ? 'currentColor' : 'none'} className={task.is_starred ? 'text-amber-500' : ''} />
-        {task.is_starred ? 'Unstar' : 'Star'}
       </button>
       <div className="border-t border-border my-0.5" />
       <div className="px-3 py-0.5 text-2xs text-ink-muted">Set priority</div>

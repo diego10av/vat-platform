@@ -1,24 +1,16 @@
 'use client';
 
 // QuickCaptureModal — press `N` anywhere under /tax-ops to open.
-// Stint 37.G rich form: title + entity searchable + task_kind + due +
-// priority + assignee, collapsed; "Show more" reveals description,
-// waiting_on_kind + note, follow_up_date, related_filing_id.
+// Stint 37.G rich form: title + entity searchable + due + priority +
+// assignee, collapsed; "Show more" reveals description, waiting_on_kind
+// + note, follow_up_date, related_filing_id.
+// Stint 103 — task_kind selector removed (column dropped in mig 095).
 // Enter (when title focused) submits. ESC closes.
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Modal } from '@/components/ui/Modal';
 import { useToast } from '@/components/Toaster';
-
-const TASK_KINDS = [
-  { value: 'action',           label: 'Action' },
-  { value: 'follow_up',        label: 'Follow-up' },
-  { value: 'clarification',    label: 'Clarification' },
-  { value: 'approval_request', label: 'Approval request' },
-  { value: 'review',           label: 'Review' },
-  { value: 'other',            label: 'Other' },
-];
 
 const WAITING_ON_OPTIONS = [
   { value: '',              label: 'Not waiting' },
@@ -45,7 +37,6 @@ export function QuickCaptureModal() {
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [entityId, setEntityId] = useState('');
   const [entitySearch, setEntitySearch] = useState('');
-  const [taskKind, setTaskKind] = useState('action');
   // Stint 40.I — Diego is the owner of most follow-ups he captures;
   // default to him so he doesn't have to type it every time.
   const [assignee, setAssignee] = useState('Diego');
@@ -103,7 +94,7 @@ export function QuickCaptureModal() {
     } else {
       // Reset everything on close
       setTitle(''); setDue(''); setPriority('medium');
-      setEntityId(''); setEntitySearch(''); setTaskKind('action');
+      setEntityId(''); setEntitySearch('');
       setAssignee('Diego'); setDescription(''); setWaitingOnKind('');
       setWaitingOnNote(''); setFollowUpDate('');
       setShowMore(false); setBusy(false); setError(null);
@@ -131,7 +122,6 @@ export function QuickCaptureModal() {
           due_date: due || null,
           priority,
           entity_id: entityId || null,
-          task_kind: taskKind,
           assignee: assignee.trim() || null,
           waiting_on_kind: waitingOnKind || null,
           waiting_on_note: waitingOnNote.trim() || null,
@@ -171,31 +161,19 @@ export function QuickCaptureModal() {
           className="w-full px-2.5 py-2 border border-border rounded-md bg-surface text-sm"
         />
 
-        <div className="grid grid-cols-2 gap-3">
-          <label>
-            <span className="text-ink-muted">Task kind</span>
-            <select
-              value={taskKind}
-              onChange={e => setTaskKind(e.target.value)}
-              className="mt-1 w-full px-2 py-1.5 border border-border rounded-md bg-surface"
-            >
-              {TASK_KINDS.map(k => <option key={k.value} value={k.value}>{k.label}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="text-ink-muted">Priority</span>
-            <select
-              value={priority}
-              onChange={e => setPriority(e.target.value as typeof priority)}
-              className="mt-1 w-full px-2 py-1.5 border border-border rounded-md bg-surface"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
-          </label>
-        </div>
+        <label className="block">
+          <span className="text-ink-muted">Priority</span>
+          <select
+            value={priority}
+            onChange={e => setPriority(e.target.value as typeof priority)}
+            className="mt-1 w-full px-2 py-1.5 border border-border rounded-md bg-surface"
+          >
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </label>
 
         <div>
           <span className="text-ink-muted">Entity (optional)</span>

@@ -17,7 +17,6 @@ interface TaskDetail {
   status: string;
   priority: string;
   due_date: string | null;
-  remind_at: string | null;
   parent_task_id: string | null;
   depends_on_task_id: string | null;
   tags: string[];
@@ -31,19 +30,9 @@ interface TaskDetail {
   updated_at: string;
   // Stint 53 — added to the GET payload so the detail page can edit them.
   entity_id: string | null;
-  task_kind: string | null;
   waiting_on_kind: string | null;
   waiting_on_note: string | null;
   follow_up_date: string | null;
-  // Stint 56.A — sign-off cascade.
-  preparer: string | null;
-  preparer_at: string | null;
-  reviewer: string | null;
-  reviewer_at: string | null;
-  partner_sign_off: string | null;
-  partner_sign_off_at: string | null;
-  // Stint 56.D — favourite.
-  is_starred: boolean;
   // Stint 84.C — deliverables list (manual-status doc tracker).
   deliverables: TaskDeliverable[];
 }
@@ -92,19 +81,14 @@ interface TaskCounterparty {
 }
 
 const ALLOWED = [
-  'title', 'description', 'status', 'priority', 'due_date', 'remind_at',
+  'title', 'description', 'status', 'priority', 'due_date',
   'parent_task_id', 'depends_on_task_id', 'tags',
   'related_filing_id', 'related_entity_id', 'assignee',
   'completed_at', 'completed_by',
   // Stint 37.G
-  'entity_id', 'task_kind', 'waiting_on_kind', 'waiting_on_note', 'follow_up_date',
-  // Stint 56.A — sign-off cascade. Setting these directly works for
-  // emergency overrides; the canonical path is POST /sign which
-  // enforces the cascade + audit log.
-  'preparer', 'preparer_at', 'reviewer', 'reviewer_at',
-  'partner_sign_off', 'partner_sign_off_at',
-  // Stint 56.D — favourite/star.
-  'is_starred',
+  'entity_id', 'waiting_on_kind', 'waiting_on_note', 'follow_up_date',
+  // Stint 103 — task_kind / is_starred / remind_at / sign-off columns
+  // dropped in mig 095. /sign route also deleted.
 ] as const;
 
 export async function GET(
@@ -117,20 +101,15 @@ export async function GET(
       // Stint 53 — surface task_kind / waiting_on_* / follow_up_date /
       // entity_id so the detail page can edit them inline (Hito 1).
       `SELECT id, title, description, status, priority,
-              due_date::text, remind_at::text,
+              due_date::text,
               parent_task_id, depends_on_task_id, tags,
               related_filing_id, related_entity_id,
               assignee, auto_generated,
               completed_at::text, completed_by,
               created_at::text, updated_at::text,
-              entity_id, task_kind,
+              entity_id,
               waiting_on_kind, waiting_on_note,
-              follow_up_date::text AS follow_up_date,
-              preparer, preparer_at::text AS preparer_at,
-              reviewer, reviewer_at::text AS reviewer_at,
-              partner_sign_off,
-              partner_sign_off_at::text AS partner_sign_off_at,
-              is_starred
+              follow_up_date::text AS follow_up_date
          FROM tax_ops_tasks WHERE id = $1`,
       [id],
     ),
