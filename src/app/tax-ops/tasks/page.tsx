@@ -543,17 +543,6 @@ function TasksListContent() {
           <option value="">All statuses</option>
           {STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
-        {/* Stint 100 — Show completed toggle. Off by default; surface
-            done/cancelled tasks on demand. */}
-        <label className="inline-flex items-center gap-1.5 text-xs text-ink-soft cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={showCompleted}
-            onChange={e => setShowCompleted(e.target.checked)}
-            className="h-3.5 w-3.5 accent-brand-500 cursor-pointer"
-          />
-          Show completed
-        </label>
         <select
           value={familyId}
           onChange={e => setFamilyId(e.target.value)}
@@ -589,10 +578,13 @@ function TasksListContent() {
             <FilterXIcon size={12} /> Clear
           </button>
         )}
-        {/* Stint 58.T2.2 — column visibility toggle. Default columns
-            (Client, Title, Status, Assignee, Due, Priority) cover ~90%
-            of cases; the noisier ones (Kind, Waiting on, Follow-up)
-            opt in via this menu. Choice persisted in localStorage. */}
+        {/* Stint 102 — "View" menu (renamed from "Columns"). Groups
+            view-options (Show completed) separate from active filters
+            (Status, Family, Assignee). Linear / Asana / Notion
+            convention: filters reduce rows, view options control what
+            renders — keep them visually distinct. The Columns toggles
+            (Kind, Waiting on) live in the same dropdown but in their
+            own section. */}
         <div className="relative">
           <button
             type="button"
@@ -600,16 +592,25 @@ function TasksListContent() {
             className="inline-flex items-center gap-1 px-2 py-1.5 text-sm rounded-md border border-border hover:bg-surface-alt"
             aria-haspopup="menu"
             aria-expanded={colsMenuOpen}
-            title="Show or hide columns"
+            title="View options + column visibility"
           >
-            <SlidersHorizontalIcon size={11} /> Columns
+            <SlidersHorizontalIcon size={11} /> View
           </button>
           {colsMenuOpen && (
             <div
               className="absolute z-popover top-full left-0 mt-1 w-[220px] bg-surface border border-border rounded-md shadow-lg p-2 text-sm"
               onMouseLeave={() => setColsMenuOpen(false)}
             >
-              <div className="text-2xs text-ink-muted mb-1.5">Optional columns</div>
+              <div className="text-2xs text-ink-muted mb-1.5">View options</div>
+              <label className="flex items-center gap-2 px-1 py-0.5 cursor-pointer hover:bg-surface-alt rounded">
+                <input
+                  type="checkbox"
+                  checked={showCompleted}
+                  onChange={e => setShowCompleted(e.target.checked)}
+                />
+                <span>Show completed</span>
+              </label>
+              <div className="mt-3 text-2xs text-ink-muted mb-1.5">Optional columns</div>
               {[
                 { key: 'kind', label: 'Kind' },
                 { key: 'waiting', label: 'Waiting on' },
@@ -828,9 +829,12 @@ function TasksListContent() {
                   className={[
                     'border-t border-border/70 align-top',
                     selected.has(t.id) ? 'bg-brand-50/40' : 'hover:bg-surface-alt/50',
-                    // Stint 100 — gray-out done / cancelled rows when
-                    // showCompleted is on (they're hidden by default).
-                    t.status === 'done' || t.status === 'cancelled' ? 'opacity-60' : '',
+                    // Stint 102 — gray-out by effective_status, not raw
+                    // status. A parent task with raw status='done' but
+                    // an open subtask has effective_status rolled up to
+                    // the open child's status — it shouldn't render as
+                    // "completed" because work is still in flight.
+                    t.effective_status === 'done' || t.effective_status === 'cancelled' ? 'opacity-60' : '',
                   ].join(' ')}
                 >
                   <td className="px-2 py-1.5">
@@ -1085,7 +1089,7 @@ function TasksListContent() {
                     <InlineDateCell
                       value={t.follow_up_date}
                       onSave={async v => { await patchTask(t.id, { follow_up_date: v }); }}
-                      mode={t.status === 'done' || t.status === 'cancelled' ? 'neutral' : 'urgency'}
+                      mode={t.effective_status === 'done' || t.effective_status === 'cancelled' ? 'neutral' : 'urgency'}
                     />
                   </td>
                   {/* Due — inline editable date. */}
@@ -1093,7 +1097,7 @@ function TasksListContent() {
                     <InlineDateCell
                       value={t.due_date}
                       onSave={async v => { await patchTask(t.id, { due_date: v }); }}
-                      mode={t.status === 'done' || t.status === 'cancelled' ? 'neutral' : 'urgency'}
+                      mode={t.effective_status === 'done' || t.effective_status === 'cancelled' ? 'neutral' : 'urgency'}
                     />
                   </td>
                   {/* Priority — Stint 58.T2.3: ChipSelect with priority tone. */}
